@@ -1,0 +1,12 @@
+*.session
+*.session-journal
+__pycache__/
+*.pyc
+users.db
+user_sites.json
+keys.json
+premium.json
+skkeys.json
+stsite.json
+daily_usage.json
+.env
