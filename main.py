@@ -1549,10 +1549,11 @@ Or send multiline / reply to a file:
 
             for res in results:
                 if res['status'] == 'alive':
-                    if res['proxy'] not in current_proxies and res['proxy'] not in alive_new:
+                    if res['proxy'] not in alive_new:
                         alive_new.append(res['proxy'])
                 else:
                     dead_count += 1
+
 
         if alive_new:
             try:
