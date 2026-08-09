@@ -1,1 +1,1 @@
-# Live proxy list
+# Empty proxy file
