@@ -15,12 +15,16 @@ DATABASE_URL = os.getenv(
 )
 
 def get_db_connection():
-    try:
-        conn = psycopg2.connect(DATABASE_URL, connect_timeout=5)
-        return conn
-    except Exception as e:
-        print(f"[Supabase DB Error] Connection failed: {e}")
-        return None
+    for attempt in range(3):
+        try:
+            conn = psycopg2.connect(DATABASE_URL, connect_timeout=10, sslmode="prefer")
+            return conn
+        except Exception as e:
+            print(f"[Supabase DB Error] Connection attempt {attempt + 1} failed: {e}")
+            if attempt < 2:
+                time.sleep(0.5)
+    return None
+
 
 # ==================== REGISTERED USERS ====================
 def add_registered_user(user_id: int):
@@ -337,11 +341,12 @@ def remove_db_rz_site(site_url: str) -> bool:
         conn.close()
 
 # ==================== PER-USER PROXIES ====================
-def add_db_user_proxies(user_id: int, proxy_urls: list[str]) -> int:
+def add_db_user_proxies(user_id: int, proxy_urls: list[str]) -> tuple[int, int]:
     conn = get_db_connection()
     if not conn:
-        return 0
+        return (0, 0)
     inserted = 0
+    duplicates = 0
     try:
         now = int(time.time())
         uid = str(user_id)
@@ -354,13 +359,16 @@ def add_db_user_proxies(user_id: int, proxy_urls: list[str]) -> int:
                 """, (uid, p, now))
                 if cur.rowcount > 0:
                     inserted += 1
+                else:
+                    duplicates += 1
             conn.commit()
-            return inserted
+            return (inserted, duplicates)
     except Exception as e:
         print(f"[Supabase DB Error] add_db_user_proxies: {e}")
-        return 0
+        return (inserted, duplicates)
     finally:
         conn.close()
+
 
 
 def get_db_user_proxies(user_id: int) -> list[str]:
