@@ -1937,14 +1937,16 @@ async def process_br1_cmd(event):
 
     time_taken = round(time.time() - start_time, 2)
     status_emoji = "✅ APPROVED" if st in ("charged", "approved") else f"❌ {st.upper()}"
-    status_line = f"Status: {status_emoji} - {msg}\n"
     res = f"""<b>Braintree $1 Charge</b>
 ━━━━━━━━━━━━━━━━━━━━
 CC: <code>{cc}|{mm}|{yy}|{cvc}</code>
-{status_line}Time: {time_taken}s
+Status: {status_emoji}
+Response: <code>{msg}</code>
+Time: {time_taken}s
 ━━━━━━━━━━━━━━━━━━━━
 Gateway: Braintree $1"""
     await status_msg.edit(res, parse_mode="html")
+
 
 
 # ==================== BRAINTREE AUTH (b3auth) ENGINE ====================
