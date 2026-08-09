@@ -1505,24 +1505,40 @@ TXT File Sent""", parse_mode="html")
 
 @bot.on(events.NewMessage(pattern=r'(?s)^/addproxy(?:\s+(.+))?$'))
 async def add_proxy_command(event):
-    user_id = event.sender_id
+    user_id = event.sender_id or event.chat_id or ADMIN_ID
 
     try:
         raw_text = event.pattern_match.group(1) or ""
-        
-        # Check if user passed proxy on same line or reply or multiline
         proxies_to_add = []
+
+        def extract_proxies_from_string(text_content):
+            cleaned_text = re.sub(r'^[•\-\*\s]+', '', text_content, flags=re.MULTILINE)
+            pattern = r'(?:(?:socks4|socks5|http|https)://)?(?:[0-9]{1,3}\.){3}[0-9]{1,3}:\d{2,5}(?::[a-zA-Z0-9_\-]+:[a-zA-Z0-9_\-]+)?'
+            return re.findall(pattern, cleaned_text)
+
         if raw_text:
-            matches = re.findall(r'(?:(?:socks4|socks5|http|https)://)?(?:[0-9]{1,3}\.){3}[0-9]{1,3}:\d{2,5}(?::[a-zA-Z0-9_\-]+:[a-zA-Z0-9_\-]+)?', raw_text)
-            proxies_to_add.extend(matches)
-            
-        # Also check replied message text/file if user replied to a message
+            proxies_to_add.extend(extract_proxies_from_string(raw_text))
+
         reply_msg = await event.get_reply_message()
+        target_msg = reply_msg if reply_msg else event.message
+
+        if target_msg and target_msg.media:
+            try:
+                file_bytes = await target_msg.download_media(bytes)
+                if file_bytes:
+                    file_text = file_bytes.decode('utf-8', errors='ignore')
+                    extracted = extract_proxies_from_string(file_text)
+                    for p in extracted:
+                        if p not in proxies_to_add:
+                            proxies_to_add.append(p)
+            except Exception as fe:
+                print(f"Media proxy extraction error: {fe}")
+
         if reply_msg and reply_msg.text:
-            matches = re.findall(r'(?:(?:socks4|socks5|http|https)://)?(?:[0-9]{1,3}\.){3}[0-9]{1,3}:\d{2,5}(?::[a-zA-Z0-9_\-]+:[a-zA-Z0-9_\-]+)?', reply_msg.text)
-            for m in matches:
-                if m not in proxies_to_add:
-                    proxies_to_add.append(m)
+            extracted = extract_proxies_from_string(reply_msg.text)
+            for p in extracted:
+                if p not in proxies_to_add:
+                    proxies_to_add.append(p)
 
         if not proxies_to_add:
             await event.reply("""<b>📡 ADD PROXY TOOL</b>
@@ -1543,7 +1559,7 @@ Or send multiline / reply to a file:
         from db import get_db_user_proxies, add_db_user_proxies
 
         existing_db_proxies = set(get_db_user_proxies(user_id))
-        status_msg = await event.reply(f" Testing {len(proxies_to_add)} Proxies in Parallel...")
+        status_msg = await event.reply(f"⏳ <b>Testing {len(proxies_to_add)} Proxies in Parallel...</b>", parse_mode="html")
 
         batch_size = 150
         alive_new = []
@@ -1555,7 +1571,7 @@ Or send multiline / reply to a file:
             results = await asyncio.gather(*tasks)
 
             for res in results:
-                if res['status'] == 'alive':
+                if isinstance(res, dict) and res.get('status') == 'alive':
                     if res['proxy'] not in alive_new:
                         alive_new.append(res['proxy'])
                 else:
@@ -1580,10 +1596,19 @@ Or send multiline / reply to a file:
 
         total_now = len(get_db_user_proxies(user_id))
 
-        await status_msg.edit(f""" Added New: <code>{new_inserted}</code>
- Duplicates Skipped: <code>{duplicates_count}</code>
- Dead Dropped: <code>{dead_count}</code>
-📊 Your Personal Active Proxies: <code>{total_now}</code>""", parse_mode="html")
+        await status_msg.edit(f"""📡 <b>PROXY AUDIT COMPLETE</b>
+━━━━━━━━━━━━━━━━━━━━
+⚡ <b>Tested:</b> <code>{len(proxies_to_add)}</code>
+✅ <b>Live Verified:</b> <code>{len(alive_new)}</code>
+🆕 <b>Added New:</b> <code>{new_inserted}</code>
+♻️ <b>Duplicates Skipped:</b> <code>{duplicates_count}</code>
+💀 <b>Dead Dropped:</b> <code>{dead_count}</code>
+📊 <b>Your Personal Active Proxies:</b> <code>{total_now}</code>""", parse_mode="html")
+
+    except Exception as e:
+        await event.reply(f" Error: {e}")
+
+
 
 
 
