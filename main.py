@@ -1763,6 +1763,7 @@ async def process_adyen_cmd(event):
 # ==================== STRIPE WCPAY ENGINE ====================
 @bot.on(events.NewMessage(pattern=r'^/st(?:\s+(.+))?$'))
 async def process_stripe_cmd(event):
+    user_id = event.sender_id
     if not is_admin(event.sender_id):
         await event.reply("Access denied.")
         return
@@ -1809,6 +1810,7 @@ Gateway: Stripe (WooCommerce Payments)"""
 # ==================== STRIPE $1 (stripe_1) ENGINE ====================
 @bot.on(events.NewMessage(pattern=r'^/st1(?:\s+(.+))?$'))
 async def process_stripe1_cmd(event):
+    user_id = event.sender_id
     if not is_admin(event.sender_id):
         await event.reply("Access denied.")
         return
@@ -1849,6 +1851,7 @@ Gateway: Stripe $1"""
 # ==================== BRAINTREE $1 (braintree_1) ENGINE ====================
 @bot.on(events.NewMessage(pattern=r'^/br1(?:\s+(.+))?$'))
 async def process_br1_cmd(event):
+    user_id = event.sender_id
     if not is_admin(event.sender_id):
         await event.reply("Access denied.")
         return
@@ -1888,6 +1891,7 @@ Gateway: Braintree $1"""
 # ==================== BRAINTREE AUTH (b3auth) ENGINE ====================
 @bot.on(events.NewMessage(pattern=r'^/b3auth(?:\s+(.+))?$'))
 async def process_b3auth_cmd(event):
+    user_id = event.sender_id
     if not is_admin(event.sender_id):
         await event.reply("Access denied.")
         return
@@ -1919,6 +1923,7 @@ Gateway: Braintree Auth (silvercell)"""
 # ==================== BRAINTREE RAPUNZEL (b3rap) ENGINE ====================
 @bot.on(events.NewMessage(pattern=r'^/b3rap(?:\s+(.+))?$'))
 async def process_b3rap_cmd(event):
+    user_id = event.sender_id
     if not is_admin(event.sender_id):
         await event.reply("Access denied.")
         return
@@ -1950,6 +1955,7 @@ Gateway: Braintree Auth (bellamoda)"""
 # ==================== RAZORPAY NEW (rz1) ENGINE ====================
 @bot.on(events.NewMessage(pattern=r'^/rz1(?:\s+(.+))?$'))
 async def process_rz1_cmd(event):
+    user_id = event.sender_id
     if not is_admin(event.sender_id):
         await event.reply("Access denied.")
         return
@@ -2005,6 +2011,7 @@ Gateway: VBV Hosted API"""
 # ==================== STRIPE NEW (st2) ENGINE ====================
 @bot.on(events.NewMessage(pattern=r'^/st2(?:\s+(.+))?$'))
 async def process_st2_cmd(event):
+    user_id = event.sender_id
     if not is_admin(event.sender_id):
         await event.reply("Access denied.")
         return
@@ -2029,6 +2036,7 @@ Gateway: Stripe New (motherluck)"""
 
 @bot.on(events.NewMessage(pattern=r'^/pp(?:\s+(.+))?$'))
 async def process_paypal_cmd(event):
+    user_id = event.sender_id
     if not is_admin(event.sender_id):
         await event.reply("Access denied.")
         return
@@ -2088,6 +2096,7 @@ async def process_paypal_cmd(event):
 # ==================== BRAINTREE VBV ENGINE ====================
 @bot.on(events.NewMessage(pattern=r'^/vbv(?:\s+(.+))?$'))
 async def process_vbv_cmd(event):
+    user_id = event.sender_id
     if not is_admin(event.sender_id):
         await event.reply("Access denied.")
         return
@@ -2745,11 +2754,10 @@ async def mass_chk_reply(event):
                     return
 
                 try:
-                    await asyncio.sleep(random.uniform(0.1, 0.3))
                     result = await check_card_with_retry(card, sites, proxies, max_retries=2)
-                    update_daily_usage(user_id, 1)
 
                     status_str = result.get('status', 'Declined')
+
                     if status_str in ('Charged', 'Approved'):
                         if status_str == 'Charged':
                             charged += 1
@@ -2854,6 +2862,7 @@ async def mass_chk_control_handler(event):
 
 @bot.on(events.NewMessage(pattern=r'^/mst1(?:\s+(.+))?$'))
 async def process_mst1_cmd(event):
+    user_id = event.sender_id
     if not is_admin(event.sender_id):
         await event.reply("Access denied.")
         return
@@ -2876,6 +2885,7 @@ async def process_mst1_cmd(event):
 
 @bot.on(events.NewMessage(pattern=r'^/mbt1(?:\s+(.+))?$'))
 async def process_mbt1_cmd(event):
+    user_id = event.sender_id
     if not is_admin(event.sender_id):
         await event.reply("Access denied.")
         return
@@ -2899,6 +2909,7 @@ async def process_mbt1_cmd(event):
 
 @bot.on(events.NewMessage(pattern=r'^/mb3(?:\s+(.+))?$'))
 async def process_mb3_cmd(event):
+    user_id = event.sender_id
     if not is_admin(event.sender_id):
         await event.reply("Access denied.")
         return
