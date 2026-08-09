@@ -121,7 +121,14 @@ KEYS_FILE = "keys.txt"
 DAILY_USAGE_FILE = "daily_usage.json"
 #  TOP PE ADD KARO (SITES_FILE ke neeche):
 RZ_SITES_FILE = 'rz_sites.txt'
-SQUARE_SITES_FILE = 'square_sites.txt'        #  Razorpay sites file
+DEFAULT_SQUARE_SITE = "https://checkout.square.site/merchant/MLR1YP75V68E5/checkout/K2D6LMLJIZFOQULVTVCNGIMV"
+
+def get_square_sites():
+    sites = get_file_lines(SQUARE_SITES_FILE)
+    if not sites:
+        sites = [DEFAULT_SQUARE_SITE]
+    return sites
+
 PHOTO_URL = "https://i.postimg.cc/pdYQxY74/Alone.png"  #    Link
 # Initialize bot
 bot = TelegramClient('freaky_checker_bot', API_ID, API_HASH)
@@ -2224,9 +2231,6 @@ Gateway: VBV (Braintree)"""
     await status_msg.edit(res, parse_mode="html")
 
 
-
-def get_square_sites():
-    return get_file_lines(SQUARE_SITES_FILE)
 
 @bot.on(events.NewMessage(pattern=r'^/sq(?:\s+(.+))?$'))
 async def sq_check_cmd(event):
