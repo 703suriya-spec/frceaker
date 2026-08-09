@@ -352,11 +352,14 @@ def add_db_user_proxies(user_id: int, proxy_urls: list[str]) -> tuple[int, int]:
         uid = str(user_id)
         with conn.cursor() as cur:
             for p in proxy_urls:
+                p_clean = p.strip()
+                if not p_clean:
+                    continue
                 cur.execute("""
                     INSERT INTO user_proxies (user_id, proxy_url, added_at)
                     VALUES (%s, %s, %s)
                     ON CONFLICT (user_id, proxy_url) DO NOTHING;
-                """, (uid, p, now))
+                """, (uid, p_clean, now))
                 if cur.rowcount > 0:
                     inserted += 1
                 else:
@@ -370,25 +373,26 @@ def add_db_user_proxies(user_id: int, proxy_urls: list[str]) -> tuple[int, int]:
         conn.close()
 
 
-
 def get_db_user_proxies(user_id: int) -> list[str]:
     conn = get_db_connection()
     if not conn:
         return []
     try:
+        uid = str(user_id)
         with conn.cursor() as cur:
             cur.execute("""
                 SELECT proxy_url FROM user_proxies
                 WHERE user_id = %s
                 ORDER BY added_at DESC;
-            """, (str(user_id),))
+            """, (uid,))
             rows = cur.fetchall()
-            return [r[0] for r in rows]
+            return [r[0].strip() for r in rows if r and r[0] and r[0].strip()]
     except Exception as e:
         print(f"[Supabase DB Error] get_db_user_proxies: {e}")
         return []
     finally:
         conn.close()
+
 
 def remove_db_user_proxy(user_id: int, proxy_url: str) -> bool:
     conn = get_db_connection()

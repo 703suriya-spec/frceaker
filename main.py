@@ -1512,9 +1512,11 @@ async def add_proxy_command(event):
         proxies_to_add = []
 
         def extract_proxies_from_string(text_content):
-            cleaned_text = re.sub(r'^[•\-\*\s]+', '', text_content, flags=re.MULTILINE)
+            cleaned_text = re.sub(r'[\r\t\u200b\u200c\u200d\ufeff\xa0]', '', text_content)
+            cleaned_text = re.sub(r'^[•\-\*\s]+', '', cleaned_text, flags=re.MULTILINE)
             pattern = r'(?:(?:socks4|socks5|http|https)://)?(?:[0-9]{1,3}\.){3}[0-9]{1,3}:\d{2,5}(?::[a-zA-Z0-9_\-]+:[a-zA-Z0-9_\-]+)?'
-            return re.findall(pattern, cleaned_text)
+            return [p.strip() for p in re.findall(pattern, cleaned_text) if p.strip()]
+
 
         if raw_text:
             proxies_to_add.extend(extract_proxies_from_string(raw_text))
