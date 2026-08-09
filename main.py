@@ -248,13 +248,11 @@ def is_premium(user_id):
         return False
 
 def load_proxies(user_id: int | None = None):
-    # 1. User's personal Supabase proxies first
+    # 1. User's personal Supabase proxies first (Source of Truth)
     if user_id:
         try:
             from db import get_db_user_proxies
-            u_proxies = get_db_user_proxies(user_id)
-            if u_proxies:
-                return u_proxies
+            return get_db_user_proxies(user_id)
         except Exception:
             pass
 
@@ -267,8 +265,10 @@ def load_proxies(user_id: int | None = None):
     if env_single:
         return [env_single]
 
-    # 3. Fallback to local proxy.txt
-    return get_file_lines(PROXY_FILE)
+    # 3. Fallback to local proxy.txt (filtered)
+    lines = get_file_lines(PROXY_FILE)
+    return [l for l in lines if not l.startswith("#")]
+
 
 
 
@@ -1450,8 +1450,9 @@ async def proxy_command(event):
     
     proxies = load_proxies(user_id)
     if not proxies:
-        await event.reply(" `proxy.txt` is empty.")
+        await event.reply("⚠️ <b>No Active Proxies in Your Pool!</b>\n\n💡 Use <code>/addproxy ip:port</code> to add working proxies.", parse_mode="html")
         return
+
 
     status_msg = await event.reply(f" **Fast Proxy Audit Started...** ({len(proxies)} proxies)")
 
