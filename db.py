@@ -9,21 +9,26 @@ from datetime import datetime
 import psycopg2
 from psycopg2.extras import RealDictCursor
 
-DATABASE_URL = os.getenv(
-    "DATABASE_URL",
-    "postgresql://postgres:Suriya303%40303@db.fgdgauxhlnwpvkpcpsmc.supabase.co:5432/postgres"
-)
+DEFAULT_DB_URL = "postgresql://postgres:Suriya303%40303@db.fgdgauxhlnwpvkpcpsmc.supabase.co:5432/postgres"
 
 def get_db_connection():
-    for attempt in range(3):
-        try:
-            conn = psycopg2.connect(DATABASE_URL, connect_timeout=10, sslmode="prefer")
-            return conn
-        except Exception as e:
-            print(f"[Supabase DB Error] Connection attempt {attempt + 1} failed: {e}")
-            if attempt < 2:
-                time.sleep(0.5)
+    candidate_urls = []
+    env_url = os.getenv("DATABASE_URL", "").strip()
+    if env_url:
+        candidate_urls.append(env_url)
+    if DEFAULT_DB_URL not in candidate_urls:
+        candidate_urls.append(DEFAULT_DB_URL)
+
+    for db_url in candidate_urls:
+        for attempt in range(2):
+            try:
+                conn = psycopg2.connect(db_url, connect_timeout=10, sslmode="prefer")
+                return conn
+            except Exception as e:
+                print(f"[Supabase DB Error] Connection attempt {attempt + 1} failed on {db_url[:35]}...: {e}")
+                time.sleep(0.3)
     return None
+
 
 
 # ==================== REGISTERED USERS ====================
