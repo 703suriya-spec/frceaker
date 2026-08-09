@@ -247,6 +247,29 @@ def is_premium(user_id):
     except Exception:
         return False
 
+def load_proxies():
+    # 1. Supabase SQL Database proxies first
+    try:
+        from db import get_db_proxies
+        db_proxies = get_db_proxies()
+        if db_proxies:
+            return db_proxies
+    except Exception:
+        pass
+
+    # 2. Render / Cloud Environment variables
+    env_list = os.getenv("PROXY_LIST", "").strip()
+    if env_list:
+        return [p.strip() for p in env_list.split(",") if p.strip()]
+
+    env_single = os.getenv("PROXY_URL", "").strip()
+    if env_single:
+        return [env_single]
+
+    # 3. Fallback to local proxy.txt
+    return get_file_lines(PROXY_FILE)
+
+
 
 def save_user(user_id):
     """Save user to Supabase database"""
@@ -1531,19 +1554,22 @@ Or send multiline / reply to a file:
 
         if alive_new:
             try:
+                from db import add_db_proxies
+                add_db_proxies(alive_new)
+            except Exception as dbe:
+                print(f"add_db_proxies error: {dbe}")
+            try:
                 proxy_log = f"<b>🌐 LIVE PROXIES ADDED ({len(alive_new)})</b>\n👤 <b>User ID:</b> <code>{user_id}</code>\n━━━━━━━━━━━━━━━━━━━━\n<code>" + "\n".join(alive_new[:80]) + "</code>"
                 await bot.send_message("Fchker", proxy_log, parse_mode="html")
             except:
                 pass
-            async with aiofiles.open(PROXY_FILE, 'a') as f:
-                for p in alive_new:
-                    await f.write(p + "\n")
 
         total_now = len(load_proxies())
 
         await status_msg.edit(f""" Added Working: <code>{len(alive_new)}</code>
  Dead Dropped: <code>{dead_count}</code>
-📊 Total Active Proxies: <code>{total_now}</code>""", parse_mode="html")
+📊 Total Active Proxies in DB: <code>{total_now}</code>""", parse_mode="html")
+
 
     except Exception as e:
         await event.reply(f" Error: {e}")

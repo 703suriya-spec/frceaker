@@ -336,3 +336,67 @@ def remove_db_rz_site(site_url: str) -> bool:
     finally:
         conn.close()
 
+# ==================== PROXIES ====================
+def add_db_proxies(proxy_urls: list[str]):
+    conn = get_db_connection()
+    if not conn:
+        return
+    try:
+        now = int(time.time())
+        with conn.cursor() as cur:
+            for p in proxy_urls:
+                cur.execute("""
+                    INSERT INTO proxies (proxy_url, added_at)
+                    VALUES (%s, %s)
+                    ON CONFLICT (proxy_url) DO NOTHING;
+                """, (p, now))
+            conn.commit()
+    except Exception as e:
+        print(f"[Supabase DB Error] add_db_proxies: {e}")
+    finally:
+        conn.close()
+
+def get_db_proxies() -> list[str]:
+    conn = get_db_connection()
+    if not conn:
+        return []
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT proxy_url FROM proxies ORDER BY added_at DESC;")
+            rows = cur.fetchall()
+            return [r[0] for r in rows]
+    except Exception as e:
+        print(f"[Supabase DB Error] get_db_proxies: {e}")
+        return []
+    finally:
+        conn.close()
+
+def remove_db_proxy(proxy_url: str) -> bool:
+    conn = get_db_connection()
+    if not conn:
+        return False
+    try:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM proxies WHERE proxy_url = %s;", (proxy_url,))
+            conn.commit()
+            return cur.rowcount > 0
+    except Exception as e:
+        print(f"[Supabase DB Error] remove_db_proxy: {e}")
+        return False
+    finally:
+        conn.close()
+
+def clear_db_proxies():
+    conn = get_db_connection()
+    if not conn:
+        return
+    try:
+        with conn.cursor() as cur:
+            cur.execute("TRUNCATE TABLE proxies;")
+            conn.commit()
+    except Exception as e:
+        print(f"[Supabase DB Error] clear_db_proxies: {e}")
+    finally:
+        conn.close()
+
+
