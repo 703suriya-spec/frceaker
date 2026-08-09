@@ -20,6 +20,8 @@ from b3wrapunzel import b3w_check_card
 from rz import charge_payment_page_card_async as check_card_rz
 from vbv import check_card_str_async as check_card_vbv
 from st import VW as check_card_st
+from dila_engine import check_card_dila
+
 from io import BytesIO
 import aiohttp
 import aiofiles
@@ -2051,6 +2053,54 @@ Gateway: Razorpay New"""
     await status_msg.edit(res, parse_mode="html")
 
 
+# ==================== STRIPE AUTH DILA (st3) ENGINE ====================
+@bot.on(events.NewMessage(pattern=r'^/st3(?:\s+(.+))?$'))
+async def process_st3_cmd(event):
+    user_id = event.sender_id
+    if not is_admin(event.sender_id):
+        await event.reply("Access denied.")
+        return
+    card_input = event.pattern_match.group(1)
+    if not card_input:
+        await event.reply("Format: `/st3 cc|mm|yy|cvv`")
+        return
+    try:
+        parts = card_input.split('|')
+        cc, mm, yy, cvc = [p.strip() for p in parts[:4]]
+    except IndexError:
+        await event.reply("Format: `/st3 cc|mm|yy|cvv`")
+        return
+
+    status_msg = await event.reply("<b>Processing Stripe Auth...</b>", parse_mode="html")
+    proxies = load_proxies(user_id)
+    proxy = random.choice(proxies) if proxies else None
+    start_time = time.time()
+
+    st, msg, brand = await check_card_dila(cc, mm, yy, cvc, proxy_url=proxy)
+    time_taken = round(time.time() - start_time, 2)
+
+    if st == "approved":
+        status_emoji = "✅ APPROVED"
+    elif st == "live":
+        status_emoji = "🟡 CVV MATCH"
+    elif st == "3ds":
+        status_emoji = "🟡 3DS REQUIRED"
+    else:
+        status_emoji = f"❌ {st.upper()}"
+
+    res = f"""<b>Stripe Auth ($0 Setup Intent)</b>
+━━━━━━━━━━━━━━━━━━━━
+CC: <code>{cc}|{mm}|{yy}|{cvc}</code>
+Status: {status_emoji}
+Response: <code>{msg}</code>
+Brand: <code>{brand}</code>
+Time: {time_taken}s
+━━━━━━━━━━━━━━━━━━━━
+Gateway: Stripe Auth (dilaboards)"""
+    await status_msg.edit(res, parse_mode="html")
+
+
+
 # ==================== VBV LOOKUP (vbv2) ENGINE ====================
 @bot.on(events.NewMessage(pattern=r'^/vbv2(?:\s+(.+))?$'))
 async def process_vbv2_cmd(event):
@@ -2429,7 +2479,11 @@ async def auth_info_handler(event):
 <code>/b3auth cc|mm|yy|cvv</code>
 
 <b><i>Braintree Auth (Bellamoda)</i></b>
-<code>/b3rap cc|mm|yy|cvv</code>"""
+<code>/b3rap cc|mm|yy|cvv</code>
+
+<b><i>Stripe Auth (Dilaboards)</i></b>
+<code>/st3 cc|mm|yy|cvv</code>"""
+
 
     buttons = [
         [Button.inline("Back", b"checker")]
