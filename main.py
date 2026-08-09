@@ -3081,20 +3081,23 @@ async def process_stats_cmd(event):
 
 
 
+from aiohttp import web
+
 async def start_dummy_health_server():
     """Starts a minimal HTTP server so Render Web Services pass health check port scan"""
     port = int(os.getenv("PORT", "10000"))
     async def handle_ping(request):
-        return aiohttp.web.Response(text="FREAKY CHECKER BOT ONLINE")
+        return web.Response(text="FREAKY CHECKER BOT ONLINE")
 
-    app = aiohttp.web.Application()
+    app = web.Application()
     app.router.add_get('/', handle_ping)
     app.router.add_get('/health', handle_ping)
-    runner = aiohttp.web.AppRunner(app)
+    runner = web.AppRunner(app)
     await runner.setup()
-    site = aiohttp.web.TCPSite(runner, '0.0.0.0', port)
+    site = web.TCPSite(runner, '0.0.0.0', port)
     await site.start()
     print(f"Health check HTTP server listening on port {port}")
+
 
 
 if __name__ == "__main__":
