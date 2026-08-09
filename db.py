@@ -345,13 +345,17 @@ def remove_db_rz_site(site_url: str) -> bool:
     finally:
         conn.close()
 
-# ==================== PER-USER PROXIES (FREAKYHITTER ARCHITECTURE) ====================
-def save_db_user_proxies(user_id: int, proxies: list[str]):
+# ==================== PER-USER PROXIES (FREAKYHITTER ARCHITECTURE + CACHE) ====================
+USER_PROXIES_CACHE: dict[str, list[str]] = {}
+
+def save_db_user_proxies(user_id: int, proxies: list[str]) -> bool:
+    uid = str(user_id)
+    USER_PROXIES_CACHE[uid] = list(proxies)
+
     conn = get_db_connection()
     if not conn:
-        return
+        return False
     try:
-        uid = str(user_id)
         now = int(time.time())
         data = json.dumps(proxies)
         with conn.cursor() as cur:
@@ -361,29 +365,32 @@ def save_db_user_proxies(user_id: int, proxies: list[str]):
                 ON CONFLICT (user_id) DO UPDATE SET proxies = EXCLUDED.proxies, updated_at = EXCLUDED.updated_at;
             """, (uid, data, now))
             conn.commit()
+            return True
     except Exception as e:
         print(f"[Supabase DB Error] save_db_user_proxies: {e}")
+        return False
     finally:
         conn.close()
 
 
 def get_db_user_proxies(user_id: int) -> list[str]:
+    uid = str(user_id)
     conn = get_db_connection()
-    if not conn:
-        return []
-    try:
-        uid = str(user_id)
-        with conn.cursor() as cur:
-            cur.execute("SELECT proxies FROM user_proxies WHERE user_id = %s;", (uid,))
-            row = cur.fetchone()
-            if row and row[0]:
-                return json.loads(row[0])
-            return []
-    except Exception as e:
-        print(f"[Supabase DB Error] get_db_user_proxies: {e}")
-        return []
-    finally:
-        conn.close()
+    if conn:
+        try:
+            with conn.cursor() as cur:
+                cur.execute("SELECT proxies FROM user_proxies WHERE user_id = %s;", (uid,))
+                row = cur.fetchone()
+                if row and row[0]:
+                    res = json.loads(row[0])
+                    USER_PROXIES_CACHE[uid] = res
+                    return res
+        except Exception as e:
+            print(f"[Supabase DB Error] get_db_user_proxies: {e}")
+        finally:
+            conn.close()
+
+    return USER_PROXIES_CACHE.get(uid, [])
 
 
 def add_db_user_proxies(user_id: int, new_proxies: list[str]) -> tuple[int, int]:
@@ -425,6 +432,7 @@ def clear_db_user_proxies(user_id: int):
 
 def sync_db_user_proxies(user_id: int, alive_proxies: list[str]):
     save_db_user_proxies(user_id, alive_proxies)
+
 
 
 

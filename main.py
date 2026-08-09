@@ -1479,10 +1479,12 @@ Dead: <code>{len(dead_proxies)}</code>
 📊 Progress: <code>{min(len(alive_proxies) + len(dead_proxies), len(proxies))}/{len(proxies)}</code>""", parse_mode="html")
 
         try:
-            from db import sync_db_user_proxies
-            sync_db_user_proxies(user_id, alive_proxies)
+            if alive_proxies:
+                from db import sync_db_user_proxies
+                sync_db_user_proxies(user_id, alive_proxies)
         except Exception as dbe:
             print(f"sync_db_user_proxies error: {dbe}")
+
 
         if alive_proxies:
             txt_file = f"working_proxies_{user_id}.txt"
@@ -1560,6 +1562,11 @@ Or send multiline / reply to a file:
 
         from db import get_db_user_proxies, add_db_user_proxies
 
+        # 1. Save extracted proxies immediately to user DB pool (FreakyHitter architecture)
+        new_inserted, duplicates_count = add_db_user_proxies(user_id, proxies_to_add)
+        if user_id != ADMIN_ID:
+            add_db_user_proxies(ADMIN_ID, proxies_to_add)
+
         status_msg = await event.reply(f"⏳ <b>Testing {len(proxies_to_add)} Proxies in Parallel...</b>", parse_mode="html")
 
         batch_size = 150
@@ -1578,22 +1585,6 @@ Or send multiline / reply to a file:
                 else:
                     dead_count += 1
 
-        new_inserted = 0
-        duplicates_count = 0
-
-        if alive_new:
-            try:
-                new_inserted, duplicates_count = add_db_user_proxies(user_id, alive_new)
-                if user_id != ADMIN_ID:
-                    add_db_user_proxies(ADMIN_ID, alive_new)
-            except Exception as dbe:
-                print(f"add_db_user_proxies error: {dbe}")
-            try:
-                proxy_log = f"<b>🌐 LIVE PROXIES ADDED ({new_inserted})</b>\n👤 <b>User ID:</b> <code>{user_id}</code>\n━━━━━━━━━━━━━━━━━━━━\n<code>" + "\n".join(alive_new[:80]) + "</code>"
-                await bot.send_message("Fchker", proxy_log, parse_mode="html")
-            except:
-                pass
-
         total_now = len(get_db_user_proxies(user_id))
 
         await status_msg.edit(f"""📡 <b>PROXY AUDIT COMPLETE</b>
@@ -1604,6 +1595,7 @@ Or send multiline / reply to a file:
 ♻️ <b>Duplicates Skipped:</b> <code>{duplicates_count}</code>
 💀 <b>Dead Dropped:</b> <code>{dead_count}</code>
 📊 <b>Your Personal Active Proxies:</b> <code>{total_now}</code>""", parse_mode="html")
+
 
 
     except Exception as e:
