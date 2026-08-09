@@ -2240,30 +2240,30 @@ async def sq_check_cmd(event):
         await event.reply("Format: `/sq cc|mm|yy|cvv`")
         return
 
-
     cards = extract_cc(raw_text)
     if not cards:
         await event.reply("Invalid format! Send: <code>/sq card|mm|yy|cvv</code>", parse_mode="html")
         return
 
     card = cards[0]
-    cc, mes, ano, cvv = card.split("|")
+    parts = card.split("|")
+    if len(parts) < 4:
+        await event.reply("Invalid format! Send: <code>/sq card|mm|yy|cvv</code>", parse_mode="html")
+        return
+
+    cc, mes, ano, cvv = [p.strip() for p in parts[:4]]
     if len(ano) == 2:
         ano = f"20{ano}"
 
-    sites = get_square_sites()
-    if not sites:
-        await event.reply("No Square checkout sites configured!")
-        return
-
-    target_site = random.choice(sites)
+    target_site = DEFAULT_SQUARE_SITE
     try:
         merchant_id, checkout_id = _parse_square_url(target_site)
-    except ValueError as e:
+    except Exception as e:
         await event.reply(f"Site config error: {e}")
         return
 
     status_msg = await event.reply(f"<b>AUTO SQUARE $1 GATEWAY</b>\n━━━━━━━━━━━━━━━━━━━━\nCard: <code>{cc}|{mes}|{ano}|{cvv}</code>\n<i>Processing payment...</i>", parse_mode="html")
+
 
     proxies = load_proxies(user_id)
     proxy = random.choice(proxies) if proxies else None
