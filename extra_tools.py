@@ -36,125 +36,50 @@ def save_user_sk(user_id: int, sk: str, pk: str):
         json.dump(data, f, indent=2)
 
 def get_user_stsites(user_id: int):
-    if os.path.exists(STSITE_FILE):
-        try:
-            with open(STSITE_FILE, "r", encoding="utf-8") as f:
-                data = json.load(f)
-                return data.get(str(user_id), [])
-        except Exception:
-            pass
-    return []
+    try:
+        from db import get_db_user_stsites
+        return get_db_user_stsites(user_id)
+    except Exception:
+        return []
 
 def add_user_stsite(user_id: int, site: str):
-    data = {}
-    if os.path.exists(STSITE_FILE):
-        try:
-            with open(STSITE_FILE, "r", encoding="utf-8") as f:
-                data = json.load(f)
-        except Exception:
-            data = {}
-    sites = data.get(str(user_id), [])
-    if site not in sites:
-        sites.append(site)
-    data[str(user_id)] = sites
-    with open(STSITE_FILE, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=2)
+    try:
+        from db import add_db_user_stsite
+        add_db_user_stsite(user_id, site)
+    except Exception as e:
+        print(f"add_user_stsite error: {e}")
 
 def remove_user_stsite(user_id: int, site: str):
-    if os.path.exists(STSITE_FILE):
-        try:
-            with open(STSITE_FILE, "r", encoding="utf-8") as f:
-                data = json.load(f)
-            sites = data.get(str(user_id), [])
-            if site in sites:
-                sites.remove(site)
-                data[str(user_id)] = sites
-                with open(STSITE_FILE, "w", encoding="utf-8") as f:
-                    json.dump(data, f, indent=2)
-                return True
-        except Exception:
-            pass
-    return False
+    try:
+        from db import remove_db_user_stsite
+        return remove_db_user_stsite(user_id, site)
+    except Exception:
+        return False
+
 
 # ==================== LICENSE KEYS & PREMIUM ACCESS ====================
 KEYS_FILE = os.path.join(os.path.dirname(__file__), "keys.json")
 PREMIUM_FILE = os.path.join(os.path.dirname(__file__), "premium.json")
 
 def generate_key(days: int = 1, max_uses: int = 1, created_by: int = 0) -> str:
-    data = {}
-    if os.path.exists(KEYS_FILE):
-        try:
-            with open(KEYS_FILE, "r", encoding="utf-8") as f:
-                data = json.load(f)
-        except Exception:
-            data = {}
-    
     charset = string.ascii_uppercase + string.digits
     rand_part = "".join(random.choices(charset, k=16))
     key = f"FREAKY-{rand_part}"
     
-    data[key] = {
-        "days": days,
-        "created_by": created_by,
-        "created_at": int(time.time()),
-        "max_uses": max_uses,
-        "redeemed_by": []
-    }
-    with open(KEYS_FILE, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=2)
-    return key
+    try:
+        from db import create_license_key
+        return create_license_key(days=days, max_uses=max_uses, created_by=created_by, key_code=key)
+    except Exception as e:
+        print(f"Generate key error: {e}")
+        return key
 
 def redeem_key(user_id: int, key: str) -> tuple[bool, str]:
-    if not os.path.exists(KEYS_FILE):
-        return False, "Key not found!"
     try:
-        with open(KEYS_FILE, "r", encoding="utf-8") as f:
-            keys_data = json.load(f)
-    except Exception:
-        return False, "Key system error!"
+        from db import redeem_license_key
+        return redeem_license_key(user_id, key)
+    except Exception as e:
+        return False, f"Key system error: {e}"
 
-    if key not in keys_data:
-        return False, "Invalid or expired key!"
-
-    kinfo = keys_data[key]
-    redeemed_by = kinfo.get("redeemed_by", [])
-    if user_id in redeemed_by:
-        return False, "You already redeemed this key!"
-
-    if len(redeemed_by) >= kinfo.get("max_uses", 1):
-        return False, "Key maximum usages reached!"
-
-    days = kinfo.get("days", 1)
-    redeemed_by.append(user_id)
-    kinfo["redeemed_by"] = redeemed_by
-    keys_data[key] = kinfo
-
-    with open(KEYS_FILE, "w", encoding="utf-8") as f:
-        json.dump(keys_data, f, indent=2)
-
-    # Grant premium access in premium.json
-    pdata = {}
-    if os.path.exists(PREMIUM_FILE):
-        try:
-            with open(PREMIUM_FILE, "r", encoding="utf-8") as f:
-                pdata = json.load(f)
-        except Exception:
-            pdata = {}
-
-    current_exp = pdata.get(str(user_id), {}).get("expires", int(time.time()))
-    base_time = max(current_exp, int(time.time()))
-    new_exp = base_time + (days * 86400)
-
-    pdata[str(user_id)] = {
-        "expires": new_exp,
-        "authorized_at": int(time.time()),
-        "key_used": key
-    }
-
-    with open(PREMIUM_FILE, "w", encoding="utf-8") as f:
-        json.dump(pdata, f, indent=2)
-
-    return True, f"Key redeemed successfully! Granted {days} day(s) Premium access."
 
 # ==================== BATCH MERCHANT SITE TESTING ====================
 async def test_merchant_site(url: str) -> tuple[bool, str]:
@@ -205,43 +130,31 @@ def filter_ccs_by_brand(ccs: list[str], brand_filter: str) -> list[str]:
 USERS_FILE = os.path.join(os.path.dirname(__file__), "users.txt")
 
 def get_all_user_ids() -> list[int]:
-    users = set()
-    if os.path.exists(USERS_FILE):
-        try:
-            with open(USERS_FILE, "r", encoding="utf-8") as f:
-                for line in f:
-                    line = line.strip()
-                    if line.isdigit():
-                        users.add(int(line))
-        except Exception:
-            pass
-    return sorted(list(users))
+    try:
+        from db import get_all_registered_users
+        return get_all_registered_users()
+    except Exception:
+        return []
 
 def get_system_telemetry() -> dict:
     all_users = get_all_user_ids()
     total_users = len(all_users)
     
     premium_count = 0
-    if os.path.exists(PREMIUM_FILE):
-        try:
-            with open(PREMIUM_FILE, "r", encoding="utf-8") as f:
-                pdata = json.load(f)
-                now = time.time()
-                for uid, info in pdata.items():
-                    exp = info.get("expires", 0)
-                    if exp == 0 or exp > now:
-                        premium_count += 1
-        except Exception:
-            pass
+    try:
+        from db import get_premium_users_count
+        premium_count = get_premium_users_count()
+    except Exception:
+        pass
 
-    proxy_file = os.path.join(os.path.dirname(__file__), "proxy.json")
     proxy_count = 0
-    if os.path.exists(proxy_file):
+    env_list = os.getenv("PROXY_LIST", "").strip()
+    if env_list:
+        proxy_count = len([p for p in env_list.split(",") if p.strip()])
+    elif os.path.exists(PROXY_FILE):
         try:
-            with open(proxy_file, "r", encoding="utf-8") as f:
-                pdata = json.load(f)
-                if isinstance(pdata, list):
-                    proxy_count = len(pdata)
+            with open(PROXY_FILE, "r", encoding="utf-8") as f:
+                proxy_count = len([line for line in f if line.strip()])
         except Exception:
             pass
 
@@ -250,5 +163,6 @@ def get_system_telemetry() -> dict:
         "premium_users": premium_count,
         "proxy_count": proxy_count,
     }
+
 
 

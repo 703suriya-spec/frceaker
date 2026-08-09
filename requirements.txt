@@ -4,3 +4,4 @@ aiofiles
 aiohttp_socks
 Pillow
 pytz
+psycopg2-binary

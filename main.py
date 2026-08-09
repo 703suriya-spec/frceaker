@@ -190,32 +190,26 @@ def load_verified_users():
 
 
 def is_verified(user_id):
-    return str(user_id) in load_verified_users()
+    try:
+        from db import add_registered_user
+        add_registered_user(user_id)
+    except Exception:
+        pass
+    return True
 
 def get_daily_usage(user_id):
-    if not os.path.exists(DAILY_USAGE_FILE):
-        return {"cc_count": 0, "date": datetime.now().date().isoformat()}
     try:
-        with open(DAILY_USAGE_FILE, "r") as f:
-            data = json.load(f)
-        today = datetime.now().date().isoformat()
-        if str(user_id) not in data or data[str(user_id)]["date"] != today:
-            data[str(user_id)] = {"cc_count": 0, "date": today}
-        return data[str(user_id)]
-    except:
+        from db import get_db_daily_usage
+        return get_db_daily_usage(user_id)
+    except Exception:
         return {"cc_count": 0, "date": datetime.now().date().isoformat()}
 
 def update_daily_usage(user_id, cc_count=1):
-    data = {}
-    if os.path.exists(DAILY_USAGE_FILE):
-        with open(DAILY_USAGE_FILE, "r") as f:
-            data = json.load(f)
-    today = datetime.now().date().isoformat()
-    if str(user_id) not in data or data[str(user_id)]["date"] != today:
-        data[str(user_id)] = {"cc_count": 0, "date": today}
-    data[str(user_id)]["cc_count"] += cc_count
-    with open(DAILY_USAGE_FILE, "w") as f:
-        json.dump(data, f)
+    try:
+        from db import update_db_daily_usage
+        update_db_daily_usage(user_id, cc_count)
+    except Exception as e:
+        print(f"update_daily_usage error: {e}")
 
 def check_limits(user_id, is_bulk=False):
     """Admin aur Premium ko full unlimited"""
@@ -225,96 +219,33 @@ def check_limits(user_id, is_bulk=False):
     if is_bulk:
         return usage["cc_count"] < 50000, 50000
     return usage["cc_count"] < 150, 150 - usage["cc_count"]
+
 def is_admin(user_id):
     return user_id == ADMIN_ID or user_id in KEY_ADMINS
     
 def save_verified(user_id):
-    users = load_verified_users()
-    if str(user_id) not in users:
-        with open(VERIFIED_FILE, "a") as f:
-            f.write(f"{user_id}\n")
-
-def get_square_sites():
-    return get_file_lines(SQUARE_SITES_FILE)
-
-def load_sites():
-    return get_file_lines(SITES_FILE)
-
-def load_proxies():
-    # Render / Cloud environment support
-    env_list = os.getenv("PROXY_LIST", "").strip()
-    if env_list:
-        return [p.strip() for p in env_list.split(",") if p.strip()]
-    
-    env_single = os.getenv("PROXY_URL", "").strip()
-    if env_single:
-        return [env_single]
-        
-    return get_file_lines(PROXY_FILE)
-def create_result_card():
-
-    img = Image.new("RGB", (800, 600), "#111827")
-    draw = ImageDraw.Draw(img)
-
-    alone_font = ImageFont.truetype("DejaVuSans.ttf", 70)
-
-    draw.text(
-        (80, 250),
-        " Powered By @Theonlysuui",
-        font=alone_font,
-        fill=(0, 200, 255)
-    )
-
-    img.save("result_card.png")
-        
-def is_premium(user_id):
-    if not os.path.exists(PREMIUM_FILE):
-        return False
-
-    valid = []
-    user_id_str = str(user_id)
-    found = False
-
     try:
-        with open(PREMIUM_FILE, "r", encoding='utf-8') as f:
-            for line in f:
-                line = line.strip()
-                if not line:
-                    continue
-                try:
-                    uid, exp_str = line.split("|", 1)
-                    exp = datetime.strptime(exp_str.strip(), "%Y-%m-%d %H:%M:%S")
-                    if exp > datetime.now():
-                        valid.append(line)
-                        if uid == user_id_str:
-                            found = True
-                except:
-                    pass
+        from db import add_registered_user
+        add_registered_user(user_id)
     except Exception as e:
-        print(f"Premium check error: {e}")
+        print(f"save_verified error: {e}")
+
+def is_premium(user_id):
+    try:
+        from db import is_user_premium
+        return is_user_premium(user_id)
+    except Exception:
         return False
 
-    # Clean expired entries
-    try:
-        with open(PREMIUM_FILE, "w", encoding='utf-8') as f:
-            f.write("\n".join(valid) + ("\n" if valid else ""))
-    except:
-        pass
-
-    return found
 
 def save_user(user_id):
-    """Save user to users database"""
+    """Save user to Supabase database"""
     try:
-        conn = sqlite3.connect('users.db')
-        c = conn.cursor()
-        c.execute("CREATE TABLE IF NOT EXISTS users (user_id TEXT PRIMARY KEY, joined TEXT)")
-        c.execute("INSERT OR IGNORE INTO users (user_id, joined) VALUES (?, ?)",
-                  (str(user_id), datetime.now().isoformat()))
-        conn.commit()
-        conn.close()
-    except:
-        pass
+        from db import add_registered_user
+        add_registered_user(user_id)
+    except Exception as e:
+        print(f"save_user error: {e}")
+
 
     
 def extract_cc(text):
