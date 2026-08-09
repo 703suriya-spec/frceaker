@@ -2225,10 +2225,17 @@ Gateway: VBV (Braintree)"""
 
 
 
-@bot.on(events.NewMessage(pattern=r'^/sq\s+(.+)'))
+def get_square_sites():
+    return get_file_lines(SQUARE_SITES_FILE)
+
+@bot.on(events.NewMessage(pattern=r'^/sq(?:\s+(.+))?$'))
 async def sq_check_cmd(event):
     user_id = event.sender_id
-    raw_text = event.pattern_match.group(1).strip()
+    raw_text = event.pattern_match.group(1) if event.pattern_match.group(1) else ""
+    if not raw_text:
+        await event.reply("Format: `/sq cc|mm|yy|cvv`")
+        return
+
 
     cards = extract_cc(raw_text)
     if not cards:
