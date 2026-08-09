@@ -3081,26 +3081,32 @@ async def process_stats_cmd(event):
 
 
 
-from aiohttp import web
+import threading
+from http.server import HTTPServer, BaseHTTPRequestHandler
 
-async def start_dummy_health_server():
-    """Starts a minimal HTTP server so Render Web Services pass health check port scan"""
+class HealthCheckHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.send_header("Content-type", "text/plain")
+        self.end_headers()
+        self.wfile.write(b"FREAKY CHECKER BOT ONLINE")
+
+    def log_message(self, format, *args):
+        pass
+
+def start_instant_health_server():
     port = int(os.getenv("PORT", "10000"))
-    async def handle_ping(request):
-        return web.Response(text="FREAKY CHECKER BOT ONLINE")
-
-    app = web.Application()
-    app.router.add_get('/', handle_ping)
-    app.router.add_get('/health', handle_ping)
-    runner = web.AppRunner(app)
-    await runner.setup()
-    site = web.TCPSite(runner, '0.0.0.0', port)
-    await site.start()
-    print(f"Health check HTTP server listening on port {port}")
-
+    try:
+        server = HTTPServer(('0.0.0.0', port), HealthCheckHandler)
+        print(f"Health check HTTP server listening instantly on 0.0.0.0:{port}")
+        server.serve_forever()
+    except Exception as e:
+        print(f"Instant health server error: {e}")
 
 
 if __name__ == "__main__":
+    # Start HTTP port instantly on startup for Render port scanner
+    threading.Thread(target=start_instant_health_server, daemon=True).start()
     print("FREAKY CHECKER BOT ACTIVE")
     retry_count = 0
     max_retries = 9999
@@ -3109,13 +3115,6 @@ if __name__ == "__main__":
         try:
             print(f"Bot running... (attempt {retry_count + 1})")
             bot.start(bot_token=BOT_TOKEN)
-            
-            # Start HTTP health check server for Render Web Service compatibility
-            try:
-                bot.loop.create_task(start_dummy_health_server())
-            except Exception as he:
-                print(f"Health server error: {he}")
-
             if globals().get("FAKE_HITS_ENABLED", False):
                 try:
                     bot.loop.create_task(start_fake_hits())
@@ -3132,4 +3131,5 @@ if __name__ == "__main__":
             error_str = str(e)
             print(f"Bot crashed: {error_str}")
             time.sleep(5)
+
 
