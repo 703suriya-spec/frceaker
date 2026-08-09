@@ -1786,7 +1786,8 @@ async def single_razorpay_cc(event):
         price = result.get("price", "1")
         response_msg = str(result.get('message', 'Unknown'))[:150]
 
-        status_line = f"Status: {response_msg}\n" if result["status"] != "Charged" else ""
+        status_emoji = "✅ CHARGED" if result.get("status") == "Charged" else "❌ DECLINED"
+        status_line = f"Status: {status_emoji} - {response_msg}\n"
         res_msg = f"""<b>AUTO RAZORPAY CHECKOUT</b>
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 CC: <code>{card}</code>
@@ -1844,8 +1845,8 @@ async def process_stripe_cmd(event):
     
     time_taken = round(time.time() - start_time, 2)
     
-    # Simple output logic based on current standalone checker structure
-    status_line = f"Status: {msg}\n" if not is_live else ""
+    status_emoji = "✅ APPROVED / LIVE" if is_live else f"❌ DECLINED ({msg})"
+    status_line = f"Status: {status_emoji}\n"
     res = f"""<b>Stripe WCPay Charge</b>
 ━━━━━━━━━━━━━━━━━━━━
 CC: <code>{cc}|{mm}|{yy}|{cvc}</code>
@@ -1887,7 +1888,8 @@ async def process_stripe1_cmd(event):
         st, msg, code = "error", f"Error: {e}", "error"
 
     time_taken = round(time.time() - start_time, 2)
-    status_line = f"Status: {st.upper()} - {msg}\n" if st not in ("charged", "approved") else ""
+    status_emoji = "✅ CHARGED" if st in ("charged", "approved") else f"❌ {st.upper()}"
+    status_line = f"Status: {status_emoji} - {msg}\n"
     res = f"""<b>Stripe $1 Charge</b>
 ━━━━━━━━━━━━━━━━━━━━
 CC: <code>{cc}|{mm}|{yy}|{cvc}</code>
@@ -1895,6 +1897,7 @@ CC: <code>{cc}|{mm}|{yy}|{cvc}</code>
 ━━━━━━━━━━━━━━━━━━━━
 Gateway: Stripe $1"""
     await status_msg.edit(res, parse_mode="html")
+
 
 # ==================== BRAINTREE $1 (braintree_1) ENGINE ====================
 @bot.on(events.NewMessage(pattern=r'^/br1(?:\s+(.+))?$'))
