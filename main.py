@@ -3081,6 +3081,22 @@ async def process_stats_cmd(event):
 
 
 
+async def start_dummy_health_server():
+    """Starts a minimal HTTP server so Render Web Services pass health check port scan"""
+    port = int(os.getenv("PORT", "10000"))
+    async def handle_ping(request):
+        return aiohttp.web.Response(text="FREAKY CHECKER BOT ONLINE")
+
+    app = aiohttp.web.Application()
+    app.router.add_get('/', handle_ping)
+    app.router.add_get('/health', handle_ping)
+    runner = aiohttp.web.AppRunner(app)
+    await runner.setup()
+    site = aiohttp.web.TCPSite(runner, '0.0.0.0', port)
+    await site.start()
+    print(f"Health check HTTP server listening on port {port}")
+
+
 if __name__ == "__main__":
     print("FREAKY CHECKER BOT ACTIVE")
     retry_count = 0
@@ -3090,6 +3106,13 @@ if __name__ == "__main__":
         try:
             print(f"Bot running... (attempt {retry_count + 1})")
             bot.start(bot_token=BOT_TOKEN)
+            
+            # Start HTTP health check server for Render Web Service compatibility
+            try:
+                bot.loop.create_task(start_dummy_health_server())
+            except Exception as he:
+                print(f"Health server error: {he}")
+
             if globals().get("FAKE_HITS_ENABLED", False):
                 try:
                     bot.loop.create_task(start_fake_hits())
@@ -3106,3 +3129,4 @@ if __name__ == "__main__":
             error_str = str(e)
             print(f"Bot crashed: {error_str}")
             time.sleep(5)
+
