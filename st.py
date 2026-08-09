@@ -66,7 +66,21 @@ async def _VW_once(ccx, url=None, proxy_url=None):
 
     URL = url.replace("https://", "").replace("http://", "").strip("/")
 
-    proxy_args = {"proxy": proxy_url} if proxy_url else {}
+    def _format_proxy(p):
+        if not p: return None
+        ps = str(p).strip()
+        if ps.startswith(("http://", "https://", "socks5://", "socks4://")): return ps
+        parts = ps.split(":")
+        if len(parts) == 4:
+            if parts[1].isdigit(): return f"http://{parts[2]}:{parts[3]}@{parts[0]}:{parts[1]}"
+            elif parts[3].isdigit(): return f"http://{parts[0]}:{parts[1]}@{parts[2]}:{parts[3]}"
+            else: return f"http://{parts[2]}:{parts[3]}@{parts[0]}:{parts[1]}"
+        elif len(parts) == 2: return f"http://{parts[0]}:{parts[1]}"
+        return f"http://{ps}"
+
+    formatted_proxy = _format_proxy(proxy_url)
+    proxy_args = {"proxy": formatted_proxy} if formatted_proxy else {}
+
 
     def generate_guid():
         return str(uuid.uuid4())

@@ -34,6 +34,20 @@ async def process_stripe(cc, mm, yy, cvc, proxy_url=None):
     Processes a card through the WooCommerce Stripe (WCPay) endpoint.
     Returns: (is_live, message, response_text, receipt_url, amount)
     """
+    def _format_proxy(p):
+        if not p: return None
+        ps = str(p).strip()
+        if ps.startswith(("http://", "https://", "socks5://", "socks4://")): return ps
+        parts = ps.split(":")
+        if len(parts) == 4:
+            if parts[1].isdigit(): return f"http://{parts[2]}:{parts[3]}@{parts[0]}:{parts[1]}"
+            elif parts[3].isdigit(): return f"http://{parts[0]}:{parts[1]}@{parts[2]}:{parts[3]}"
+            else: return f"http://{parts[2]}:{parts[3]}@{parts[0]}:{parts[1]}"
+        elif len(parts) == 2: return f"http://{parts[0]}:{parts[1]}"
+        return f"http://{ps}"
+
+    proxy_url = _format_proxy(proxy_url)
+
     try:
         first_name = random.choice(first_names)
         last_name = random.choice(last_names)

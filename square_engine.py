@@ -388,7 +388,21 @@ async def process_square(merchant_id: str, checkout_id: str, cc: str, mes: str, 
     ua, ch = _rand_ua()
     first_name, last_name, email, phone = _rand_identity()
 
-    proxies_to_try = [proxy, None] if proxy else [None]
+    def _format_proxy(p):
+        if not p: return None
+        ps = str(p).strip()
+        if ps.startswith(("http://", "https://", "socks5://", "socks4://")): return ps
+        parts = ps.split(":")
+        if len(parts) == 4:
+            if parts[1].isdigit(): return f"http://{parts[2]}:{parts[3]}@{parts[0]}:{parts[1]}"
+            elif parts[3].isdigit(): return f"http://{parts[0]}:{parts[1]}@{parts[2]}:{parts[3]}"
+            else: return f"http://{parts[2]}:{parts[3]}@{parts[0]}:{parts[1]}"
+        elif len(parts) == 2: return f"http://{parts[0]}:{parts[1]}"
+        return f"http://{ps}"
+
+    formatted_proxy = _format_proxy(proxy)
+    proxies_to_try = [formatted_proxy, None] if formatted_proxy else [None]
+
     for px in proxies_to_try:
         kw: Dict[str, Any] = {"timeout": 30}
         if px:

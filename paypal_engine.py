@@ -31,10 +31,20 @@ async def process_paypal_charge(cc, mm, yy, cvv, proxy_url=None):
     Processes a card through the PayPal Commerce $1.00 donation endpoint (mylifebloom.co).
     Returns: (is_live, message, response_text, receipt_url, amount)
     """
-    if proxy_url:
-        proxy_url = proxy_url.strip()
-        if not proxy_url.startswith(('http://', 'https://', 'socks4://', 'socks5://')):
-            proxy_url = f"http://{proxy_url}"
+    def _format_proxy(p):
+        if not p: return None
+        ps = str(p).strip()
+        if ps.startswith(("http://", "https://", "socks5://", "socks4://")): return ps
+        parts = ps.split(":")
+        if len(parts) == 4:
+            if parts[1].isdigit(): return f"http://{parts[2]}:{parts[3]}@{parts[0]}:{parts[1]}"
+            elif parts[3].isdigit(): return f"http://{parts[0]}:{parts[1]}@{parts[2]}:{parts[3]}"
+            else: return f"http://{parts[2]}:{parts[3]}@{parts[0]}:{parts[1]}"
+        elif len(parts) == 2: return f"http://{parts[0]}:{parts[1]}"
+        return f"http://{ps}"
+
+    proxy_url = _format_proxy(proxy_url)
+
 
     if len(yy) == 2:
         yy = "20" + yy

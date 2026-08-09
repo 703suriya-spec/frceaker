@@ -81,7 +81,27 @@ async def _process_card_async(cc: str, mm: str, yy: str, cvc: str, proxy_url: st
         city, state, zip_prefix = random.choice(CITIES_STATES)
         zip_code = zip_prefix + str(random.randint(10, 99))
 
-        proxy_args = {"proxy": proxy_url} if proxy_url else {}
+        def _format_proxy(proxy: str | None) -> str | None:
+            if not proxy:
+                return None
+            p = str(proxy).strip()
+            if p.startswith(("http://", "https://", "socks5://", "socks4://")):
+                return p
+            parts = p.split(":")
+            if len(parts) == 4:
+                if parts[1].isdigit():
+                    return f"http://{parts[2]}:{parts[3]}@{parts[0]}:{parts[1]}"
+                elif parts[3].isdigit():
+                    return f"http://{parts[0]}:{parts[1]}@{parts[2]}:{parts[3]}"
+                else:
+                    return f"http://{parts[2]}:{parts[3]}@{parts[0]}:{parts[1]}"
+            elif len(parts) == 2:
+                return f"http://{parts[0]}:{parts[1]}"
+            return f"http://{p}"
+
+        formatted_proxy = _format_proxy(proxy_url)
+        proxy_args = {"proxy": formatted_proxy} if formatted_proxy else {}
+
 
         # Use an isolated session to maintain cookie state per card check
         async with aiohttp.ClientSession(
