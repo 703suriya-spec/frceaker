@@ -169,7 +169,17 @@ _DEAD_INDICATORS = (
 )
 # --- UPDATED LOADING FUNCTIONS ---
 def load_razorpay_sites():
-    return [RAZORPAY_FIXED_SITE]  # Sirf single fixed site, no sites1.txt
+    sites = [RAZORPAY_FIXED_SITE]
+    try:
+        from db import get_db_rz_sites
+        db_sites = get_db_rz_sites()
+        for s in db_sites:
+            if s not in sites:
+                sites.append(s)
+    except Exception:
+        pass
+    return sites
+
     
 def get_file_lines(filepath):
     """Helper to read lines from a file fresh every time"""
@@ -1227,11 +1237,11 @@ async def add_razorpay_site(event):
                     await status_msg.edit(f" RZ Site Dead!\n\n<code>{site[:60]}</code>", parse_mode="html")
                     return
                 
-                #  ADD TO RZ SITES FILE
-                current_rz = get_file_lines(RZ_SITES_FILE)
+                #  ADD TO RZ SITES SUPABASE DB
+                from db import add_db_rz_site, get_db_rz_sites
+                current_rz = get_db_rz_sites()
                 if site not in current_rz:
-                    async with aiofiles.open(RZ_SITES_FILE, 'a') as f:
-                        await f.write(f"{site}\n")
+                    add_db_rz_site(site)
                     await status_msg.edit(f""" Razorpay Site Added!
 
 📊 Total RZ Sites: <code>{len(current_rz) + 1}</code>
@@ -1240,8 +1250,8 @@ async def add_razorpay_site(event):
                 else:
                     await status_msg.edit("[WARN] Already in RZ list!", parse_mode="html")
                     
-    except:
-        await status_msg.edit(" Test Failed! Not Added.", parse_mode="html")
+    except Exception as e:
+        await status_msg.edit(f" Test Failed! Not Added: {e}", parse_mode="html")
 
 
 # ==================== /rmrzsites - RAZORPAY SITE REMOVE ====================
@@ -1253,10 +1263,11 @@ async def remove_razorpay_site(event):
     if not site_to_remove.startswith("http"):
         site_to_remove = f"https://{site_to_remove}"
 
-    current_rz = get_file_lines(RZ_SITES_FILE)
+    from db import get_db_rz_sites, remove_db_rz_site
+    current_rz = get_db_rz_sites()
 
     if not current_rz:
-        await event.reply(" No Razorpay sites found!\nUse /addrzsites url to add.", parse_mode="html")
+        await event.reply(" No custom Razorpay sites found!\nUse /addrzsites url to add.", parse_mode="html")
         return
 
     found = None
@@ -1267,33 +1278,24 @@ async def remove_razorpay_site(event):
 
     target = found if found else site_to_remove
 
-    if target not in current_rz:
-        await event.reply(" Site not found in RZ list!\n\nUse /rzsites to view all.", parse_mode="html")
-        return
+    if remove_db_rz_site(target):
+        await event.reply(f" Removed Razorpay site:\n<code>{target[:60]}</code>\n\n💡 /addrzsites url | /rzsites", parse_mode="html")
+    else:
+        await event.reply(f" Site not found in RZ list:\n<code>{target[:60]}</code>", parse_mode="html")
 
-    new_rz = [s for s in current_rz if s != target]
-    async with aiofiles.open(RZ_SITES_FILE, 'w') as f:
-        for s in new_rz:
-            await f.write(s + "\n")
-
-    await event.reply(f""" Razorpay Site Removed!
-
- <code>{target[:50]}</code>
-📊 Remaining: <code>{len(new_rz)}</code>
-
-💡 /addrzsites url | /rzsites""", parse_mode="html")
 
 
 @bot.on(events.NewMessage(pattern=r'^/rzsites$'))
 async def rz_sites_check(event):
     user_id = event.sender_id
 
-    sites = get_file_lines(RZ_SITES_FILE)
+    sites = load_razorpay_sites()
     proxies = load_proxies()
     
     if not sites:
-        await event.reply(" No Razorpay sites in rz_sites.txt\nUse /addrzsites url to add.")
+        await event.reply(" No Razorpay sites saved!\nUse /addrzsites url to add.")
         return
+
     
     if not proxies:
         await event.reply(" No proxies.")

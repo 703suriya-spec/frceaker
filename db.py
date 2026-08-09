@@ -287,3 +287,52 @@ def update_db_daily_usage(user_id: int, cc_count=1):
         print(f"[Supabase DB Error] update_db_daily_usage: {e}")
     finally:
         conn.close()
+
+# ==================== RAZORPAY SITES ====================
+def add_db_rz_site(site_url: str):
+    conn = get_db_connection()
+    if not conn:
+        return
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                INSERT INTO rz_sites (site_url, added_at)
+                VALUES (%s, %s)
+                ON CONFLICT (site_url) DO NOTHING;
+            """, (site_url, int(time.time())))
+            conn.commit()
+    except Exception as e:
+        print(f"[Supabase DB Error] add_db_rz_site: {e}")
+    finally:
+        conn.close()
+
+def get_db_rz_sites() -> list[str]:
+    conn = get_db_connection()
+    if not conn:
+        return []
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT site_url FROM rz_sites ORDER BY added_at DESC;")
+            rows = cur.fetchall()
+            return [r[0] for r in rows]
+    except Exception as e:
+        print(f"[Supabase DB Error] get_db_rz_sites: {e}")
+        return []
+    finally:
+        conn.close()
+
+def remove_db_rz_site(site_url: str) -> bool:
+    conn = get_db_connection()
+    if not conn:
+        return False
+    try:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM rz_sites WHERE site_url = %s;", (site_url,))
+            conn.commit()
+            return cur.rowcount > 0
+    except Exception as e:
+        print(f"[Supabase DB Error] remove_db_rz_site: {e}")
+        return False
+    finally:
+        conn.close()
+
