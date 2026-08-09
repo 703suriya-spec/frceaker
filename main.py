@@ -1539,7 +1539,9 @@ Or send multiline / reply to a file:
 • <code>SOCKS4/5</code>""", parse_mode="html")
             return
 
-        current_proxies = load_proxies(user_id)
+        from db import get_db_user_proxies, add_db_user_proxies
+
+        existing_db_proxies = set(get_db_user_proxies(user_id))
         status_msg = await event.reply(f" Testing {len(proxies_to_add)} Proxies in Parallel...")
 
         batch_size = 150
@@ -1558,31 +1560,30 @@ Or send multiline / reply to a file:
                 else:
                     dead_count += 1
 
-
+        truly_new = [p for p in alive_new if p not in existing_db_proxies]
+        duplicates_count = len(alive_new) - len(truly_new)
         new_inserted = 0
-        if alive_new:
+
+        if truly_new:
             try:
-                from db import add_db_user_proxies
-                # Add to user's list and get actual new inserted count
-                new_inserted = add_db_user_proxies(user_id, alive_new)
-                # Also automatically copy live proxies to Owner (ADMIN_ID) proxy list
+                new_inserted = add_db_user_proxies(user_id, truly_new)
                 if user_id != ADMIN_ID:
-                    add_db_user_proxies(ADMIN_ID, alive_new)
+                    add_db_user_proxies(ADMIN_ID, truly_new)
             except Exception as dbe:
                 print(f"add_db_user_proxies error: {dbe}")
             try:
-                proxy_log = f"<b>🌐 LIVE PROXIES ADDED ({len(alive_new)})</b>\n👤 <b>User ID:</b> <code>{user_id}</code>\n━━━━━━━━━━━━━━━━━━━━\n<code>" + "\n".join(alive_new[:80]) + "</code>"
+                proxy_log = f"<b>🌐 LIVE PROXIES ADDED ({len(truly_new)})</b>\n👤 <b>User ID:</b> <code>{user_id}</code>\n━━━━━━━━━━━━━━━━━━━━\n<code>" + "\n".join(truly_new[:80]) + "</code>"
                 await bot.send_message("Fchker", proxy_log, parse_mode="html")
             except:
                 pass
 
-        duplicates_count = len(alive_new) - new_inserted
-        total_now = len(load_proxies(user_id))
+        total_now = len(get_db_user_proxies(user_id))
 
         await status_msg.edit(f""" Added New: <code>{new_inserted}</code>
  Duplicates Skipped: <code>{duplicates_count}</code>
  Dead Dropped: <code>{dead_count}</code>
 📊 Your Personal Active Proxies: <code>{total_now}</code>""", parse_mode="html")
+
 
 
 
