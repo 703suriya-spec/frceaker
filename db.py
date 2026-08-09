@@ -337,10 +337,11 @@ def remove_db_rz_site(site_url: str) -> bool:
         conn.close()
 
 # ==================== PER-USER PROXIES ====================
-def add_db_user_proxies(user_id: int, proxy_urls: list[str]):
+def add_db_user_proxies(user_id: int, proxy_urls: list[str]) -> int:
     conn = get_db_connection()
     if not conn:
-        return
+        return 0
+    inserted = 0
     try:
         now = int(time.time())
         uid = str(user_id)
@@ -351,11 +352,16 @@ def add_db_user_proxies(user_id: int, proxy_urls: list[str]):
                     VALUES (%s, %s, %s)
                     ON CONFLICT (user_id, proxy_url) DO NOTHING;
                 """, (uid, p, now))
+                if cur.rowcount > 0:
+                    inserted += 1
             conn.commit()
+            return inserted
     except Exception as e:
         print(f"[Supabase DB Error] add_db_user_proxies: {e}")
+        return 0
     finally:
         conn.close()
+
 
 def get_db_user_proxies(user_id: int) -> list[str]:
     conn = get_db_connection()

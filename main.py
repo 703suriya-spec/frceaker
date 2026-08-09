@@ -1555,11 +1555,12 @@ Or send multiline / reply to a file:
                     dead_count += 1
 
 
+        new_inserted = 0
         if alive_new:
             try:
                 from db import add_db_user_proxies
-                # Add to user's list
-                add_db_user_proxies(user_id, alive_new)
+                # Add to user's list and get actual new inserted count
+                new_inserted = add_db_user_proxies(user_id, alive_new)
                 # Also automatically copy live proxies to Owner (ADMIN_ID) proxy list
                 if user_id != ADMIN_ID:
                     add_db_user_proxies(ADMIN_ID, alive_new)
@@ -1571,11 +1572,14 @@ Or send multiline / reply to a file:
             except:
                 pass
 
+        duplicates_count = len(alive_new) - new_inserted
         total_now = len(load_proxies(user_id))
 
-        await status_msg.edit(f""" Added Working: <code>{len(alive_new)}</code>
+        await status_msg.edit(f""" Added New: <code>{new_inserted}</code>
+ Duplicates Skipped: <code>{duplicates_count}</code>
  Dead Dropped: <code>{dead_count}</code>
 📊 Your Personal Active Proxies: <code>{total_now}</code>""", parse_mode="html")
+
 
 
 
