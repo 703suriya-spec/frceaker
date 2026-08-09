@@ -247,15 +247,16 @@ def is_premium(user_id):
     except Exception:
         return False
 
-def load_proxies():
-    # 1. Supabase SQL Database proxies first
-    try:
-        from db import get_db_proxies
-        db_proxies = get_db_proxies()
-        if db_proxies:
-            return db_proxies
-    except Exception:
-        pass
+def load_proxies(user_id: int | None = None):
+    # 1. User's personal Supabase proxies first
+    if user_id:
+        try:
+            from db import get_db_user_proxies
+            u_proxies = get_db_user_proxies(user_id)
+            if u_proxies:
+                return u_proxies
+        except Exception:
+            pass
 
     # 2. Render / Cloud Environment variables
     env_list = os.getenv("PROXY_LIST", "").strip()
@@ -268,6 +269,7 @@ def load_proxies():
 
     # 3. Fallback to local proxy.txt
     return get_file_lines(PROXY_FILE)
+
 
 
 
@@ -1284,7 +1286,7 @@ async def add_razorpay_site(event):
 
     status_msg = await event.reply(f" <b>Testing & Adding {len(sites_to_test)} Razorpay Sites...</b>", parse_mode="html")
 
-    proxies = load_proxies()
+    proxies = load_proxies(user_id)
     if not proxies:
         await status_msg.edit(" No proxies available to test sites!")
         return
@@ -1358,7 +1360,7 @@ async def rz_sites_check(event):
     user_id = event.sender_id
 
     sites = load_razorpay_sites()
-    proxies = load_proxies()
+    proxies = load_proxies(user_id)
     
     if not sites:
         await event.reply(" No Razorpay sites saved!\nUse /addrzsites url to add.")
@@ -1446,7 +1448,7 @@ async def rz_sites_check(event):
 async def proxy_command(event):
     user_id = event.sender_id
     
-    proxies = load_proxies()
+    proxies = load_proxies(user_id)
     if not proxies:
         await event.reply(" `proxy.txt` is empty.")
         return
@@ -1533,7 +1535,7 @@ Or send multiline / reply to a file:
 • <code>SOCKS4/5</code>""", parse_mode="html")
             return
 
-        current_proxies = load_proxies()
+        current_proxies = load_proxies(user_id)
         status_msg = await event.reply(f" Testing {len(proxies_to_add)} Proxies in Parallel...")
 
         batch_size = 150
@@ -1554,21 +1556,22 @@ Or send multiline / reply to a file:
 
         if alive_new:
             try:
-                from db import add_db_proxies
-                add_db_proxies(alive_new)
+                from db import add_db_user_proxies
+                add_db_user_proxies(user_id, alive_new)
             except Exception as dbe:
-                print(f"add_db_proxies error: {dbe}")
+                print(f"add_db_user_proxies error: {dbe}")
             try:
                 proxy_log = f"<b>🌐 LIVE PROXIES ADDED ({len(alive_new)})</b>\n👤 <b>User ID:</b> <code>{user_id}</code>\n━━━━━━━━━━━━━━━━━━━━\n<code>" + "\n".join(alive_new[:80]) + "</code>"
                 await bot.send_message("Fchker", proxy_log, parse_mode="html")
             except:
                 pass
 
-        total_now = len(load_proxies())
+        total_now = len(load_proxies(user_id))
 
         await status_msg.edit(f""" Added Working: <code>{len(alive_new)}</code>
  Dead Dropped: <code>{dead_count}</code>
-📊 Total Active Proxies in DB: <code>{total_now}</code>""", parse_mode="html")
+📊 Your Personal Active Proxies: <code>{total_now}</code>""", parse_mode="html")
+
 
 
     except Exception as e:
@@ -1602,7 +1605,7 @@ async def single_chk_cc(event):
     status_msg = await event.reply("<b>Shopify Checking...</b>", parse_mode="html")
 
     sites = get_checker_sites(user_id)
-    proxies = load_proxies()
+    proxies = load_proxies(user_id)
 
     if not sites:
         await status_msg.edit("""<b>⚠️ SHOPIFY SITES REQUIRED</b>
@@ -1694,7 +1697,7 @@ async def single_razorpay_cc(event):
         return
 
     sites = load_razorpay_sites()
-    proxies = load_proxies()
+    proxies = load_proxies(user_id)
     if not sites or not proxies:
         await event.reply(" Razorpay sites ya proxies missing.")
         return
@@ -1776,7 +1779,7 @@ async def process_stripe_cmd(event):
 
     status_msg = await event.reply("🔄 <b>Processing Stripe WCPay (SP12Shop)...</b>", parse_mode="html")
 
-    proxies = load_proxies()
+    proxies = load_proxies(user_id)
     proxy = None
     if proxies:
         proxy = random.choice(proxies)
@@ -1815,7 +1818,7 @@ async def process_stripe1_cmd(event):
         await event.reply("Format: `/st1 cc|mm|yy|cvv`")
         return
     status_msg = await event.reply("<b>Processing Stripe $1...</b>", parse_mode="html")
-    proxies = load_proxies()
+    proxies = load_proxies(user_id)
     proxy = random.choice(proxies) if proxies else None
     start_time = time.time()
     
@@ -1855,7 +1858,7 @@ async def process_br1_cmd(event):
         await event.reply("Format: `/br1 cc|mm|yy|cvv`")
         return
     status_msg = await event.reply("<b>Processing Braintree $1...</b>", parse_mode="html")
-    proxies = load_proxies()
+    proxies = load_proxies(user_id)
     proxy = random.choice(proxies) if proxies else None
     start_time = time.time()
 
@@ -1894,7 +1897,7 @@ async def process_b3auth_cmd(event):
         await event.reply("Format: `/b3auth cc|mm|yy|cvv`")
         return
     status_msg = await event.reply("<b>Processing Braintree Auth...</b>", parse_mode="html")
-    proxies = load_proxies()
+    proxies = load_proxies(user_id)
     proxy = random.choice(proxies) if proxies else None
     start_time = time.time()
     st, msg, code = await b3_check_card(cc, mm, yy, cvc, proxy_url=proxy)
@@ -1925,7 +1928,7 @@ async def process_b3rap_cmd(event):
         await event.reply("Format: `/b3rap cc|mm|yy|cvv`")
         return
     status_msg = await event.reply("<b>Processing Braintree Rapunzel...</b>", parse_mode="html")
-    proxies = load_proxies()
+    proxies = load_proxies(user_id)
     proxy = random.choice(proxies) if proxies else None
     start_time = time.time()
     st, msg, code = await b3w_check_card(cc, mm, yy, cvc, proxy_url=proxy)
@@ -1956,7 +1959,7 @@ async def process_rz1_cmd(event):
         await event.reply("Format: `/rz1 cc|mm|yy|cvv`")
         return
     status_msg = await event.reply("<b>Processing Razorpay $1...</b>", parse_mode="html")
-    proxies = load_proxies()
+    proxies = load_proxies(user_id)
     proxy = random.choice(proxies) if proxies else None
     start_time = time.time()
     page_url = "https://razorpay.me/@tpstech"
@@ -2005,7 +2008,7 @@ async def process_st2_cmd(event):
         await event.reply("Format: `/st2 cc|mm|yy|cvv`")
         return
     status_msg = await event.reply("<b>Processing Stripe WCPay...</b>", parse_mode="html")
-    proxies = load_proxies()
+    proxies = load_proxies(user_id)
     proxy = random.choice(proxies) if proxies else None
     start_time = time.time()
     msg = await check_card_st(card_input, proxy_url=proxy)
@@ -2042,7 +2045,7 @@ async def process_paypal_cmd(event):
 
     status_msg = await event.reply("<b>Processing PayPal Commerce ($1.00)...</b>", parse_mode="html")
 
-    proxies = load_proxies()
+    proxies = load_proxies(user_id)
     proxy = None
     proxy_status = "Direct"
     if proxies:
@@ -2101,7 +2104,7 @@ async def process_vbv_cmd(event):
 
     status_msg = await event.reply("🔄 <b>Checking 3DS Status (Braintree VBV)...</b>", parse_mode="html")
 
-    proxies = load_proxies()
+    proxies = load_proxies(user_id)
     proxy = None
     proxy_status = "Direct"
     if proxies:
@@ -2178,7 +2181,7 @@ async def sq_check_cmd(event):
 
     status_msg = await event.reply(f"<b>AUTO SQUARE $1 GATEWAY</b>\n━━━━━━━━━━━━━━━━━━━━\nCard: <code>{cc}|{mes}|{ano}|{cvv}</code>\n<i>Processing payment...</i>", parse_mode="html")
 
-    proxies = load_proxies()
+    proxies = load_proxies(user_id)
     proxy = random.choice(proxies) if proxies else None
 
     result = await process_square(merchant_id, checkout_id, cc, mes, ano, cvv, proxy=proxy)
@@ -2601,7 +2604,7 @@ async def mass_chk_reply(event):
             return
 
         sites = get_checker_sites(user_id)
-        proxies = load_proxies()
+        proxies = load_proxies(user_id)
         if not sites:
             await status_msg.edit("""<b>⚠️ SHOPIFY SITES REQUIRED</b>
 ━━━━━━━━━━━━━━━━━━━━
@@ -2856,7 +2859,7 @@ async def process_mst1_cmd(event):
         return
     cards = cards[:20]
     status_msg = await event.reply(f"<b>Mass Stripe $1 Check ({len(cards)})</b>\n<i>Processing...</i>", parse_mode="html")
-    proxies = load_proxies()
+    proxies = load_proxies(user_id)
     results = []
     for card in cards:
         proxy = random.choice(proxies) if proxies else None
@@ -2878,7 +2881,7 @@ async def process_mbt1_cmd(event):
         return
     cards = cards[:20]
     status_msg = await event.reply(f"<b>Mass Braintree $1 Check ({len(cards)})</b>\n<i>Processing...</i>", parse_mode="html")
-    proxies = load_proxies()
+    proxies = load_proxies(user_id)
     results = []
     for card in cards:
         parts = card.split("|")
@@ -2901,7 +2904,7 @@ async def process_mb3_cmd(event):
         return
     cards = cards[:20]
     status_msg = await event.reply(f"<b>Mass Braintree Auth Check ({len(cards)})</b>\n<i>Processing...</i>", parse_mode="html")
-    proxies = load_proxies()
+    proxies = load_proxies(user_id)
     results = []
     for card in cards:
         parts = card.split("|")
