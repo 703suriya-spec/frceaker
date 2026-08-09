@@ -345,35 +345,24 @@ def remove_db_rz_site(site_url: str) -> bool:
     finally:
         conn.close()
 
-# ==================== PER-USER PROXIES ====================
-def add_db_user_proxies(user_id: int, proxy_urls: list[str]) -> tuple[int, int]:
+# ==================== PER-USER PROXIES (FREAKYHITTER ARCHITECTURE) ====================
+def save_db_user_proxies(user_id: int, proxies: list[str]):
     conn = get_db_connection()
     if not conn:
-        return (0, 0)
-    inserted = 0
-    duplicates = 0
+        return
     try:
-        now = int(time.time())
         uid = str(user_id)
+        now = int(time.time())
+        data = json.dumps(proxies)
         with conn.cursor() as cur:
-            for p in proxy_urls:
-                p_clean = p.strip()
-                if not p_clean:
-                    continue
-                cur.execute("""
-                    INSERT INTO user_proxies (user_id, proxy_url, added_at)
-                    VALUES (%s, %s, %s)
-                    ON CONFLICT (user_id, proxy_url) DO NOTHING;
-                """, (uid, p_clean, now))
-                if cur.rowcount > 0:
-                    inserted += 1
-                else:
-                    duplicates += 1
+            cur.execute("""
+                INSERT INTO user_proxies (user_id, proxies, updated_at)
+                VALUES (%s, %s, %s)
+                ON CONFLICT (user_id) DO UPDATE SET proxies = EXCLUDED.proxies, updated_at = EXCLUDED.updated_at;
+            """, (uid, data, now))
             conn.commit()
-            return (inserted, duplicates)
     except Exception as e:
-        print(f"[Supabase DB Error] add_db_user_proxies: {e}")
-        return (inserted, duplicates)
+        print(f"[Supabase DB Error] save_db_user_proxies: {e}")
     finally:
         conn.close()
 
@@ -385,13 +374,11 @@ def get_db_user_proxies(user_id: int) -> list[str]:
     try:
         uid = str(user_id)
         with conn.cursor() as cur:
-            cur.execute("""
-                SELECT proxy_url FROM user_proxies
-                WHERE user_id = %s
-                ORDER BY added_at DESC;
-            """, (uid,))
-            rows = cur.fetchall()
-            return [r[0].strip() for r in rows if r and r[0] and r[0].strip()]
+            cur.execute("SELECT proxies FROM user_proxies WHERE user_id = %s;", (uid,))
+            row = cur.fetchone()
+            if row and row[0]:
+                return json.loads(row[0])
+            return []
     except Exception as e:
         print(f"[Supabase DB Error] get_db_user_proxies: {e}")
         return []
@@ -399,58 +386,46 @@ def get_db_user_proxies(user_id: int) -> list[str]:
         conn.close()
 
 
+def add_db_user_proxies(user_id: int, new_proxies: list[str]) -> tuple[int, int]:
+    existing = get_db_user_proxies(user_id)
+    existing_set = set(existing)
+    truly_new = []
+    duplicates = 0
+
+    for p in new_proxies:
+        p_clean = p.strip()
+        if not p_clean:
+            continue
+        if p_clean in existing_set:
+            duplicates += 1
+        else:
+            truly_new.append(p_clean)
+            existing_set.add(p_clean)
+
+    if truly_new:
+        updated_list = existing + truly_new
+        save_db_user_proxies(user_id, updated_list)
+
+    return (len(truly_new), duplicates)
+
+
 def remove_db_user_proxy(user_id: int, proxy_url: str) -> bool:
-    conn = get_db_connection()
-    if not conn:
-        return False
-    try:
-        with conn.cursor() as cur:
-            cur.execute("""
-                DELETE FROM user_proxies
-                WHERE user_id = %s AND (proxy_url = %s OR proxy_url LIKE %s);
-            """, (str(user_id), proxy_url, f"%{proxy_url}%"))
-            conn.commit()
-            return cur.rowcount > 0
-    except Exception as e:
-        print(f"[Supabase DB Error] remove_db_user_proxy: {e}")
-        return False
-    finally:
-        conn.close()
+    existing = get_db_user_proxies(user_id)
+    target = proxy_url.strip()
+    new_list = [p for p in existing if p != target and target not in p]
+    if len(new_list) != len(existing):
+        save_db_user_proxies(user_id, new_list)
+        return True
+    return False
+
 
 def clear_db_user_proxies(user_id: int):
-    conn = get_db_connection()
-    if not conn:
-        return
-    try:
-        with conn.cursor() as cur:
-            cur.execute("DELETE FROM user_proxies WHERE user_id = %s;", (str(user_id),))
-            conn.commit()
-    except Exception as e:
-        print(f"[Supabase DB Error] clear_db_user_proxies: {e}")
-    finally:
-        conn.close()
+    save_db_user_proxies(user_id, [])
+
 
 def sync_db_user_proxies(user_id: int, alive_proxies: list[str]):
-    """Atomic replacement of user's active proxies in Supabase database after audit."""
-    conn = get_db_connection()
-    if not conn:
-        return
-    try:
-        uid = str(user_id)
-        now = int(time.time())
-        with conn.cursor() as cur:
-            cur.execute("DELETE FROM user_proxies WHERE user_id = %s;", (uid,))
-            for p in alive_proxies:
-                cur.execute("""
-                    INSERT INTO user_proxies (user_id, proxy_url, added_at)
-                    VALUES (%s, %s, %s)
-                    ON CONFLICT (user_id, proxy_url) DO NOTHING;
-                """, (uid, p, now))
-            conn.commit()
-    except Exception as e:
-        print(f"[Supabase DB Error] sync_db_user_proxies: {e}")
-    finally:
-        conn.close()
+    save_db_user_proxies(user_id, alive_proxies)
+
 
 
 
