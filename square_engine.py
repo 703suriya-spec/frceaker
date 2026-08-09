@@ -430,5 +430,13 @@ def _extract_square_result(result) -> tuple[bool, str]:
     if not code:
         code = (data.get("payment") or {}).get("card_details", {}).get("errors", [{}])[0].get("code")
     detail = errors[0].get("detail") if errors else ""
-    msg = f"{code}: {detail}" if code and detail else (code or "DECLINED")
+    
+    if detail:
+        detail = detail.replace("Authorization error:", "").replace("'", "").strip()
+    
+    if code and detail and detail.upper() != code.upper():
+        msg = f"{code} - {detail}"
+    else:
+        msg = code or detail or "DECLINED"
     return False, msg
+
