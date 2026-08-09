@@ -149,7 +149,9 @@ async def check_card(
     formatted_proxy = _format_proxy(proxy_url)
     proxy_args = {"proxy": formatted_proxy} if formatted_proxy else {}
 
+    user_agent = random.choice(USER_AGENTS)
     billing, shipping = _rand_billing()
+
 
     try:
         async with aiohttp.ClientSession(
