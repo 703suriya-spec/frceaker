@@ -2040,14 +2040,16 @@ async def process_rz1_cmd(event):
     st, msg, code, _ = await check_card_rz(page_url, cc, mm, yy, cvc, proxy_url=proxy)
     time_taken = round(time.time() - start_time, 2)
     status_emoji = "✅ LIVE / CHARGED" if st == "live" else f"❌ {st.upper()}"
-    status_line = f"Status: {status_emoji} - {msg}\n"
     res = f"""<b>Razorpay $1 Charge</b>
 ━━━━━━━━━━━━━━━━━━━━
 CC: <code>{cc}|{mm}|{yy}|{cvc}</code>
-{status_line}Time: {time_taken}s
+Status: {status_emoji}
+Response: <code>{msg}</code>
+Time: {time_taken}s
 ━━━━━━━━━━━━━━━━━━━━
 Gateway: Razorpay New"""
     await status_msg.edit(res, parse_mode="html")
+
 
 # ==================== VBV LOOKUP (vbv2) ENGINE ====================
 @bot.on(events.NewMessage(pattern=r'^/vbv2(?:\s+(.+))?$'))
