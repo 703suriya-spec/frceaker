@@ -5,3 +5,8 @@ aiohttp_socks
 Pillow
 pytz
 psycopg2-binary
+httpx
+requests
+cachetools
+beautifulsoup4
+
