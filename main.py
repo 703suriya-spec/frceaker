@@ -1791,7 +1791,6 @@ async def single_razorpay_cc(event):
         update_daily_usage(user_id, 1)
 
         brand, bin_type, level, bank, country, flag = await get_bin_info(card.split('|')[0])
-        gateway = "Razorpay"
         price = result.get("price", "1")
         response_msg = str(result.get('message', 'Unknown'))[:150]
 
@@ -1803,12 +1802,12 @@ CC: <code>{card}</code>
 {status_line}Brand: {brand} - {bin_type} ({level})
 Bank: {bank}
 Country: {country}
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Gateway: Razorpay ₹1"""
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━"""
 
         await status_msg.edit(res_msg, parse_mode="html")
     except Exception as e:
         await status_msg.edit(f"Error: {e}")
+
 
 
 
@@ -1841,7 +1840,7 @@ async def process_stripe_cmd(event):
         await event.reply("⚠️ Format: `/st cc|mm|yy|cvv`")
         return
 
-    status_msg = await event.reply("🔄 <b>Processing Stripe WCPay (SP12Shop)...</b>", parse_mode="html")
+    status_msg = await event.reply("<b>Processing Stripe WCPay ($22.00)...</b>", parse_mode="html")
 
     proxies = load_proxies(user_id)
     proxy = None
@@ -1860,8 +1859,7 @@ async def process_stripe_cmd(event):
 ━━━━━━━━━━━━━━━━━━━━
 CC: <code>{cc}|{mm}|{yy}|{cvc}</code>
 {status_line}Time: {time_taken}s
-━━━━━━━━━━━━━━━━━━━━
-Gateway: Stripe (WooCommerce Payments)"""
+━━━━━━━━━━━━━━━━━━━━"""
 
     await status_msg.edit(res, parse_mode="html")
 
@@ -1903,8 +1901,7 @@ async def process_stripe1_cmd(event):
 ━━━━━━━━━━━━━━━━━━━━
 CC: <code>{cc}|{mm}|{yy}|{cvc}</code>
 {status_line}Time: {time_taken}s
-━━━━━━━━━━━━━━━━━━━━
-Gateway: Stripe $1"""
+━━━━━━━━━━━━━━━━━━━━"""
     await status_msg.edit(res, parse_mode="html")
 
 
@@ -1945,8 +1942,7 @@ CC: <code>{cc}|{mm}|{yy}|{cvc}</code>
 Status: {status_emoji}
 Response: <code>{msg}</code>
 Time: {time_taken}s
-━━━━━━━━━━━━━━━━━━━━
-Gateway: Braintree $1"""
+━━━━━━━━━━━━━━━━━━━━"""
     await status_msg.edit(res, parse_mode="html")
 
 
@@ -1980,8 +1976,7 @@ async def process_b3auth_cmd(event):
 ━━━━━━━━━━━━━━━━━━━━
 CC: <code>{cc}|{mm}|{yy}|{cvc}</code>
 {status_line}Time: {time_taken}s
-━━━━━━━━━━━━━━━━━━━━
-Gateway: Braintree Auth (silvercell)"""
+━━━━━━━━━━━━━━━━━━━━"""
     await status_msg.edit(res, parse_mode="html")
 
 # ==================== BRAINTREE RAPUNZEL (b3rap) ENGINE ====================
@@ -2013,8 +2008,7 @@ async def process_b3rap_cmd(event):
 ━━━━━━━━━━━━━━━━━━━━
 CC: <code>{cc}|{mm}|{yy}|{cvc}</code>
 {status_line}Time: {time_taken}s
-━━━━━━━━━━━━━━━━━━━━
-Gateway: Braintree Auth (bellamoda)"""
+━━━━━━━━━━━━━━━━━━━━"""
     await status_msg.edit(res, parse_mode="html")
 
 # ==================== RAZORPAY NEW (rz1) ENGINE ====================
@@ -2048,8 +2042,7 @@ CC: <code>{cc}|{mm}|{yy}|{cvc}</code>
 Status: {status_emoji}
 Response: <code>{msg}</code>
 Time: {time_taken}s
-━━━━━━━━━━━━━━━━━━━━
-Gateway: Razorpay New"""
+━━━━━━━━━━━━━━━━━━━━"""
     await status_msg.edit(res, parse_mode="html")
 
 
@@ -2095,8 +2088,7 @@ Status: {status_emoji}
 Response: <code>{msg}</code>
 Brand: <code>{brand}</code>
 Time: {time_taken}s
-━━━━━━━━━━━━━━━━━━━━
-Gateway: Stripe Auth (dilaboards)"""
+━━━━━━━━━━━━━━━━━━━━"""
     await status_msg.edit(res, parse_mode="html")
 
 
@@ -2121,8 +2113,7 @@ async def process_vbv2_cmd(event):
 ━━━━━━━━━━━━━━━━━━━━
 CC: <code>{card_input}</code>
 {status_line}Time: {time_taken}s
-━━━━━━━━━━━━━━━━━━━━
-Gateway: VBV Hosted API"""
+━━━━━━━━━━━━━━━━━━━━"""
     await status_msg.edit(res, parse_mode="html")
 
 # ==================== STRIPE NEW (st2) ENGINE ====================
@@ -2148,8 +2139,7 @@ async def process_st2_cmd(event):
 ━━━━━━━━━━━━━━━━━━━━
 CC: <code>{card_input}</code>
 {status_line}Time: {time_taken}s
-━━━━━━━━━━━━━━━━━━━━
-Gateway: Stripe New (motherluck)"""
+━━━━━━━━━━━━━━━━━━━━"""
     await status_msg.edit(res, parse_mode="html")
 
 @bot.on(events.NewMessage(pattern=r'^/pp(?:\s+(.+))?$'))
@@ -2204,8 +2194,7 @@ async def process_paypal_cmd(event):
 <b>Status:</b> {status}
 <b>Amount:</b> {amt}
 <b>Time:</b> {time_taken}s | <b>Proxy:</b> {proxy_status}
-━━━━━━━━━━━━━━━━━━━━
-<i>Gateway: PayPal Commerce</i>"""
+━━━━━━━━━━━━━━━━━━━━"""
 
     await status_msg.edit(res, parse_mode="html")
 
@@ -2279,10 +2268,10 @@ Country: <code>{country}</code>
 Bank: <code>{bank}</code>
 Type: <code>{card_type}</code>
 Time: {time_taken}s | Proxy: {proxy_status}
-━━━━━━━━━━━━━━━━━━━━
-Gateway: VBV (Braintree)"""
+━━━━━━━━━━━━━━━━━━━━"""
 
     await status_msg.edit(res, parse_mode="html")
+
 
 
 
@@ -2338,8 +2327,8 @@ async def sq_check_cmd(event):
 
 ℹ️ <b>Brand:</b> {brand} - {bin_type} ({level})
 🏦 <b>Bank:</b> {bank}
-🌐 <b>Country:</b> {country} {flag}
-🏢 <b>Merchant:</b> <code>{merchant_id}</code>"""
+🌐 <b>Country:</b> {country} {flag}"""
+
 
     await status_msg.edit(res_msg, parse_mode="html")
 
