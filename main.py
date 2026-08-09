@@ -1192,66 +1192,111 @@ async def clear_user_sites_cmd(event):
 
 
 # ==================== /addrzsites - RAZORPAY SITE ADD ====================
-@bot.on(events.NewMessage(pattern=r'^/addrzsites\s+(.+)'))
-async def add_razorpay_site(event):
-    user_id = event.sender_id
-
-    site = event.pattern_match.group(1).strip()
-    if not site.startswith("http"):
+async def check_single_rz_site(site: str, proxy: str) -> bool:
+    """Verifies if a Razorpay payment page URL is active via Razorpay bridge"""
+    site = site.strip()
+    if not site.startswith("http://") and not site.startswith("https://"):
         site = f"https://{site}"
-
-    status_msg = await event.reply(f" Testing Razorpay Site...\n\n<code>{site[:60]}</code>", parse_mode="html")
-    
-    proxies = load_proxies()
-    if not proxies:
-        await status_msg.edit(" No proxies available!")
-        return
-    
-    proxy = random.choice(proxies)
     test_card = "5154623245618097|03|2032|156"
-    
+    base_url = f"{RAZORPAY_API_BASE}?Key=aiojames&Site={site}&amount=1&cc={test_card}&proxy={proxy}"
     try:
-        #  RAZORPAY API TEST
-        base_url = f"{RAZORPAY_API_BASE}?Key=aiojames&Site={site}&amount=1&cc={test_card}&proxy={proxy}"
-        
-        timeout = aiohttp.ClientTimeout(total=25)
+        timeout = aiohttp.ClientTimeout(total=20)
         async with aiohttp.ClientSession(timeout=timeout) as session:
             async with session.get(base_url, ssl=False) as resp:
                 raw_text = await resp.text()
-                
                 if not raw_text or len(raw_text) < 10:
-                    await status_msg.edit(" RZ Site Dead! Empty Response.", parse_mode="html")
-                    return
-                
+                    return False
                 try:
                     raw = json.loads(raw_text)
-                except:
-                    await status_msg.edit(" RZ Site Dead! Invalid Response.", parse_mode="html")
-                    return
-                
+                except Exception:
+                    return False
                 response_msg = str(raw.get('response', raw.get('Response', ''))).lower()
-                
                 dead_indicators = ['error', 'invalid', 'dead', 'failed', 'timeout', 'not found', 'bad gateway', 'cloudflare', 'captcha', 'connection', 'refused']
-                
                 if any(x in response_msg for x in dead_indicators):
-                    await status_msg.edit(f" RZ Site Dead!\n\n<code>{site[:60]}</code>", parse_mode="html")
-                    return
-                
-                #  ADD TO RZ SITES SUPABASE DB
-                from db import add_db_rz_site, get_db_rz_sites
-                current_rz = get_db_rz_sites()
-                if site not in current_rz:
-                    add_db_rz_site(site)
-                    await status_msg.edit(f""" Razorpay Site Added!
+                    return False
+                return True
+    except Exception:
+        return False
 
-📊 Total RZ Sites: <code>{len(current_rz) + 1}</code>
 
-💡 /rzsites - Check | /rmrzsites url - Remove""", parse_mode="html")
-                else:
-                    await status_msg.edit("[WARN] Already in RZ list!", parse_mode="html")
-                    
-    except Exception as e:
-        await status_msg.edit(f" Test Failed! Not Added: {e}", parse_mode="html")
+@bot.on(events.NewMessage(pattern=r'^/addrzsites(?:\s+(.+))?$'))
+async def add_razorpay_site(event):
+    user_id = event.sender_id
+    raw_args = event.pattern_match.group(1)
+    sites_to_test = []
+
+    # 1. Check if replying to a file or message
+    if event.is_reply:
+        reply_msg = await event.get_reply_message()
+        if reply_msg and reply_msg.file:
+            try:
+                file_path = await reply_msg.download_media()
+                async with aiofiles.open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                    file_content = await f.read()
+                try: os.remove(file_path)
+                except: pass
+
+                extracted = re.findall(r'(?:https?://)?(?:[a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}(?:/[^\s]*)?', file_content)
+                sites_to_test.extend(extracted)
+            except Exception as e:
+                await event.reply(f" Error reading site file: {e}")
+                return
+
+    # 2. Extract sites from command text if provided
+    if raw_args:
+        text_sites = re.findall(r'(?:https?://)?(?:[a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}(?:/[^\s]*)?', raw_args)
+        sites_to_test.extend(text_sites)
+
+    # Clean & deduplicate site list
+    sites_to_test = list(dict.fromkeys([s.strip() for s in sites_to_test if s.strip()]))
+
+    if not sites_to_test:
+        await event.reply("""<b>RAZORPAY SITE ADDER</b>
+━━━━━━━━━━━━━━━━━━━━
+<b>Usage:</b>
+1. Reply <code>/addrzsites</code> to a <code>.txt</code> file containing Razorpay site links.
+2. <code>/addrzsites https://pages.razorpay.com/your_link</code>
+3. Send multiple URLs separated by newlines.""", parse_mode="html")
+        return
+
+    status_msg = await event.reply(f" <b>Testing & Adding {len(sites_to_test)} Razorpay Sites...</b>", parse_mode="html")
+
+    proxies = load_proxies()
+    if not proxies:
+        await status_msg.edit(" No proxies available to test sites!")
+        return
+
+    from db import add_db_rz_site, get_db_rz_sites
+    existing_sites = set(get_db_rz_sites())
+
+    alive_added = 0
+    dead_count = 0
+
+    batch_size = 20
+    for i in range(0, len(sites_to_test), batch_size):
+        batch = sites_to_test[i:i + batch_size]
+        tasks = [check_single_rz_site(s, random.choice(proxies)) for s in batch]
+        results = await asyncio.gather(*tasks)
+
+        for site_url, is_alive in zip(batch, results):
+            if not site_url.startswith("http"):
+                site_url = f"https://{site_url}"
+            if is_alive:
+                if site_url not in existing_sites:
+                    add_db_rz_site(site_url)
+                    existing_sites.add(site_url)
+                    alive_added += 1
+            else:
+                dead_count += 1
+
+    await status_msg.edit(f"""<b> RAZORPAY SITES BATCH COMPLETE</b>
+━━━━━━━━━━━━━━━━━━━━
+ <b>Added Active Sites:</b> <code>{alive_added}</code>
+[WARN] <b>Dead / Invalid Sites:</b> <code>{dead_count}</code>
+📊 <b>Total RZ Sites in DB:</b> <code>{len(existing_sites)}</code>
+
+💡 <code>/rzsites</code> to view all active sites.""", parse_mode="html")
+
 
 
 # ==================== /rmrzsites - RAZORPAY SITE REMOVE ====================
