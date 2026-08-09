@@ -318,6 +318,25 @@ def _extract_error_li(html: str) -> str | None:
     return None
 
 
+def _format_proxy(proxy: str | None) -> str | None:
+    if not proxy:
+        return None
+    p = str(proxy).strip()
+    if p.startswith(("http://", "https://", "socks5://", "socks4://")):
+        return p
+    parts = p.split(":")
+    if len(parts) == 4:
+        if parts[1].isdigit():
+            return f"http://{parts[2]}:{parts[3]}@{parts[0]}:{parts[1]}"
+        elif parts[3].isdigit():
+            return f"http://{parts[0]}:{parts[1]}@{parts[2]}:{parts[3]}"
+        else:
+            return f"http://{parts[2]}:{parts[3]}@{parts[0]}:{parts[1]}"
+    elif len(parts) == 2:
+        return f"http://{parts[0]}:{parts[1]}"
+    return f"http://{p}"
+
+
 async def b3w_check_card(
     cc: str,
     mm: str,
@@ -335,8 +354,10 @@ async def b3w_check_card(
         yy = "20" + yy[-2:]
     mm = mm.zfill(2)
 
-    proxy_args = {"proxy": proxy_url} if proxy_url else {}
+    formatted_proxy = _format_proxy(proxy_url)
+    proxy_args = {"proxy": formatted_proxy} if formatted_proxy else {}
     device_id = str(uuid.uuid4())
+
 
     try:
         async with aiohttp.ClientSession(

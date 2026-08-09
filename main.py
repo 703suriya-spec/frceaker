@@ -247,27 +247,40 @@ def is_premium(user_id):
     except Exception:
         return False
 
-def load_proxies(user_id: int | None = None):
+def load_proxies(user_id: int | None = None) -> list[str]:
+    raw_list = []
     # 1. User's personal Supabase proxies first (Source of Truth)
     if user_id:
         try:
             from db import get_db_user_proxies
-            return get_db_user_proxies(user_id)
+            raw_list = get_db_user_proxies(user_id)
         except Exception:
             pass
 
     # 2. Render / Cloud Environment variables
-    env_list = os.getenv("PROXY_LIST", "").strip()
-    if env_list:
-        return [p.strip() for p in env_list.split(",") if p.strip()]
+    if not raw_list:
+        env_list = os.getenv("PROXY_LIST", "").strip()
+        if env_list:
+            raw_list = [p.strip() for p in env_list.split(",") if p.strip()]
 
-    env_single = os.getenv("PROXY_URL", "").strip()
-    if env_single:
-        return [env_single]
+    if not raw_list:
+        env_single = os.getenv("PROXY_URL", "").strip()
+        if env_single:
+            raw_list = [env_single]
 
     # 3. Fallback to local proxy.txt (filtered)
-    lines = get_file_lines(PROXY_FILE)
-    return [l for l in lines if not l.startswith("#")]
+    if not raw_list:
+        lines = get_file_lines(PROXY_FILE)
+        raw_list = [l.strip() for l in lines if l and not l.startswith("#")]
+
+    formatted = []
+    for p in raw_list:
+        if p and p.strip():
+            fp = format_proxy_url(p)
+            if fp and fp not in formatted:
+                formatted.append(fp)
+    return formatted
+
 
 
 
@@ -736,18 +749,24 @@ async def remove_user_site(user_id, site):
         return True
     return False
 
-def format_proxy_url(proxy: str) -> str:
-    proxy = proxy.strip()
-    if proxy.startswith("http://") or proxy.startswith("https://") or proxy.startswith("socks5://") or proxy.startswith("socks4://"):
-        return proxy
-    parts = proxy.split(":")
+def format_proxy_url(proxy: str | None) -> str:
+    if not proxy:
+        return ""
+    p = str(proxy).strip()
+    if p.startswith(("http://", "https://", "socks5://", "socks4://")):
+        return p
+    parts = p.split(":")
     if len(parts) == 4:
-        ip, port, user, password = parts[0], parts[1], parts[2], parts[3]
-        return f"http://{user}:{password}@{ip}:{port}"
+        if parts[1].isdigit():  # ip:port:user:pass
+            return f"http://{parts[2]}:{parts[3]}@{parts[0]}:{parts[1]}"
+        elif parts[3].isdigit():  # user:pass:ip:port
+            return f"http://{parts[0]}:{parts[1]}@{parts[2]}:{parts[3]}"
+        else:
+            return f"http://{parts[2]}:{parts[3]}@{parts[0]}:{parts[1]}"
     elif len(parts) == 2:
-        ip, port = parts[0], parts[1]
-        return f"http://{ip}:{port}"
-    return f"http://{proxy}"
+        return f"http://{parts[0]}:{parts[1]}"
+    return f"http://{p}"
+
 
 async def test_proxy(proxy: str):
     """Robust fast proxy health check with multi-endpoint fallback"""
