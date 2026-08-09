@@ -1477,16 +1477,19 @@ Working: <code>{len(alive_proxies)}</code>
 Dead: <code>{len(dead_proxies)}</code>
 📊 Progress: <code>{min(len(alive_proxies) + len(dead_proxies), len(proxies))}/{len(proxies)}</code>""", parse_mode="html")
 
-        async with aiofiles.open(PROXY_FILE, 'w') as f:
-            for proxy in alive_proxies:
-                await f.write(proxy + "\n")
+        try:
+            from db import sync_db_user_proxies
+            sync_db_user_proxies(user_id, alive_proxies)
+        except Exception as dbe:
+            print(f"sync_db_user_proxies error: {dbe}")
 
         if alive_proxies:
-            txt_file = "working_proxies.txt"
+            txt_file = f"working_proxies_{user_id}.txt"
             with open(txt_file, "w") as f:
                 f.write("\n".join(alive_proxies))
             await bot.send_message(user_id, f" **{len(alive_proxies)} Working Proxies**", file=txt_file)
-            os.remove(txt_file)
+            if os.path.exists(txt_file):
+                os.remove(txt_file)
 
         await status_msg.edit(f"""⚠️ <b>Proxy Audit Complete!</b>
 
@@ -1496,6 +1499,7 @@ TXT File Sent""", parse_mode="html")
 
     except Exception as e:
         await status_msg.edit(f" Error: {e}")
+
 
 
 @bot.on(events.NewMessage(pattern=r'(?s)^/addproxy(?:\s+(.+))?$'))

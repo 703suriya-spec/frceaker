@@ -413,5 +413,28 @@ def clear_db_user_proxies(user_id: int):
     finally:
         conn.close()
 
+def sync_db_user_proxies(user_id: int, alive_proxies: list[str]):
+    """Atomic replacement of user's active proxies in Supabase database after audit."""
+    conn = get_db_connection()
+    if not conn:
+        return
+    try:
+        uid = str(user_id)
+        now = int(time.time())
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM user_proxies WHERE user_id = %s;", (uid,))
+            for p in alive_proxies:
+                cur.execute("""
+                    INSERT INTO user_proxies (user_id, proxy_url, added_at)
+                    VALUES (%s, %s, %s)
+                    ON CONFLICT (user_id, proxy_url) DO NOTHING;
+                """, (uid, p, now))
+            conn.commit()
+    except Exception as e:
+        print(f"[Supabase DB Error] sync_db_user_proxies: {e}")
+    finally:
+        conn.close()
+
+
 
 
