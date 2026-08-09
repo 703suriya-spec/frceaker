@@ -1926,7 +1926,8 @@ async def process_br1_cmd(event):
         st, msg, code = "error", f"Error: {e}", "error"
 
     time_taken = round(time.time() - start_time, 2)
-    status_line = f"Status: {st.upper()} - {msg}\n" if st not in ("charged", "approved") else ""
+    status_emoji = "✅ APPROVED" if st in ("charged", "approved") else f"❌ {st.upper()}"
+    status_line = f"Status: {status_emoji} - {msg}\n"
     res = f"""<b>Braintree $1 Charge</b>
 ━━━━━━━━━━━━━━━━━━━━
 CC: <code>{cc}|{mm}|{yy}|{cvc}</code>
@@ -1959,7 +1960,8 @@ async def process_b3auth_cmd(event):
     start_time = time.time()
     st, msg, code = await b3_check_card(cc, mm, yy, cvc, proxy_url=proxy)
     time_taken = round(time.time() - start_time, 2)
-    status_line = f"Status: {st.upper()} - {msg}\n" if st not in ("approved", "ccn") else ""
+    status_emoji = "✅ APPROVED" if st == "approved" else ("🟡 CCN MATCH" if st == "ccn" else f"❌ {st.upper()}")
+    status_line = f"Status: {status_emoji} - {msg}\n"
     res = f"""<b>Braintree Auth</b>
 ━━━━━━━━━━━━━━━━━━━━
 CC: <code>{cc}|{mm}|{yy}|{cvc}</code>
@@ -1991,7 +1993,8 @@ async def process_b3rap_cmd(event):
     start_time = time.time()
     st, msg, code = await b3w_check_card(cc, mm, yy, cvc, proxy_url=proxy)
     time_taken = round(time.time() - start_time, 2)
-    status_line = f"Status: {st.upper()} - {msg}\n" if st not in ("approved", "ccn") else ""
+    status_emoji = "✅ APPROVED" if st == "approved" else ("🟡 CCN MATCH" if st == "ccn" else f"❌ {st.upper()}")
+    status_line = f"Status: {status_emoji} - {msg}\n"
     res = f"""<b>Braintree Rapunzel Auth</b>
 ━━━━━━━━━━━━━━━━━━━━
 CC: <code>{cc}|{mm}|{yy}|{cvc}</code>
@@ -2024,7 +2027,8 @@ async def process_rz1_cmd(event):
     page_url = "https://razorpay.me/@tpstech"
     st, msg, code, _ = await check_card_rz(page_url, cc, mm, yy, cvc, proxy_url=proxy)
     time_taken = round(time.time() - start_time, 2)
-    status_line = f"Status: {st.upper()} - {msg}\n" if st != "live" else ""
+    status_emoji = "✅ LIVE / CHARGED" if st == "live" else f"❌ {st.upper()}"
+    status_line = f"Status: {status_emoji} - {msg}\n"
     res = f"""<b>Razorpay $1 Charge</b>
 ━━━━━━━━━━━━━━━━━━━━
 CC: <code>{cc}|{mm}|{yy}|{cvc}</code>
@@ -2047,7 +2051,8 @@ async def process_vbv2_cmd(event):
     start_time = time.time()
     st, msg, code, _ = await check_card_vbv(card_input)
     time_taken = round(time.time() - start_time, 2)
-    status_line = f"Status: {code.upper()} - {msg}\n" if code != "passed" else ""
+    status_emoji = "✅ PASSED (NON-VBV)" if code == "passed" else f"❌ {code.upper()}"
+    status_line = f"Status: {status_emoji} - {msg}\n"
     res = f"""<b>Braintree 3DS Lookup</b>
 ━━━━━━━━━━━━━━━━━━━━
 CC: <code>{card_input}</code>
@@ -2073,7 +2078,8 @@ async def process_st2_cmd(event):
     start_time = time.time()
     msg = await check_card_st(card_input, proxy_url=proxy)
     time_taken = round(time.time() - start_time, 2)
-    status_line = f"Status: {msg}\n" if msg != "Card Added" else ""
+    status_emoji = "✅ APPROVED" if msg == "Card Added" else "❌ DECLINED"
+    status_line = f"Status: {status_emoji} - {msg}\n"
     res = f"""<b>Stripe WCPay New</b>
 ━━━━━━━━━━━━━━━━━━━━
 CC: <code>{card_input}</code>
@@ -2199,7 +2205,8 @@ async def process_vbv_cmd(event):
     except Exception:
         pass
 
-    status_line = f"Status: {msg}\n" if not is_live else ""
+    status_emoji = "✅ PASSED (NON-VBV)" if is_live else f"❌ DECLINED ({msg})"
+    status_line = f"Status: {status_emoji}\n"
     res = f"""<b>Vbv Check</b>
 ━━━━━━━━━━━━━━━━━━━━
 CC: <code>{cc}|{mm}|{yy}|{cvc}</code>
@@ -2212,6 +2219,7 @@ Time: {time_taken}s | Proxy: {proxy_status}
 Gateway: VBV (Braintree)"""
 
     await status_msg.edit(res, parse_mode="html")
+
 
 
 @bot.on(events.NewMessage(pattern=r'^/sq\s+(.+)'))
