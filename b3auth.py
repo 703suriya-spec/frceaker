@@ -23,8 +23,8 @@ _LOGIN_PASS = "DDcc55@&#"
 HTTP_TIMEOUT = aiohttp.ClientTimeout(total=30, connect=10)
 
 _UA = (
-    "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 "
-    "(KHTML, like Gecko) Chrome/143.0.0.0 Mobile Safari/537.36"
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+    "(KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36"
 )
 
 _CCN_KEYWORDS = [
@@ -80,18 +80,18 @@ def _doc_headers() -> dict:
             "image/avif,image/webp,image/apng,*/*;q=0.8,"
             "application/signed-exchange;v=b3;q=0.7"
         ),
-        "Accept-Language": "en-IN,en;q=0.9,bn-IN;q=0.8,bn;q=0.7,en-GB;q=0.6,en-US;q=0.5",
+        "Accept-Language": "en-US,en;q=0.9",
         "Cache-Control": "max-age=0",
-        "Sec-Ch-Ua": '"Google Chrome";v="143", "Chromium";v="143", "Not A(Brand";v="24"',
-        "Sec-Ch-Ua-Mobile": "?1",
-        "Sec-Ch-Ua-Platform": '"Android"',
+        "Sec-Ch-Ua": '"Google Chrome";v="125", "Chromium";v="125", "Not?A_Brand";v="24"',
+        "Sec-Ch-Ua-Mobile": "?0",
+        "Sec-Ch-Ua-Platform": '"Windows"',
         "Upgrade-Insecure-Requests": "1",
         "Sec-Fetch-Site": "none",
         "Sec-Fetch-Mode": "navigate",
         "Sec-Fetch-User": "?1",
         "Sec-Fetch-Dest": "document",
-        "Priority": "u=0, i",
     }
+
 
 
 def _form_headers(referer: str | None = None) -> dict:
