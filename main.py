@@ -1925,14 +1925,16 @@ async def process_stripe1_cmd(event):
         st, msg, code = "error", f"Error: {e}", "error"
 
     time_taken = round(time.time() - start_time, 2)
-    status_emoji = "✅ CHARGED" if st in ("charged", "approved") else f"❌ {st.upper()}"
-    status_line = f"Status: {status_emoji} - {msg}\n"
+    status_emoji = "✅ CHARGED" if st in ("charged", "approved") else "❌ DECLINED"
     res = f"""<b>Stripe $1 Charge</b>
 ━━━━━━━━━━━━━━━━━━━━
 CC: <code>{cc}|{mm}|{yy}|{cvc}</code>
-{status_line}Time: {time_taken}s
+Status: {status_emoji}
+Response: <code>{msg}</code>
+Time: {time_taken}s
 ━━━━━━━━━━━━━━━━━━━━"""
     await status_msg.edit(res, parse_mode="html")
+
 
 
 # ==================== BRAINTREE $1 (braintree_1) ENGINE ====================
@@ -2000,12 +2002,13 @@ async def process_b3auth_cmd(event):
     start_time = time.time()
     st, msg, code = await b3_check_card(cc, mm, yy, cvc, proxy_url=proxy)
     time_taken = round(time.time() - start_time, 2)
-    status_emoji = "✅ APPROVED" if st == "approved" else ("🟡 CCN MATCH" if st == "ccn" else f"❌ {st.upper()}")
-    status_line = f"Status: {status_emoji} - {msg}\n"
+    status_emoji = "✅ APPROVED" if st == "approved" else ("🟡 CCN MATCH" if st == "ccn" else "❌ DECLINED")
     res = f"""<b>Braintree Auth</b>
 ━━━━━━━━━━━━━━━━━━━━
 CC: <code>{cc}|{mm}|{yy}|{cvc}</code>
-{status_line}Time: {time_taken}s
+Status: {status_emoji}
+Response: <code>{msg}</code>
+Time: {time_taken}s
 ━━━━━━━━━━━━━━━━━━━━"""
     await status_msg.edit(res, parse_mode="html")
 
@@ -2032,14 +2035,16 @@ async def process_b3rap_cmd(event):
     start_time = time.time()
     st, msg, code = await b3w_check_card(cc, mm, yy, cvc, proxy_url=proxy)
     time_taken = round(time.time() - start_time, 2)
-    status_emoji = "✅ APPROVED" if st == "approved" else ("🟡 CCN MATCH" if st == "ccn" else f"❌ {st.upper()}")
-    status_line = f"Status: {status_emoji} - {msg}\n"
+    status_emoji = "✅ APPROVED" if st == "approved" else ("🟡 CCN MATCH" if st == "ccn" else "❌ DECLINED")
     res = f"""<b>Braintree Rapunzel Auth</b>
 ━━━━━━━━━━━━━━━━━━━━
 CC: <code>{cc}|{mm}|{yy}|{cvc}</code>
-{status_line}Time: {time_taken}s
+Status: {status_emoji}
+Response: <code>{msg}</code>
+Time: {time_taken}s
 ━━━━━━━━━━━━━━━━━━━━"""
     await status_msg.edit(res, parse_mode="html")
+
 
 # ==================== RAZORPAY NEW (rz1) ENGINE ====================
 @bot.on(events.NewMessage(pattern=r'^/rz1(?:\s+(.+))?$'))
@@ -2230,12 +2235,13 @@ async def process_vbv2_cmd(event):
     start_time = time.time()
     st, msg, code, _ = await check_card_vbv(card_input)
     time_taken = round(time.time() - start_time, 2)
-    status_emoji = "✅ PASSED (NON-VBV)" if code == "passed" else f"❌ {code.upper()}"
-    status_line = f"Status: {status_emoji} - {msg}\n"
+    status_emoji = "✅ PASSED (NON-VBV)" if code == "passed" else "❌ DECLINED"
     res = f"""<b>Braintree 3DS Lookup</b>
 ━━━━━━━━━━━━━━━━━━━━
 CC: <code>{card_input}</code>
-{status_line}Time: {time_taken}s
+Status: {status_emoji}
+Response: <code>{msg}</code>
+Time: {time_taken}s
 ━━━━━━━━━━━━━━━━━━━━"""
     await status_msg.edit(res, parse_mode="html")
 
@@ -2257,11 +2263,12 @@ async def process_st2_cmd(event):
     msg = await check_card_st(card_input, proxy_url=proxy)
     time_taken = round(time.time() - start_time, 2)
     status_emoji = "✅ APPROVED" if msg == "Card Added" else "❌ DECLINED"
-    status_line = f"Status: {status_emoji} - {msg}\n"
     res = f"""<b>Stripe WCPay New</b>
 ━━━━━━━━━━━━━━━━━━━━
 CC: <code>{card_input}</code>
-{status_line}Time: {time_taken}s
+Status: {status_emoji}
+Response: <code>{msg}</code>
+Time: {time_taken}s
 ━━━━━━━━━━━━━━━━━━━━"""
     await status_msg.edit(res, parse_mode="html")
 
@@ -2306,17 +2313,15 @@ async def process_paypal_cmd(event):
 
     time_taken = round(time.time() - start_time, 2)
 
-    if is_live:
-        status = f"<b>Approved / Live</b> - {msg}"
-    else:
-        status = f"<b>Declined</b> - {msg}"
+    status_emoji = "✅ APPROVED / LIVE" if is_live else "❌ DECLINED"
 
     res = f"""<b>PayPal Commerce Charge</b>
 ━━━━━━━━━━━━━━━━━━━━
-<b>CC:</b> <code>{cc}|{mm}|{yy}|{cvc}</code>
-<b>Status:</b> {status}
-<b>Amount:</b> {amt}
-<b>Time:</b> {time_taken}s | <b>Proxy:</b> {proxy_status}
+CC: <code>{cc}|{mm}|{yy}|{cvc}</code>
+Status: {status_emoji}
+Response: <code>{msg}</code>
+Amount: {amt}
+Time: {time_taken}s | Proxy: {proxy_status}
 ━━━━━━━━━━━━━━━━━━━━"""
 
     await status_msg.edit(res, parse_mode="html")
@@ -2381,12 +2386,13 @@ async def process_vbv_cmd(event):
     except Exception:
         pass
 
-    status_emoji = "✅ PASSED (NON-VBV)" if is_live else f"❌ DECLINED ({msg})"
-    status_line = f"Status: {status_emoji}\n"
+    status_emoji = "✅ PASSED (NON-VBV)" if is_live else "❌ DECLINED"
     res = f"""<b>Vbv Check</b>
 ━━━━━━━━━━━━━━━━━━━━
 CC: <code>{cc}|{mm}|{yy}|{cvc}</code>
-{status_line}BIN: <code>{bin_num}</code>
+Status: {status_emoji}
+Response: <code>{msg}</code>
+BIN: <code>{bin_num}</code>
 Country: <code>{country}</code>
 Bank: <code>{bank}</code>
 Type: <code>{card_type}</code>
@@ -2394,6 +2400,7 @@ Time: {time_taken}s | Proxy: {proxy_status}
 ━━━━━━━━━━━━━━━━━━━━"""
 
     await status_msg.edit(res, parse_mode="html")
+
 
 
 
