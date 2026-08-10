@@ -762,19 +762,37 @@ def format_proxy_url(proxy: str | None) -> str:
     if not proxy:
         return ""
     p = str(proxy).strip()
-    if p.startswith(("http://", "https://", "socks5://", "socks4://")):
-        return p
+    if not p or any(dummy in p.lower() for dummy in ("user:pass", "ip:port", "username:password", "<user>", "<pass>", "1.1.1.1:8080", "0.0.0.0:8080")):
+        return ""
+    scheme = "http://"
+    if "://" in p:
+        scheme_part, p = p.split("://", 1)
+        scheme = f"{scheme_part}://"
+
+    if "@" in p:
+        parts = p.split("@", 1)
+        auth, hostport = parts[0], parts[1]
+        if not auth or not hostport or ":" not in hostport:
+            return ""
+        host, port = hostport.split(":", 1)
+        if not port.isdigit() or not (1 <= int(port) <= 65535) or host.lower() in ("ip", "user", "pass"):
+            return ""
+        return f"{scheme}{auth}@{host}:{port}"
+
     parts = p.split(":")
     if len(parts) == 4:
-        if parts[1].isdigit():  # ip:port:user:pass
-            return f"http://{parts[2]}:{parts[3]}@{parts[0]}:{parts[1]}"
-        elif parts[3].isdigit():  # user:pass:ip:port
-            return f"http://{parts[0]}:{parts[1]}@{parts[2]}:{parts[3]}"
+        if parts[1].isdigit() and (1 <= int(parts[1]) <= 65535):
+            return f"{scheme}{parts[2]}:{parts[3]}@{parts[0]}:{parts[1]}"
+        elif parts[3].isdigit() and (1 <= int(parts[3]) <= 65535):
+            return f"{scheme}{parts[0]}:{parts[1]}@{parts[2]}:{parts[3]}"
         else:
-            return f"http://{parts[2]}:{parts[3]}@{parts[0]}:{parts[1]}"
+            return ""
     elif len(parts) == 2:
-        return f"http://{parts[0]}:{parts[1]}"
-    return f"http://{p}"
+        if parts[1].isdigit() and (1 <= int(parts[1]) <= 65535):
+            return f"{scheme}{parts[0]}:{parts[1]}"
+        return ""
+    return ""
+
 
 
 async def test_proxy(proxy: str):
@@ -1852,14 +1870,22 @@ async def process_stripe_cmd(event):
     is_live, msg, raw_resp, _, amt = await process_stripe(cc, mm, yy, cvc, proxy_url=proxy)
     
     time_taken = round(time.time() - start_time, 2)
-    
-    status_emoji = "✅ APPROVED / LIVE" if is_live else f"❌ DECLINED ({msg})"
-    status_line = f"Status: {status_emoji}\n"
+
+    if is_live:
+        status_emoji = "✅ APPROVED"
+    elif any(k in msg.lower() for k in ("exception", "error", "timeout", "proxy", "http", "failed to")):
+        status_emoji = "❌ ERROR"
+    else:
+        status_emoji = "❌ DECLINED"
+
     res = f"""<b>Stripe WCPay Charge</b>
 ━━━━━━━━━━━━━━━━━━━━
 CC: <code>{cc}|{mm}|{yy}|{cvc}</code>
-{status_line}Time: {time_taken}s
+Status: {status_emoji}
+Response: <code>{msg}</code>
+Time: {time_taken}s
 ━━━━━━━━━━━━━━━━━━━━"""
+
 
     await status_msg.edit(res, parse_mode="html")
 

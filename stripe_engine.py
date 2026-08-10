@@ -37,14 +37,37 @@ async def process_stripe(cc, mm, yy, cvc, proxy_url=None):
     def _format_proxy(p):
         if not p: return None
         ps = str(p).strip()
-        if ps.startswith(("http://", "https://", "socks5://", "socks4://")): return ps
+        if not ps or any(dummy in ps.lower() for dummy in ("user:pass", "ip:port", "username:password", "<user>", "<pass>", "1.1.1.1:8080", "0.0.0.0:8080")):
+            return None
+        scheme = "http://"
+        if "://" in ps:
+            scheme_part, ps = ps.split("://", 1)
+            scheme = f"{scheme_part}://"
+
+        if "@" in ps:
+            parts = ps.split("@", 1)
+            auth, hostport = parts[0], parts[1]
+            if not auth or not hostport or ":" not in hostport:
+                return None
+            host, port = hostport.split(":", 1)
+            if not port.isdigit() or not (1 <= int(port) <= 65535) or host.lower() in ("ip", "user", "pass"):
+                return None
+            return f"{scheme}{auth}@{host}:{port}"
+
         parts = ps.split(":")
         if len(parts) == 4:
-            if parts[1].isdigit(): return f"http://{parts[2]}:{parts[3]}@{parts[0]}:{parts[1]}"
-            elif parts[3].isdigit(): return f"http://{parts[0]}:{parts[1]}@{parts[2]}:{parts[3]}"
-            else: return f"http://{parts[2]}:{parts[3]}@{parts[0]}:{parts[1]}"
-        elif len(parts) == 2: return f"http://{parts[0]}:{parts[1]}"
-        return f"http://{ps}"
+            if parts[1].isdigit() and (1 <= int(parts[1]) <= 65535):
+                return f"{scheme}{parts[2]}:{parts[3]}@{parts[0]}:{parts[1]}"
+            elif parts[3].isdigit() and (1 <= int(parts[3]) <= 65535):
+                return f"{scheme}{parts[0]}:{parts[1]}@{parts[2]}:{parts[3]}"
+            else:
+                return None
+        elif len(parts) == 2:
+            if parts[1].isdigit() and (1 <= int(parts[1]) <= 65535):
+                return f"{scheme}{parts[0]}:{parts[1]}"
+            return None
+        return None
+
 
     proxy_url = _format_proxy(proxy_url)
 
