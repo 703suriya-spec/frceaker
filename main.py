@@ -22,6 +22,8 @@ from vbv import check_card_str_async as check_card_vbv
 from st import VW as check_card_st
 from dila_engine import check_card_dila
 from nantucket_engine import check_card_nantucket
+from mixtape_engine import check_card_mixtape
+
 
 
 from io import BytesIO
@@ -2165,6 +2167,50 @@ Time: {time_taken}s
     await status_msg.edit(res, parse_mode="html")
 
 
+# ==================== BRAINTREE CHARGE MIXTAPE (br2) ENGINE ====================
+@bot.on(events.NewMessage(pattern=r'^/br2(?:\s+(.+))?$'))
+async def process_br2_cmd(event):
+    user_id = event.sender_id
+    if not is_admin(event.sender_id):
+        await event.reply("Access denied.")
+        return
+    card_input = event.pattern_match.group(1)
+    if not card_input:
+        await event.reply("Format: `/br2 cc|mm|yy|cvv`")
+        return
+    try:
+        parts = card_input.split('|')
+        cc, mm, yy, cvc = [p.strip() for p in parts[:4]]
+    except IndexError:
+        await event.reply("Format: `/br2 cc|mm|yy|cvv`")
+        return
+
+    status_msg = await event.reply("<b>Processing Braintree $10 Charge...</b>", parse_mode="html")
+    proxies = load_proxies(user_id)
+    proxy = random.choice(proxies) if proxies else None
+    start_time = time.time()
+
+    st, msg, brand = await check_card_mixtape(cc, mm, yy, cvc, proxy_url=proxy)
+    time_taken = round(time.time() - start_time, 2)
+
+    if st == "approved":
+        status_emoji = "✅ APPROVED"
+    elif st == "live":
+        status_emoji = "🟡 LIVE / MATCH"
+    else:
+        status_emoji = f"❌ {st.upper()}"
+
+    res = f"""<b>Braintree Charge Gate ($10.00)</b>
+━━━━━━━━━━━━━━━━━━━━
+CC: <code>{cc}|{mm}|{yy}|{cvc}</code>
+Status: {status_emoji}
+Response: <code>{msg}</code>
+Time: {time_taken}s
+━━━━━━━━━━━━━━━━━━━━"""
+    await status_msg.edit(res, parse_mode="html")
+
+
+
 
 
 # ==================== VBV LOOKUP (vbv2) ENGINE ====================
@@ -2619,7 +2665,11 @@ async def charge_info_handler(event):
 <code>/pp cc|mm|yy|cvv</code>
 
 <b><i>Stripe Charge Gate ($15.00)</i></b>
-<code>/st4 cc|mm|yy|cvv</code>"""
+<code>/st4 cc|mm|yy|cvv</code>
+
+<b><i>Braintree $10 Charge Gate</i></b>
+<code>/br2 cc|mm|yy|cvv</code>"""
+
 
 
     buttons = [
