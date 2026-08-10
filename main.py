@@ -24,6 +24,8 @@ from dila_engine import check_card_dila
 from nantucket_engine import check_card_nantucket
 from mixtape_engine import check_card_mixtape
 from clover_engine import check_card_clover
+from authorize_engine import check_card_authorize
+
 
 
 
@@ -2270,6 +2272,53 @@ Time: {time_taken}s
     await status_msg.edit(res, parse_mode="html")
 
 
+# ==================== AUTHORIZE.NET GATE (an) ENGINE ====================
+@bot.on(events.NewMessage(pattern=r'^/an(?:\s+(.+))?$'))
+async def process_an_cmd(event):
+    user_id = event.sender_id
+    if not is_admin(event.sender_id):
+        await event.reply("Access denied.")
+        return
+    card_input = event.pattern_match.group(1)
+    if not card_input:
+        await event.reply("Format: `/an cc|mm|yy|cvv`")
+        return
+
+    try:
+        parts = card_input.split('|')
+        cc, mm, yy, cvc = [p.strip() for p in parts[:4]]
+    except IndexError:
+        await event.reply("Format: `/an cc|mm|yy|cvv`")
+        return
+
+    status_msg = await event.reply("<b>Processing Authorize.Net ($0.10)...</b>", parse_mode="html")
+    proxies = load_proxies(user_id)
+    proxy = random.choice(proxies) if proxies else None
+    start_time = time.time()
+
+    st, msg, brand = await check_card_authorize(cc, mm, yy, cvc, proxy_url=proxy)
+    time_taken = round(time.time() - start_time, 2)
+
+    if st == "charged":
+        status_emoji = "✅ CHARGED"
+    elif st in ("approved", "live"):
+        status_emoji = "✅ APPROVED"
+    elif st == "3ds":
+        status_emoji = "❌ DECLINED"
+    else:
+        status_emoji = "❌ DECLINED"
+
+    res = f"""<b>Authorize.Net Charge Gate ($0.10)</b>
+━━━━━━━━━━━━━━━━━━━━
+CC: <code>{cc}|{mm}|{yy}|{cvc}</code>
+Status: {status_emoji}
+Response: <code>{msg}</code>
+Time: {time_taken}s
+━━━━━━━━━━━━━━━━━━━━"""
+    await status_msg.edit(res, parse_mode="html")
+
+
+
 
 
 
@@ -2735,7 +2784,11 @@ async def charge_info_handler(event):
 <code>/br2 cc|mm|yy|cvv</code>
 
 <b><i>Clover Auto Gate ($1.00)</i></b>
-<code>/cl site_url|cc|mm|yy|cvv</code>"""
+<code>/cl site_url|cc|mm|yy|cvv</code>
+
+<b><i>Authorize.Net Charge Gate ($0.10)</i></b>
+<code>/an cc|mm|yy|cvv</code>"""
+
 
 
 
