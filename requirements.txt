@@ -9,4 +9,6 @@ httpx
 requests
 cachetools
 beautifulsoup4
+cloudscraper
+
 
