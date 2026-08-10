@@ -2112,11 +2112,11 @@ async def process_st3_cmd(event):
     if st == "approved":
         status_emoji = "✅ APPROVED"
     elif st == "live":
-        status_emoji = "🟡 CVV MATCH"
+        status_emoji = "✅ APPROVED"
     elif st == "3ds":
-        status_emoji = "🟡 3DS REQUIRED"
+        status_emoji = "❌ DECLINED"
     else:
-        status_emoji = f"❌ {st.upper()}"
+        status_emoji = "❌ DECLINED"
 
     res = f"""<b>Stripe Auth ($0 Setup Intent)</b>
 ━━━━━━━━━━━━━━━━━━━━
@@ -2157,12 +2157,12 @@ async def process_st4_cmd(event):
 
     if st == "charged":
         status_emoji = "✅ CHARGED"
-    elif st == "live":
-        status_emoji = "🟡 LIVE / MATCH"
+    elif st in ("live", "approved"):
+        status_emoji = "✅ APPROVED"
     elif st == "3ds":
-        status_emoji = "🟡 3DS REQUIRED"
+        status_emoji = "❌ DECLINED"
     else:
-        status_emoji = f"❌ {st.upper()}"
+        status_emoji = "❌ DECLINED"
 
     res = f"""<b>Stripe Charge Gate ($15.00)</b>
 ━━━━━━━━━━━━━━━━━━━━
@@ -2200,14 +2200,14 @@ async def process_br2_cmd(event):
     st, msg, brand = await check_card_mixtape(cc, mm, yy, cvc, proxy_url=proxy)
     time_taken = round(time.time() - start_time, 2)
 
-    if st == "approved":
-        status_emoji = "✅ APPROVED"
+    if st in ("charged", "approved"):
+        status_emoji = "✅ CHARGED"
     elif st == "live":
-        status_emoji = "🟡 LIVE / MATCH"
+        status_emoji = "✅ APPROVED"
     elif st == "3ds":
-        status_emoji = "🟡 3DS REQUIRED"
+        status_emoji = "❌ DECLINED"
     else:
-        status_emoji = f"❌ {st.upper()}"
+        status_emoji = "❌ DECLINED"
 
 
     res = f"""<b>Braintree Charge Gate ($10.00)</b>
@@ -2251,14 +2251,14 @@ async def process_cl_cmd(event):
     st, msg, brand = await check_card_clover(site_url, cc, mm, yy, cvc, proxy_url=proxy)
     time_taken = round(time.time() - start_time, 2)
 
-    if st == "approved":
+    if st == "charged":
+        status_emoji = "✅ CHARGED"
+    elif st in ("approved", "live"):
         status_emoji = "✅ APPROVED"
-    elif st == "live":
-        status_emoji = "🟡 LIVE / MATCH"
     elif st == "3ds":
-        status_emoji = "🟡 3DS REQUIRED"
+        status_emoji = "❌ DECLINED"
     else:
-        status_emoji = f"❌ {st.upper()}"
+        status_emoji = "❌ DECLINED"
 
     res = f"""<b>Clover Auto Gate ($1.00)</b>
 ━━━━━━━━━━━━━━━━━━━━
@@ -2268,6 +2268,7 @@ Response: <code>{msg}</code>
 Time: {time_taken}s
 ━━━━━━━━━━━━━━━━━━━━"""
     await status_msg.edit(res, parse_mode="html")
+
 
 
 
