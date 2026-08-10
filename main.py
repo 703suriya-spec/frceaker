@@ -2197,8 +2197,11 @@ async def process_br2_cmd(event):
         status_emoji = "✅ APPROVED"
     elif st == "live":
         status_emoji = "🟡 LIVE / MATCH"
+    elif st == "3ds":
+        status_emoji = "🟡 3DS REQUIRED"
     else:
         status_emoji = f"❌ {st.upper()}"
+
 
     res = f"""<b>Braintree Charge Gate ($10.00)</b>
 ━━━━━━━━━━━━━━━━━━━━

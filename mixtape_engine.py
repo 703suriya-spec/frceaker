@@ -44,6 +44,9 @@ def classify(msg):
     if any(x in m for x in ('approved','settling','authorized','succeeded','subscribed','subscription created')):
         return "approved", "Subscription Created / Approved"
     
+    if any(k in m for k in ('verification required', '3d', '3ds', 'authenticate', 'authentication required', 'challenge')):
+        return "3ds", "3D Secure / Verification Required"
+
     if any(k in m for k in ('insufficient', 'cvv', 'avs')):
         if 'insufficient' in m:
             return "live", "Insufficient Funds"
@@ -53,6 +56,7 @@ def classify(msg):
             return "live", "AVS Mismatch"
 
     return "declined", msg[:80] if msg else "Declined"
+
 
 def check_card_mixtape_sync(cc, mm, yy, cvc, proxy_url=None):
     """
