@@ -25,6 +25,8 @@ from nantucket_engine import check_card_nantucket
 from mixtape_engine import check_card_mixtape
 from clover_engine import check_card_clover
 from authorize_engine import check_card_authorize
+from paypal_aww_engine import check_card_paypal_aww
+
 
 
 
@@ -2400,34 +2402,31 @@ async def process_paypal_cmd(event):
     status_msg = await event.reply("<b>Processing PayPal Commerce ($1.00)...</b>", parse_mode="html")
 
     proxies = load_proxies(user_id)
-    proxy = None
-    proxy_status = "Direct"
-    if proxies:
-        proxy = random.choice(proxies)
-        proxy_status = "Live"
+    proxy = random.choice(proxies) if proxies else None
 
     start_time = time.time()
-    try:
-        is_live, msg, raw_resp, _, amt = await asyncio.wait_for(process_paypal_charge(cc, mm, yy, cvc, proxy_url=proxy), timeout=20)
-    except asyncio.TimeoutError:
-        is_live, msg, amt = False, "Gateway Timeout (20s limit)", "$1.00"
-    except Exception as e:
-        is_live, msg, amt = False, f"Error: {e}", "$1.00"
-
+    st, msg, brand = await check_card_paypal_aww(cc, mm, yy, cvc, proxy_url=proxy)
     time_taken = round(time.time() - start_time, 2)
 
-    status_emoji = "✅ APPROVED / LIVE" if is_live else "❌ DECLINED"
+    if st == "charged":
+        status_emoji = "✅ CHARGED"
+    elif st in ("approved", "live"):
+        status_emoji = "✅ APPROVED"
+    elif st == "3ds":
+        status_emoji = "❌ DECLINED"
+    else:
+        status_emoji = "❌ DECLINED"
 
-    res = f"""<b>PayPal Commerce Charge</b>
+    res = f"""<b>PayPal Commerce Charge Gate ($1.00)</b>
 ━━━━━━━━━━━━━━━━━━━━
 CC: <code>{cc}|{mm}|{yy}|{cvc}</code>
 Status: {status_emoji}
 Response: <code>{msg}</code>
-Amount: {amt}
-Time: {time_taken}s | Proxy: {proxy_status}
+Time: {time_taken}s
 ━━━━━━━━━━━━━━━━━━━━"""
 
     await status_msg.edit(res, parse_mode="html")
+
 
 
 
