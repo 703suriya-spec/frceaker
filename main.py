@@ -23,6 +23,8 @@ from st import VW as check_card_st
 from dila_engine import check_card_dila
 from nantucket_engine import check_card_nantucket
 from mixtape_engine import check_card_mixtape
+from clover_engine import check_card_clover
+
 
 
 
@@ -2218,6 +2220,57 @@ Time: {time_taken}s
     await status_msg.edit(res, parse_mode="html")
 
 
+# ==================== CLOVER AUTO GATE (cl) ENGINE ====================
+@bot.on(events.NewMessage(pattern=r'^/cl(?:\s+(.+))?$'))
+async def process_cl_cmd(event):
+    user_id = event.sender_id
+    if not is_admin(event.sender_id):
+        await event.reply("Access denied.")
+        return
+    card_input = event.pattern_match.group(1)
+    if not card_input:
+        await event.reply("Format: `/cl site_url|cc|mm|yy|cvv` or `/cl cc|mm|yy|cvv`")
+        return
+
+    parts = [p.strip() for p in card_input.split('|')]
+    if len(parts) >= 5:
+        site_url = parts[0]
+        cc, mm, yy, cvc = parts[1:5]
+    elif len(parts) == 4:
+        site_url = "https://www.clover.com"
+        cc, mm, yy, cvc = parts[:4]
+    else:
+        await event.reply("Format: `/cl site_url|cc|mm|yy|cvv` or `/cl cc|mm|yy|cvv`")
+        return
+
+    status_msg = await event.reply("<b>Processing Clover Auto Gate...</b>", parse_mode="html")
+    proxies = load_proxies(user_id)
+    proxy = random.choice(proxies) if proxies else None
+    start_time = time.time()
+
+    st, msg, brand = await check_card_clover(site_url, cc, mm, yy, cvc, proxy_url=proxy)
+    time_taken = round(time.time() - start_time, 2)
+
+    if st == "approved":
+        status_emoji = "✅ APPROVED"
+    elif st == "live":
+        status_emoji = "🟡 LIVE / MATCH"
+    elif st == "3ds":
+        status_emoji = "🟡 3DS REQUIRED"
+    else:
+        status_emoji = f"❌ {st.upper()}"
+
+    res = f"""<b>Clover Auto Gate ($1.00)</b>
+━━━━━━━━━━━━━━━━━━━━
+CC: <code>{cc}|{mm}|{yy}|{cvc}</code>
+Status: {status_emoji}
+Response: <code>{msg}</code>
+Time: {time_taken}s
+━━━━━━━━━━━━━━━━━━━━"""
+    await status_msg.edit(res, parse_mode="html")
+
+
+
 
 
 
@@ -2678,7 +2731,11 @@ async def charge_info_handler(event):
 <code>/st4 cc|mm|yy|cvv</code>
 
 <b><i>Braintree $10 Charge Gate</i></b>
-<code>/br2 cc|mm|yy|cvv</code>"""
+<code>/br2 cc|mm|yy|cvv</code>
+
+<b><i>Clover Auto Gate ($1.00)</i></b>
+<code>/cl site_url|cc|mm|yy|cvv</code>"""
+
 
 
 
