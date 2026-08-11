@@ -15,9 +15,8 @@ from braintree_engine import process_braintree_vbv
 from paypal_engine import process_paypal_charge
 from stripe_1 import check_card_stripe_1
 from braintree_1 import check_card as check_card_braintree_1
-from b3auth import b3_check_card
-from b3wrapunzel import b3w_check_card
 from rz import charge_payment_page_card_async as check_card_rz
+
 from st import VW as check_card_st
 
 from dila_engine import check_card_dila
@@ -2004,84 +2003,8 @@ async def process_br1_cmd(event):
 
 
 
-# ==================== BRAINTREE AUTH (b3auth) ENGINE ====================
-@bot.on(events.NewMessage(pattern=r'^/b3auth(?:\s+(.+))?$'))
-async def process_b3auth_cmd(event):
-    user_id = event.sender_id
-    if not is_admin(event.sender_id):
-        await event.reply("Access denied.")
-        return
-    card_input = event.pattern_match.group(1)
-    if not card_input:
-        await event.reply("Format: `/b3auth cc|mm|yy|cvv`")
-        return
-    try:
-        parts = card_input.split('|')
-        cc, mm, yy, cvc = [p.strip() for p in parts[:4]]
-    except IndexError:
-        await event.reply("Format: `/b3auth cc|mm|yy|cvv`")
-        return
-    status_msg = await event.reply("<b>Processing Braintree Auth...</b>", parse_mode="html")
-    proxies = load_proxies(user_id)
-    proxy = random.choice(proxies) if proxies else None
-    start_time = time.time()
-    
-    is_live, msg, raw_resp, _, amt = await process_braintree_vbv(cc, mm, yy, cvc, proxy_url=proxy)
-    time_taken = round(time.time() - start_time, 2)
-    brand, bin_type, level, bank, country, flag = await get_bin_info(cc[:6])
-
-    status_emoji = "✅ APPROVED" if is_live else ("🟡 CCN MATCH" if "ccn" in msg.lower() or "cvv" in msg.lower() else "❌ DECLINED")
-    res = f"""<b>AUTO BRAINTREE AUTH CHECKOUT</b>
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-<b>Card:</b> <code>{cc}|{mm}|{yy}|{cvc}</code>
-<b>Status:</b> {status_emoji}
-<b>Response:</b> <code>{msg}</code>
-<b>Amount:</b> <code>$0.00 USD (Auth)</code>
-
-<b>Brand:</b> {brand} - {bin_type} ({level})
-<b>Bank:</b> {bank}
-<b>Country:</b> {country} {flag}
-<b>Time:</b> {time_taken}s"""
-    await status_msg.edit(res, parse_mode="html")
 
 
-# ==================== BRAINTREE RAPUNZEL (b3rap) ENGINE ====================
-@bot.on(events.NewMessage(pattern=r'^/b3rap(?:\s+(.+))?$'))
-async def process_b3rap_cmd(event):
-    user_id = event.sender_id
-    if not is_admin(event.sender_id):
-        await event.reply("Access denied.")
-        return
-    card_input = event.pattern_match.group(1)
-    if not card_input:
-        await event.reply("Format: `/b3rap cc|mm|yy|cvv`")
-        return
-    try:
-        parts = card_input.split('|')
-        cc, mm, yy, cvc = [p.strip() for p in parts[:4]]
-    except IndexError:
-        await event.reply("Format: `/b3rap cc|mm|yy|cvv`")
-        return
-    status_msg = await event.reply("<b>Processing Braintree Rapunzel...</b>", parse_mode="html")
-    proxies = load_proxies(user_id)
-    proxy = random.choice(proxies) if proxies else None
-    start_time = time.time()
-    st, msg, code = await b3w_check_card(cc, mm, yy, cvc, proxy_url=proxy)
-    time_taken = round(time.time() - start_time, 2)
-    brand, bin_type, level, bank, country, flag = await get_bin_info(cc[:6])
-    status_emoji = "✅ APPROVED" if st == "approved" else ("🟡 CCN MATCH" if st == "ccn" else "❌ DECLINED")
-    res = f"""<b>AUTO BRAINTREE RAPUNZEL AUTH</b>
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-<b>Card:</b> <code>{cc}|{mm}|{yy}|{cvc}</code>
-<b>Status:</b> {status_emoji}
-<b>Response:</b> <code>{msg}</code>
-<b>Amount:</b> <code>$0.00 USD (Auth)</code>
-
-<b>Brand:</b> {brand} - {bin_type} ({level})
-<b>Bank:</b> {bank}
-<b>Country:</b> {country} {flag}
-<b>Time:</b> {time_taken}s"""
-    await status_msg.edit(res, parse_mode="html")
 
 
 # ==================== RAZORPAY NEW (rz1) ENGINE ====================
@@ -2772,17 +2695,12 @@ async def auth_info_handler(event):
 <b><i>Braintree 3DS (VBV)</i></b>
 <code>/vbv cc|mm|yy|cvv</code>
 
-<b><i>Braintree 3DS Hosted</i></b>
-<code>/vbv2 cc|mm|yy|cvv</code>
-
-<b><i>Braintree Auth (Silvercell)</i></b>
-<code>/b3auth cc|mm|yy|cvv</code>
-
-<b><i>Braintree Auth (Bellamoda)</i></b>
-<code>/b3rap cc|mm|yy|cvv</code>
-
 <b><i>Stripe Auth (Dilaboards)</i></b>
-<code>/st3 cc|mm|yy|cvv</code>"""
+<code>/st3 cc|mm|yy|cvv</code>
+
+<b><i>Stripe Auth (Nemaneide)</i></b>
+<code>/st5 cc|mm|yy|cvv</code>"""
+
 
 
     buttons = [
@@ -3351,29 +3269,8 @@ async def process_mbt1_cmd(event):
     res = f"<b>Mass Braintree $1 Results ({len(cards)})</b>\n" + "\n".join(results)
     await status_msg.edit(res, parse_mode="html")
 
-@bot.on(events.NewMessage(pattern=r'^/mb3(?:\s+(.+))?$'))
-async def process_mb3_cmd(event):
-    user_id = event.sender_id
-    if not is_admin(event.sender_id):
-        await event.reply("Access denied.")
-        return
-    text = event.pattern_match.group(1) or ""
-    cards = extract_cc(text)
-    if not cards:
-        await event.reply("Format: `/mb3 cc|mm|yy|cvv cc|mm|yy|cvv...`")
-        return
-    cards = cards[:20]
-    status_msg = await event.reply(f"<b>Mass Braintree Auth Check ({len(cards)})</b>\n<i>Processing...</i>", parse_mode="html")
-    proxies = load_proxies(user_id)
-    results = []
-    for card in cards:
-        parts = card.split("|")
-        if len(parts) >= 4:
-            proxy = random.choice(proxies) if proxies else None
-            st, msg, code = await b3_check_card(parts[0], parts[1], parts[2], parts[3], proxy_url=proxy)
-            results.append(f"<code>{card}</code> -> {st.upper()} ({msg})")
-    res = f"<b>Mass Braintree Auth Results ({len(cards)})</b>\n" + "\n".join(results)
-    await status_msg.edit(res, parse_mode="html")
+
+
 
 @bot.on(events.NewMessage(pattern=r'^/skadd(?:\s+(.+))?$'))
 async def process_skadd_cmd(event):
