@@ -2264,12 +2264,10 @@ async def process_cl_cmd(event):
     if len(parts) >= 5:
         site_url = parts[0]
         cc, mm, yy, cvc = parts[1:5]
-    elif len(parts) == 4:
-        site_url = "https://www.clover.com"
-        cc, mm, yy, cvc = parts[:4]
     else:
-        await event.reply("Format: `/cl site_url|cc|mm|yy|cvv` or `/cl cc|mm|yy|cvv`")
+        await event.reply("Format: `/cl site_url|cc|mm|yy|cvv`")
         return
+
 
     status_msg = await event.reply("<b>Processing Clover Auto Gate...</b>", parse_mode="html")
     proxies = load_proxies(user_id)

@@ -63,8 +63,8 @@ def check_card_clover_sync(site_url, cc, mm, yy, cvc, proxy_url=None):
         merchant_id = merchant_match.group(1) if merchant_match else None
 
         if not api_key:
-            # High-capacity Clover public API key fallback for general tokenization
-            api_key = "pak_a97e6822-263f-4e3a-9774-8b6b66e3b5e4"
+            return "error", "Missing Clover API key. Use: /cl site_url|cc|mm|yy|cvv", brand
+
 
 
         # Step 2: Tokenize Card via token.clover.com
