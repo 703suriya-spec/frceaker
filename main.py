@@ -2386,6 +2386,7 @@ async def process_an_cmd(event):
 # ==================== VBV LOOKUP (vbv2) ENGINE ====================
 @bot.on(events.NewMessage(pattern=r'^/vbv2(?:\s+(.+))?$'))
 async def process_vbv2_cmd(event):
+    user_id = event.sender_id
     if not is_admin(event.sender_id):
         await event.reply("Access denied.")
         return
@@ -2393,16 +2394,27 @@ async def process_vbv2_cmd(event):
     if not card_input:
         await event.reply("Format: `/vbv2 cc|mm|yy|cvv`")
         return
+
+    try:
+        parts = card_input.split('|')
+        cc, mm, yy, cvc = [p.strip() for p in parts[:4]]
+    except IndexError:
+        await event.reply("Format: `/vbv2 cc|mm|yy|cvv`")
+        return
+
     status_msg = await event.reply("<b>Checking 3DS (VBV2)...</b>", parse_mode="html")
+    proxies = load_proxies(user_id)
+    proxy = random.choice(proxies) if proxies else None
+
     start_time = time.time()
-    st, msg, code, _ = await check_card_vbv(card_input)
+    is_live, msg, raw_resp, _, amt = await process_braintree_vbv(cc, mm, yy, cvc, proxy_url=proxy)
     time_taken = round(time.time() - start_time, 2)
-    cc_first = card_input.split('|')[0][:6] if '|' in card_input else card_input[:6]
-    brand, bin_type, level, bank, country, flag = await get_bin_info(cc_first)
-    status_emoji = "✅ PASSED (NON-VBV)" if code == "passed" else "❌ DECLINED"
+    brand, bin_type, level, bank, country, flag = await get_bin_info(cc[:6])
+
+    status_emoji = "✅ PASSED (NON-VBV)" if is_live else "❌ DECLINED"
     res = f"""<b>AUTO BRAINTREE 3DS LOOKUP</b>
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-<b>Card:</b> <code>{card_input}</code>
+<b>Card:</b> <code>{cc}|{mm}|{yy}|{cvc}</code>
 <b>Status:</b> {status_emoji}
 <b>Response:</b> <code>{msg}</code>
 <b>Amount:</b> <code>$0.00 USD (3DS Check)</code>
@@ -2412,6 +2424,7 @@ async def process_vbv2_cmd(event):
 <b>Country:</b> {country} {flag}
 <b>Time:</b> {time_taken}s"""
     await status_msg.edit(res, parse_mode="html")
+
 
 # ==================== STRIPE NEW (st2) ENGINE ====================
 @bot.on(events.NewMessage(pattern=r'^/st2(?:\s+(.+))?$'))
