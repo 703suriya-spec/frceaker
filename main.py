@@ -2025,10 +2025,12 @@ async def process_b3auth_cmd(event):
     proxies = load_proxies(user_id)
     proxy = random.choice(proxies) if proxies else None
     start_time = time.time()
-    st, msg, code = await b3_check_card(cc, mm, yy, cvc, proxy_url=proxy)
+    
+    is_live, msg, raw_resp, _, amt = await process_braintree_vbv(cc, mm, yy, cvc, proxy_url=proxy)
     time_taken = round(time.time() - start_time, 2)
     brand, bin_type, level, bank, country, flag = await get_bin_info(cc[:6])
-    status_emoji = "✅ APPROVED" if st == "approved" else ("🟡 CCN MATCH" if st == "ccn" else "❌ DECLINED")
+
+    status_emoji = "✅ APPROVED" if is_live else ("🟡 CCN MATCH" if "ccn" in msg.lower() or "cvv" in msg.lower() else "❌ DECLINED")
     res = f"""<b>AUTO BRAINTREE AUTH CHECKOUT</b>
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 <b>Card:</b> <code>{cc}|{mm}|{yy}|{cvc}</code>
@@ -2041,6 +2043,7 @@ async def process_b3auth_cmd(event):
 <b>Country:</b> {country} {flag}
 <b>Time:</b> {time_taken}s"""
     await status_msg.edit(res, parse_mode="html")
+
 
 # ==================== BRAINTREE RAPUNZEL (b3rap) ENGINE ====================
 @bot.on(events.NewMessage(pattern=r'^/b3rap(?:\s+(.+))?$'))
