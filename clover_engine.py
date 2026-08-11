@@ -102,10 +102,16 @@ def check_card_clover_sync(site_url, cc, mm, yy, cvc, proxy_url=None):
             err_txt = r_tok.text[:150]
             try:
                 err_json = r_tok.json()
-                err_txt = err_json.get('error', {}).get('message', err_txt)
+                err_txt = err_json.get('error', {}).get('message') or err_json.get('message') or err_txt
             except Exception:
                 pass
-            return "declined", f"Tokenization Failed: {err_txt}", brand
+            clean_err = str(err_txt).strip()
+            if "401" in clean_err or "unauthorized" in clean_err.lower():
+                clean_err = "Invalid Merchant API Key"
+            else:
+                clean_err = re.sub(r'[\{\}\"\:]', '', clean_err).strip()
+            return "declined", clean_err, brand
+
 
         tok_json = r_tok.json()
         token_id = tok_json.get('id')
