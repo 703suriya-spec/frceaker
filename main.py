@@ -2669,14 +2669,14 @@ async def checker_menu_handler(event):
     gates_msg = """<b>Gates Menu</b>
 
 Browse the available categories:
-\u2022 <b>Auth Gates:</b> 5
-\u2022 <b>Mass Checker:</b> 6
-\u2022 <b>Charge Gates:</b> 9"""
+• <b>Auth Gates:</b> 5
+• <b>Charge Gates:</b> 11
+• <b>Mass Checker:</b> 3"""
 
     buttons = [
         [Button.inline("Auth Gates", b"auth_info"),
-         Button.inline("Mass Checker", b"mass_info")],
-        [Button.inline("Charge Gates", b"charge_info")],
+         Button.inline("Charge Gates", b"charge_info")],
+        [Button.inline("Mass Checker", b"mass_info")],
         [Button.inline("Back", b"back_to_start")]
     ]
 
@@ -2687,19 +2687,22 @@ Browse the available categories:
 @bot.on(events.NewMessage(pattern=r'^/(?:auth|authgates)$'))
 @bot.on(events.CallbackQuery(data=b"auth_info"))
 async def auth_info_handler(event):
-    auth_msg = """<b><i>Shopify Auto</i></b>
+    auth_msg = """<b>AUTH GATES</b>
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+<b><i>Shopify Auto ($0.00)</i></b>
 <code>/cc cc|mm|yy|cvv</code>
 
-<b><i>Braintree 3DS (VBV)</i></b>
-<code>/vbv cc|mm|yy|cvv</code>
+<b><i>Stripe WCPay Auth ($0.00)</i></b>
+<code>/st2 cc|mm|yy|cvv</code>
 
-<b><i>Stripe Auth (Dilaboards)</i></b>
+<b><i>Stripe SetupIntent Dilaboards ($0.00)</i></b>
 <code>/st3 cc|mm|yy|cvv</code>
 
-<b><i>Stripe Auth (Nemaneide)</i></b>
-<code>/st5 cc|mm|yy|cvv</code>"""
+<b><i>Stripe SetupIntent Nemaneide ($0.00)</i></b>
+<code>/st5 cc|mm|yy|cvv</code>
 
-
+<b><i>Braintree 3DS VBV ($0.00)</i></b>
+<code>/vbv cc|mm|yy|cvv</code>"""
 
     buttons = [
         [Button.inline("Back", b"checker")]
@@ -2711,81 +2714,44 @@ async def auth_info_handler(event):
         await event.reply(auth_msg, parse_mode="html")
 
 
-# ==================== MASS CHECKER INFO ====================
-@bot.on(events.NewMessage(pattern=r'^/(?:mass|masschecker)$'))
-@bot.on(events.CallbackQuery(data=b"mass_info"))
-async def mass_info_handler(event):
-    mass_msg = """<b><i>Shopify Mass Auto</i></b>
-Reply to a .txt file with: <code>/chk</code>
-
-<b><i>Mass Stripe ($1)</i></b>
-Inline: <code>/mst1 cc cc...</code> | File: <code>/st1txt</code>
-
-<b><i>Mass Braintree Auth</i></b>
-Inline: <code>/mb3 cc cc...</code> | File: <code>/b3txt</code>
-
-<b><i>Mass Braintree Auth (Alt)</i></b>
-Inline: <code>/mb3a cc cc...</code> | File: <code>/b3atxt</code>
-
-<b><i>Mass Braintree ($1)</i></b>
-Inline: <code>/mbt1 cc cc...</code> | File: <code>/bt1txt</code>
-
-<b><i>Mass Razorpay</i></b>
-Inline: <code>/mrz site cc...</code> | File: <code>/rztxt</code>"""
-
-    buttons = [
-        [Button.inline("Back", b"checker")]
-    ]
-
-    if isinstance(event, events.CallbackQuery.Event):
-        await event.edit(mass_msg, buttons=buttons, parse_mode="html")
-    else:
-        await event.reply(mass_msg, parse_mode="html")
-
-
 # ==================== CHARGE GATES INFO ====================
 @bot.on(events.NewMessage(pattern=r'^/(?:charge|chargegates)$'))
 @bot.on(events.CallbackQuery(data=b"charge_info"))
 async def charge_info_handler(event):
-    charge_msg = """<b><i>Razorpay</i></b>
-<code>/rz cc|mm|yy|cvv</code>
-
-<b><i>Razorpay Hosted</i></b>
-<code>/rz1 cc|mm|yy|cvv</code>
-
-<b><i>Stripe $22.00 USD</i></b>
+    charge_msg = """<b>CHARGE GATES</b>
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+<b><i>Stripe WCPay Charge ($22.00)</i></b>
 <code>/st cc|mm|yy|cvv</code>
 
-<b><i>Stripe $1</i></b>
-<code>/st1 cc|mm|yy|cvv</code>
-
-<b><i>Stripe Hosted</i></b>
-<code>/st2 cc|mm|yy|cvv</code>
-
-<b><i>Braintree $1</i></b>
-<code>/br1 cc|mm|yy|cvv</code>
-
-<b><i>Square $1.00 USD</i></b>
-<code>/sq cc|mm|yy|cvv</code>
-
-<b><i>PayPal $1.00 USD</i></b>
-<code>/pp cc|mm|yy|cvv</code>
-
-<b><i>Stripe Charge Gate ($15.00)</i></b>
+<b><i>Stripe Charge Nantucket ($15.00)</i></b>
 <code>/st4 cc|mm|yy|cvv</code>
 
-<b><i>Braintree $10 Charge Gate</i></b>
+<b><i>Stripe Charge ($1.00)</i></b>
+<code>/st1 cc|mm|yy|cvv</code>
+
+<b><i>Braintree Charge Mixtape ($10.00)</i></b>
 <code>/br2 cc|mm|yy|cvv</code>
+
+<b><i>Braintree Charge ($1.00)</i></b>
+<code>/br1 cc|mm|yy|cvv</code>
+
+<b><i>Square Charge ($1.00)</i></b>
+<code>/sq cc|mm|yy|cvv</code>
+
+<b><i>PayPal Commerce ($1.00)</i></b>
+<code>/pp cc|mm|yy|cvv</code>
 
 <b><i>Clover Auto Gate ($1.00)</i></b>
 <code>/cl site_url|cc|mm|yy|cvv</code>
 
-<b><i>Authorize.Net Charge Gate ($0.10)</i></b>
+<b><i>Razorpay Auto ($1.00)</i></b>
+<code>/rz1 cc|mm|yy|cvv</code>
+
+<b><i>Razorpay Charge (₹1.00)</i></b>
+<code>/rz cc|mm|yy|cvv</code>
+
+<b><i>Authorize.Net ($0.10)</i></b>
 <code>/an cc|mm|yy|cvv</code>"""
-
-
-
-
 
     buttons = [
         [Button.inline("Back", b"checker")]
@@ -2796,6 +2762,30 @@ async def charge_info_handler(event):
     else:
         await event.reply(charge_msg, parse_mode="html")
 
+
+# ==================== MASS CHECKER INFO ====================
+@bot.on(events.NewMessage(pattern=r'^/(?:mass|masschecker)$'))
+@bot.on(events.CallbackQuery(data=b"mass_info"))
+async def mass_info_handler(event):
+    mass_msg = """<b>MASS CHECKER GATES</b>
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+<b><i>Shopify Mass Auto</i></b>
+Reply to .txt file: <code>/chk</code>
+
+<b><i>Mass Stripe ($1.00)</i></b>
+Inline: <code>/mst1 cc|mm|yy|cvv cc...</code>
+
+<b><i>Mass Braintree ($1.00)</i></b>
+Inline: <code>/mbt1 cc|mm|yy|cvv cc...</code>"""
+
+    buttons = [
+        [Button.inline("Back", b"checker")]
+    ]
+
+    if isinstance(event, events.CallbackQuery.Event):
+        await event.edit(mass_msg, buttons=buttons, parse_mode="html")
+    else:
+        await event.reply(mass_msg, parse_mode="html")
 
 # ==================== TOOLS MENU ====================
 @bot.on(events.CallbackQuery(data=b"tools"))
