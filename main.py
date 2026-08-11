@@ -1744,14 +1744,14 @@ async def single_chk_cc(event):
 
         res_msg = f"""<b>AUTO SHOPIFY CHECKOUT</b>
 ━━━━━━━━━━━━━━━━━━━━
-💳 <b>Card:</b> <code>{card}</code>
-⚡ <b>Status:</b> {status_emoji}
-💬 <b>Response:</b> <code>{response_msg}</code>
-💰 <b>Amount:</b> <code>{price}</code>
+<b>Card:</b> <code>{card}</code>
+<b>Status:</b> {status_emoji}
+<b>Response:</b> <code>{response_msg}</code>
+<b>Amount:</b> <code>{price}</code>
 
-ℹ️ <b>Brand:</b> {brand} - {bin_type} ({level})
-🏦 <b>Bank:</b> {bank}
-🌐 <b>Country:</b> {country} {flag}"""
+<b>Brand:</b> {brand} - {bin_type} ({level})
+<b>Bank:</b> {bank}
+<b>Country:</b> {country} {flag}"""
 
         await status_msg.edit(res_msg, parse_mode="html")
 
@@ -1824,14 +1824,14 @@ async def single_razorpay_cc(event):
         status_emoji = "✅ CHARGED" if result.get("status") == "Charged" else "❌ DECLINED"
         res_msg = f"""<b>AUTO RAZORPAY CHECKOUT</b>
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-💳 <b>Card:</b> <code>{card}</code>
-⚡ <b>Status:</b> {status_emoji}
-💬 <b>Response:</b> <code>{response_msg}</code>
-💰 <b>Amount:</b> <code>$1.00 USD</code>
+<b>Card:</b> <code>{card}</code>
+<b>Status:</b> {status_emoji}
+<b>Response:</b> <code>{response_msg}</code>
+<b>Amount:</b> <code>$1.00 USD</code>
 
-ℹ️ <b>Brand:</b> {brand} - {bin_type} ({level})
-🏦 <b>Bank:</b> {bank}
-🌐 <b>Country:</b> {country} {flag}"""
+<b>Brand:</b> {brand} - {bin_type} ({level})
+<b>Bank:</b> {bank}
+<b>Country:</b> {country} {flag}"""
 
         await status_msg.edit(res_msg, parse_mode="html")
     except Exception as e:
@@ -1892,15 +1892,15 @@ async def process_stripe_cmd(event):
 
     res = f"""<b>STRIPE WCPAY CHARGE ($22.00)</b>
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-💳 <b>Card:</b> <code>{cc}|{mm}|{yy}|{cvc}</code>
-⚡ <b>Status:</b> {status_emoji}
-💬 <b>Response:</b> <code>{msg}</code>
-💰 <b>Amount:</b> <code>$22.00 USD</code>
+<b>Card:</b> <code>{cc}|{mm}|{yy}|{cvc}</code>
+<b>Status:</b> {status_emoji}
+<b>Response:</b> <code>{msg}</code>
+<b>Amount:</b> <code>$22.00 USD</code>
 
-ℹ️ <b>Brand:</b> {brand} - {bin_type} ({level})
-🏦 <b>Bank:</b> {bank}
-🌐 <b>Country:</b> {country} {flag}
-⏱️ <b>Time:</b> {time_taken}s"""
+<b>Brand:</b> {brand} - {bin_type} ({level})
+<b>Bank:</b> {bank}
+<b>Country:</b> {country} {flag}
+<b>Time:</b> {time_taken}s"""
 
 
     await status_msg.edit(res, parse_mode="html")
@@ -1942,15 +1942,15 @@ async def process_stripe1_cmd(event):
     status_emoji = "✅ CHARGED" if st in ("charged", "approved") else "❌ DECLINED"
     res = f"""<b>AUTO STRIPE $1.00 CHECKOUT</b>
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-💳 <b>Card:</b> <code>{cc}|{mm}|{yy}|{cvc}</code>
-⚡ <b>Status:</b> {status_emoji}
-💬 <b>Response:</b> <code>{msg}</code>
-💰 <b>Amount:</b> <code>$1.00 USD</code>
+<b>Card:</b> <code>{cc}|{mm}|{yy}|{cvc}</code>
+<b>Status:</b> {status_emoji}
+<b>Response:</b> <code>{msg}</code>
+<b>Amount:</b> <code>$1.00 USD</code>
 
-ℹ️ <b>Brand:</b> {brand} - {bin_type} ({level})
-🏦 <b>Bank:</b> {bank}
-🌐 <b>Country:</b> {country} {flag}
-⏱️ <b>Time:</b> {time_taken}s"""
+<b>Brand:</b> {brand} - {bin_type} ({level})
+<b>Bank:</b> {bank}
+<b>Country:</b> {country} {flag}
+<b>Time:</b> {time_taken}s"""
     await status_msg.edit(res, parse_mode="html")
 
 
@@ -1989,15 +1989,15 @@ async def process_br1_cmd(event):
     status_emoji = "✅ APPROVED" if st in ("charged", "approved") else f"❌ {st.upper()}"
     res = f"""<b>AUTO BRAINTREE $1.00 CHECKOUT</b>
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-💳 <b>Card:</b> <code>{cc}|{mm}|{yy}|{cvc}</code>
-⚡ <b>Status:</b> {status_emoji}
-💬 <b>Response:</b> <code>{msg}</code>
-💰 <b>Amount:</b> <code>$1.00 USD</code>
+<b>Card:</b> <code>{cc}|{mm}|{yy}|{cvc}</code>
+<b>Status:</b> {status_emoji}
+<b>Response:</b> <code>{msg}</code>
+<b>Amount:</b> <code>$1.00 USD</code>
 
-ℹ️ <b>Brand:</b> {brand} - {bin_type} ({level})
-🏦 <b>Bank:</b> {bank}
-🌐 <b>Country:</b> {country} {flag}
-⏱️ <b>Time:</b> {time_taken}s"""
+<b>Brand:</b> {brand} - {bin_type} ({level})
+<b>Bank:</b> {bank}
+<b>Country:</b> {country} {flag}
+<b>Time:</b> {time_taken}s"""
     await status_msg.edit(res, parse_mode="html")
 
 
@@ -2029,15 +2029,15 @@ async def process_b3auth_cmd(event):
     status_emoji = "✅ APPROVED" if st == "approved" else ("🟡 CCN MATCH" if st == "ccn" else "❌ DECLINED")
     res = f"""<b>AUTO BRAINTREE AUTH CHECKOUT</b>
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-💳 <b>Card:</b> <code>{cc}|{mm}|{yy}|{cvc}</code>
-⚡ <b>Status:</b> {status_emoji}
-💬 <b>Response:</b> <code>{msg}</code>
-💰 <b>Amount:</b> <code>$0.00 USD (Auth)</code>
+<b>Card:</b> <code>{cc}|{mm}|{yy}|{cvc}</code>
+<b>Status:</b> {status_emoji}
+<b>Response:</b> <code>{msg}</code>
+<b>Amount:</b> <code>$0.00 USD (Auth)</code>
 
-ℹ️ <b>Brand:</b> {brand} - {bin_type} ({level})
-🏦 <b>Bank:</b> {bank}
-🌐 <b>Country:</b> {country} {flag}
-⏱️ <b>Time:</b> {time_taken}s"""
+<b>Brand:</b> {brand} - {bin_type} ({level})
+<b>Bank:</b> {bank}
+<b>Country:</b> {country} {flag}
+<b>Time:</b> {time_taken}s"""
     await status_msg.edit(res, parse_mode="html")
 
 # ==================== BRAINTREE RAPUNZEL (b3rap) ENGINE ====================
@@ -2067,15 +2067,15 @@ async def process_b3rap_cmd(event):
     status_emoji = "✅ APPROVED" if st == "approved" else ("🟡 CCN MATCH" if st == "ccn" else "❌ DECLINED")
     res = f"""<b>AUTO BRAINTREE RAPUNZEL AUTH</b>
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-💳 <b>Card:</b> <code>{cc}|{mm}|{yy}|{cvc}</code>
-⚡ <b>Status:</b> {status_emoji}
-💬 <b>Response:</b> <code>{msg}</code>
-💰 <b>Amount:</b> <code>$0.00 USD (Auth)</code>
+<b>Card:</b> <code>{cc}|{mm}|{yy}|{cvc}</code>
+<b>Status:</b> {status_emoji}
+<b>Response:</b> <code>{msg}</code>
+<b>Amount:</b> <code>$0.00 USD (Auth)</code>
 
-ℹ️ <b>Brand:</b> {brand} - {bin_type} ({level})
-🏦 <b>Bank:</b> {bank}
-🌐 <b>Country:</b> {country} {flag}
-⏱️ <b>Time:</b> {time_taken}s"""
+<b>Brand:</b> {brand} - {bin_type} ({level})
+<b>Bank:</b> {bank}
+<b>Country:</b> {country} {flag}
+<b>Time:</b> {time_taken}s"""
     await status_msg.edit(res, parse_mode="html")
 
 
@@ -2107,15 +2107,15 @@ async def process_rz1_cmd(event):
     status_emoji = "✅ LIVE / CHARGED" if st == "live" else f"❌ {st.upper()}"
     res = f"""<b>AUTO RAZORPAY $1.00 CHECKOUT</b>
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-💳 <b>Card:</b> <code>{cc}|{mm}|{yy}|{cvc}</code>
-⚡ <b>Status:</b> {status_emoji}
-💬 <b>Response:</b> <code>{msg}</code>
-💰 <b>Amount:</b> <code>$1.00 USD</code>
+<b>Card:</b> <code>{cc}|{mm}|{yy}|{cvc}</code>
+<b>Status:</b> {status_emoji}
+<b>Response:</b> <code>{msg}</code>
+<b>Amount:</b> <code>$1.00 USD</code>
 
-ℹ️ <b>Brand:</b> {brand} - {bin_type} ({level})
-🏦 <b>Bank:</b> {bank}
-🌐 <b>Country:</b> {country} {flag}
-⏱️ <b>Time:</b> {time_taken}s"""
+<b>Brand:</b> {brand} - {bin_type} ({level})
+<b>Bank:</b> {bank}
+<b>Country:</b> {country} {flag}
+<b>Time:</b> {time_taken}s"""
     await status_msg.edit(res, parse_mode="html")
 
 
@@ -2158,15 +2158,15 @@ async def process_st3_cmd(event):
 
     res = f"""<b>AUTO STRIPE SETUP INTENT CHECKOUT</b>
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-💳 <b>Card:</b> <code>{cc}|{mm}|{yy}|{cvc}</code>
-⚡ <b>Status:</b> {status_emoji}
-💬 <b>Response:</b> <code>{msg}</code>
-💰 <b>Amount:</b> <code>$0.00 USD (Auth)</code>
+<b>Card:</b> <code>{cc}|{mm}|{yy}|{cvc}</code>
+<b>Status:</b> {status_emoji}
+<b>Response:</b> <code>{msg}</code>
+<b>Amount:</b> <code>$0.00 USD (Auth)</code>
 
-ℹ️ <b>Brand:</b> {brand} - {bin_type} ({level})
-🏦 <b>Bank:</b> {bank}
-🌐 <b>Country:</b> {country} {flag}
-⏱️ <b>Time:</b> {time_taken}s"""
+<b>Brand:</b> {brand} - {bin_type} ({level})
+<b>Bank:</b> {bank}
+<b>Country:</b> {country} {flag}
+<b>Time:</b> {time_taken}s"""
     await status_msg.edit(res, parse_mode="html")
 
 
@@ -2208,15 +2208,15 @@ async def process_st4_cmd(event):
 
     res = f"""<b>AUTO STRIPE $15.00 CHECKOUT</b>
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-💳 <b>Card:</b> <code>{cc}|{mm}|{yy}|{cvc}</code>
-⚡ <b>Status:</b> {status_emoji}
-💬 <b>Response:</b> <code>{msg}</code>
-💰 <b>Amount:</b> <code>$15.00 USD</code>
+<b>Card:</b> <code>{cc}|{mm}|{yy}|{cvc}</code>
+<b>Status:</b> {status_emoji}
+<b>Response:</b> <code>{msg}</code>
+<b>Amount:</b> <code>$15.00 USD</code>
 
-ℹ️ <b>Brand:</b> {brand} - {bin_type} ({level})
-🏦 <b>Bank:</b> {bank}
-🌐 <b>Country:</b> {country} {flag}
-⏱️ <b>Time:</b> {time_taken}s"""
+<b>Brand:</b> {brand} - {bin_type} ({level})
+<b>Bank:</b> {bank}
+<b>Country:</b> {country} {flag}
+<b>Time:</b> {time_taken}s"""
     await status_msg.edit(res, parse_mode="html")
 
 
@@ -2258,15 +2258,15 @@ async def process_br2_cmd(event):
 
     res = f"""<b>AUTO BRAINTREE $10.00 CHECKOUT</b>
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-💳 <b>Card:</b> <code>{cc}|{mm}|{yy}|{cvc}</code>
-⚡ <b>Status:</b> {status_emoji}
-💬 <b>Response:</b> <code>{msg}</code>
-💰 <b>Amount:</b> <code>$10.00 USD</code>
+<b>Card:</b> <code>{cc}|{mm}|{yy}|{cvc}</code>
+<b>Status:</b> {status_emoji}
+<b>Response:</b> <code>{msg}</code>
+<b>Amount:</b> <code>$10.00 USD</code>
 
-ℹ️ <b>Brand:</b> {brand} - {bin_type} ({level})
-🏦 <b>Bank:</b> {bank}
-🌐 <b>Country:</b> {country} {flag}
-⏱️ <b>Time:</b> {time_taken}s"""
+<b>Brand:</b> {brand} - {bin_type} ({level})
+<b>Bank:</b> {bank}
+<b>Country:</b> {country} {flag}
+<b>Time:</b> {time_taken}s"""
     await status_msg.edit(res, parse_mode="html")
 
 
@@ -2313,15 +2313,15 @@ async def process_cl_cmd(event):
 
     res = f"""<b>AUTO CLOVER $1.00 CHECKOUT</b>
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-💳 <b>Card:</b> <code>{cc}|{mm}|{yy}|{cvc}</code>
-⚡ <b>Status:</b> {status_emoji}
-💬 <b>Response:</b> <code>{msg}</code>
-💰 <b>Amount:</b> <code>$1.00 USD</code>
+<b>Card:</b> <code>{cc}|{mm}|{yy}|{cvc}</code>
+<b>Status:</b> {status_emoji}
+<b>Response:</b> <code>{msg}</code>
+<b>Amount:</b> <code>$1.00 USD</code>
 
-ℹ️ <b>Brand:</b> {brand} - {bin_type} ({level})
-🏦 <b>Bank:</b> {bank}
-🌐 <b>Country:</b> {country} {flag}
-⏱️ <b>Time:</b> {time_taken}s"""
+<b>Brand:</b> {brand} - {bin_type} ({level})
+<b>Bank:</b> {bank}
+<b>Country:</b> {country} {flag}
+<b>Time:</b> {time_taken}s"""
     await status_msg.edit(res, parse_mode="html")
 
 
@@ -2364,15 +2364,15 @@ async def process_an_cmd(event):
 
     res = f"""<b>AUTO AUTHORIZE.NET $0.10 CHECKOUT</b>
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-💳 <b>Card:</b> <code>{cc}|{mm}|{yy}|{cvc}</code>
-⚡ <b>Status:</b> {status_emoji}
-💬 <b>Response:</b> <code>{msg}</code>
-💰 <b>Amount:</b> <code>$0.10 USD</code>
+<b>Card:</b> <code>{cc}|{mm}|{yy}|{cvc}</code>
+<b>Status:</b> {status_emoji}
+<b>Response:</b> <code>{msg}</code>
+<b>Amount:</b> <code>$0.10 USD</code>
 
-ℹ️ <b>Brand:</b> {brand} - {bin_type} ({level})
-🏦 <b>Bank:</b> {bank}
-🌐 <b>Country:</b> {country} {flag}
-⏱️ <b>Time:</b> {time_taken}s"""
+<b>Brand:</b> {brand} - {bin_type} ({level})
+<b>Bank:</b> {bank}
+<b>Country:</b> {country} {flag}
+<b>Time:</b> {time_taken}s"""
     await status_msg.edit(res, parse_mode="html")
 
 
@@ -2402,15 +2402,15 @@ async def process_vbv2_cmd(event):
     status_emoji = "✅ PASSED (NON-VBV)" if code == "passed" else "❌ DECLINED"
     res = f"""<b>AUTO BRAINTREE 3DS LOOKUP</b>
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-💳 <b>Card:</b> <code>{card_input}</code>
-⚡ <b>Status:</b> {status_emoji}
-💬 <b>Response:</b> <code>{msg}</code>
-💰 <b>Amount:</b> <code>$0.00 USD (3DS Check)</code>
+<b>Card:</b> <code>{card_input}</code>
+<b>Status:</b> {status_emoji}
+<b>Response:</b> <code>{msg}</code>
+<b>Amount:</b> <code>$0.00 USD (3DS Check)</code>
 
-ℹ️ <b>Brand:</b> {brand} - {bin_type} ({level})
-🏦 <b>Bank:</b> {bank}
-🌐 <b>Country:</b> {country} {flag}
-⏱️ <b>Time:</b> {time_taken}s"""
+<b>Brand:</b> {brand} - {bin_type} ({level})
+<b>Bank:</b> {bank}
+<b>Country:</b> {country} {flag}
+<b>Time:</b> {time_taken}s"""
     await status_msg.edit(res, parse_mode="html")
 
 # ==================== STRIPE NEW (st2) ENGINE ====================
@@ -2435,15 +2435,15 @@ async def process_st2_cmd(event):
     status_emoji = "✅ APPROVED" if msg == "Card Added" else "❌ DECLINED"
     res = f"""<b>AUTO STRIPE WCPAY CHECKOUT</b>
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-💳 <b>Card:</b> <code>{card_input}</code>
-⚡ <b>Status:</b> {status_emoji}
-💬 <b>Response:</b> <code>{msg}</code>
-💰 <b>Amount:</b> <code>$0.00 USD (Auth)</code>
+<b>Card:</b> <code>{card_input}</code>
+<b>Status:</b> {status_emoji}
+<b>Response:</b> <code>{msg}</code>
+<b>Amount:</b> <code>$0.00 USD (Auth)</code>
 
-ℹ️ <b>Brand:</b> {brand} - {bin_type} ({level})
-🏦 <b>Bank:</b> {bank}
-🌐 <b>Country:</b> {country} {flag}
-⏱️ <b>Time:</b> {time_taken}s"""
+<b>Brand:</b> {brand} - {bin_type} ({level})
+<b>Bank:</b> {bank}
+<b>Country:</b> {country} {flag}
+<b>Time:</b> {time_taken}s"""
     await status_msg.edit(res, parse_mode="html")
 
 @bot.on(events.NewMessage(pattern=r'^/pp(?:\s+(.+))?$'))
@@ -2489,15 +2489,15 @@ async def process_paypal_cmd(event):
 
     res = f"""<b>AUTO PAYPAL COMMERCE $1.00 CHECKOUT</b>
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-💳 <b>Card:</b> <code>{cc}|{mm}|{yy}|{cvc}</code>
-⚡ <b>Status:</b> {status_emoji}
-💬 <b>Response:</b> <code>{msg}</code>
-💰 <b>Amount:</b> <code>$1.00 USD</code>
+<b>Card:</b> <code>{cc}|{mm}|{yy}|{cvc}</code>
+<b>Status:</b> {status_emoji}
+<b>Response:</b> <code>{msg}</code>
+<b>Amount:</b> <code>$1.00 USD</code>
 
-ℹ️ <b>Brand:</b> {brand} - {bin_type} ({level})
-🏦 <b>Bank:</b> {bank}
-🌐 <b>Country:</b> {country} {flag}
-⏱️ <b>Time:</b> {time_taken}s"""
+<b>Brand:</b> {brand} - {bin_type} ({level})
+<b>Bank:</b> {bank}
+<b>Country:</b> {country} {flag}
+<b>Time:</b> {time_taken}s"""
 
     await status_msg.edit(res, parse_mode="html")
 
@@ -2544,15 +2544,15 @@ async def process_vbv_cmd(event):
     status_emoji = "✅ PASSED (NON-VBV)" if is_live else "❌ DECLINED"
     res = f"""<b>AUTO BRAINTREE VBV LOOKUP</b>
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-💳 <b>Card:</b> <code>{cc}|{mm}|{yy}|{cvc}</code>
-⚡ <b>Status:</b> {status_emoji}
-💬 <b>Response:</b> <code>{msg}</code>
-💰 <b>Amount:</b> <code>$0.00 USD (3DS Check)</code>
+<b>Card:</b> <code>{cc}|{mm}|{yy}|{cvc}</code>
+<b>Status:</b> {status_emoji}
+<b>Response:</b> <code>{msg}</code>
+<b>Amount:</b> <code>$0.00 USD (3DS Check)</code>
 
-ℹ️ <b>Brand:</b> {brand} - {bin_type} ({level})
-🏦 <b>Bank:</b> {bank}
-🌐 <b>Country:</b> {country} {flag}
-⏱️ <b>Time:</b> {time_taken}s"""
+<b>Brand:</b> {brand} - {bin_type} ({level})
+<b>Bank:</b> {bank}
+<b>Country:</b> {country} {flag}
+<b>Time:</b> {time_taken}s"""
 
     await status_msg.edit(res, parse_mode="html")
 
@@ -2606,14 +2606,14 @@ async def sq_check_cmd(event):
 
     res_msg = f"""<b>AUTO SQUARE $1 CHECKOUT</b>
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-💳 <b>Card:</b> <code>{cc}|{mes}|{ano}|{cvv}</code>
-⚡ <b>Status:</b> {status_emoji}
-💬 <b>Response:</b> <code>{resp_text}</code>
-💰 <b>Amount:</b> <code>$1.00 USD</code>
+<b>Card:</b> <code>{cc}|{mes}|{ano}|{cvv}</code>
+<b>Status:</b> {status_emoji}
+<b>Response:</b> <code>{resp_text}</code>
+<b>Amount:</b> <code>$1.00 USD</code>
 
-ℹ️ <b>Brand:</b> {brand} - {bin_type} ({level})
-🏦 <b>Bank:</b> {bank}
-🌐 <b>Country:</b> {country} {flag}"""
+<b>Brand:</b> {brand} - {bin_type} ({level})
+<b>Bank:</b> {bank}
+<b>Country:</b> {country} {flag}"""
 
 
     await status_msg.edit(res_msg, parse_mode="html")
