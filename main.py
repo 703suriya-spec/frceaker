@@ -26,6 +26,8 @@ from mixtape_engine import check_card_mixtape
 from clover_engine import check_card_clover
 from authorize_engine import check_card_authorize
 from paypal_aww_engine import check_card_paypal_aww
+from nemaneide_engine import check_card_nemaneide
+
 
 
 
@@ -2212,6 +2214,56 @@ async def process_st4_cmd(event):
 <b>Status:</b> {status_emoji}
 <b>Response:</b> <code>{msg}</code>
 <b>Amount:</b> <code>$15.00 USD</code>
+
+<b>Brand:</b> {brand} - {bin_type} ({level})
+<b>Bank:</b> {bank}
+<b>Country:</b> {country} {flag}
+<b>Time:</b> {time_taken}s"""
+    await status_msg.edit(res, parse_mode="html")
+
+
+# ==================== STRIPE $0 AUTH NEMANEIDE (st5) ENGINE ====================
+@bot.on(events.NewMessage(pattern=r'^/st5(?:\s+(.+))?$'))
+async def process_st5_cmd(event):
+    user_id = event.sender_id
+    if not is_admin(event.sender_id):
+        await event.reply("Access denied.")
+        return
+    card_input = event.pattern_match.group(1)
+    if not card_input:
+        await event.reply("Format: `/st5 cc|mm|yy|cvv`")
+        return
+    try:
+        parts = card_input.split('|')
+        cc, mm, yy, cvc = [p.strip() for p in parts[:4]]
+    except IndexError:
+        await event.reply("Format: `/st5 cc|mm|yy|cvv`")
+        return
+
+    status_msg = await event.reply("<b>Processing Stripe Auth ($0.00)...</b>", parse_mode="html")
+    proxies = load_proxies(user_id)
+    proxy = random.choice(proxies) if proxies else None
+    start_time = time.time()
+
+    st, msg, brand = await check_card_nemaneide(cc, mm, yy, cvc, proxy_url=proxy)
+    time_taken = round(time.time() - start_time, 2)
+    brand, bin_type, level, bank, country, flag = await get_bin_info(cc[:6])
+
+    if st == "approved":
+        status_emoji = "✅ APPROVED"
+    elif st == "live":
+        status_emoji = "✅ APPROVED"
+    elif st == "3ds":
+        status_emoji = "❌ DECLINED"
+    else:
+        status_emoji = "❌ DECLINED"
+
+    res = f"""<b>AUTO STRIPE $0.00 AUTH CHECKOUT</b>
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+<b>Card:</b> <code>{cc}|{mm}|{yy}|{cvc}</code>
+<b>Status:</b> {status_emoji}
+<b>Response:</b> <code>{msg}</code>
+<b>Amount:</b> <code>$0.00 USD (Auth)</code>
 
 <b>Brand:</b> {brand} - {bin_type} ({level})
 <b>Bank:</b> {bank}
