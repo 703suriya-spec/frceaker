@@ -368,29 +368,34 @@ async def process_stripe(cc, mm, yy, cvc, proxy_url=None):
                 if status == 'success':
                     return True, "Charged (success)", str(res_json), None, "$22.00"
                 
-                # Check for specific decline messages inside payment_details
                 details_msg = ""
                 if 'payment_details' in result:
                     details = result['payment_details']
                     if isinstance(details, list) and len(details) > 0:
                         if isinstance(details[0], dict):
-                            details_msg = details[0].get('message', '')
+                            details_msg = details[0].get('message') or details[0].get('value') or ''
                         else:
                             details_msg = str(details[0])
-                            
-                err_msg = res_json.get('message', 'Failed')
-                if details_msg:
-                    err_msg += f" - {details_msg}"
                 
-                if "insufficient funds" in err_msg.lower() or "do not honor" in err_msg.lower():
-                    return False, f"Declined - {err_msg}", str(res_json), None, "$22.00"
+                err_msg = details_msg or res_json.get('message', 'Card declined')
+                if err_msg.startswith("Error: "):
+                    err_msg = err_msg[7:]
+                err_low = err_msg.lower()
+                
+                if any(k in err_low for k in ("insufficient", "do not honor", "security code", "incorrect", "cvv", "cvc", "declined")):
+                    return False, f"Declined - {err_msg}" if "declined" not in err_low else err_msg, str(res_json), None, "$22.00"
                     
-                return False, f"Failed - {err_msg}", str(res_json), None, "$22.00"
+                return False, err_msg, str(res_json), None, "$22.00"
                 
             elif 'message' in res_json:
-                return False, f"Error: {res_json['message']}", str(res_json), None, "$22.00"
+                msg_txt = res_json['message']
+                if msg_txt.startswith("Error: "):
+                    msg_txt = msg_txt[7:]
+                return False, msg_txt, str(res_json), None, "$22.00"
             else:
                 return False, "Unknown Checkout Response", str(res_json), None, "$22.00"
+
+
                 
     except Exception as e:
         return False, f"Exception: {str(e)}", "", None, "$22.00"
