@@ -2890,6 +2890,10 @@ Reply to .txt file: <code>/chk</code>
 <b><i>Mass Stripe ($1.00)</i></b>
 Inline: <code>/mst1 cc|mm|yy|cvv cc...</code>
 
+<b><i>Mass Stripe Bloomerang ($1.00)</i></b>
+Inline: <code>/mst6 cc|mm|yy|cvv cc...</code>
+
+
 <b><i>Mass Braintree ($1.00)</i></b>
 Inline: <code>/mbt1 cc|mm|yy|cvv cc...</code>
 
@@ -3352,7 +3356,32 @@ async def process_mst1_cmd(event):
     res = f"<b>Mass Stripe $1 Results ({len(cards)})</b>\n" + "\n".join(results)
     await status_msg.edit(res, parse_mode="html")
 
+@bot.on(events.NewMessage(pattern=r'^/mst6(?:\s+(.+))?$'))
+async def process_mst6_cmd(event):
+    user_id = event.sender_id
+    if not is_admin(event.sender_id):
+        await event.reply("Access denied.")
+        return
+    text = event.pattern_match.group(1) or ""
+    cards = extract_cc(text)
+    if not cards:
+        await event.reply("Format: `/mst6 cc|mm|yy|cvv cc|mm|yy|cvv...`")
+        return
+    cards = cards[:20]
+    status_msg = await event.reply(f"<b>Mass Stripe Bloomerang $1 Check ({len(cards)})</b>\n<i>Processing...</i>", parse_mode="html")
+    proxies = load_proxies(user_id)
+    results = []
+    for card in cards:
+        parts = card.split("|")
+        if len(parts) >= 4:
+            proxy = random.choice(proxies) if proxies else None
+            st, msg, brand = await check_card_bloomerang(parts[0], parts[1], parts[2], parts[3], proxy_url=proxy)
+            results.append(f"<code>{card}</code> -> {st.upper()} ({msg})")
+    res = f"<b>Mass Stripe Bloomerang $1 Results ({len(cards)})</b>\n" + "\n".join(results)
+    await status_msg.edit(res, parse_mode="html")
+
 @bot.on(events.NewMessage(pattern=r'^/mbt1(?:\s+(.+))?$'))
+
 async def process_mbt1_cmd(event):
     user_id = event.sender_id
     if not is_admin(event.sender_id):
