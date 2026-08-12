@@ -25,7 +25,9 @@ from mixtape_engine import check_card_mixtape
 from clover_engine import check_card_clover
 from authorize_engine import check_card_authorize
 from paypal_aww_engine import check_card_paypal_aww
+from paypal_lounsbury_engine import check_card_paypal_lounsbury
 from nemaneide_engine import check_card_nemaneide
+
 
 
 
@@ -2448,9 +2450,65 @@ async def process_paypal_cmd(event):
     await status_msg.edit(res, parse_mode="html")
 
 
+# ==================== PAYPAL LOUNSBURY ($10.00) ENGINE ====================
+@bot.on(events.NewMessage(pattern=r'^/pp2(?:\s+(.+))?$'))
+async def process_paypal2_cmd(event):
+    user_id = event.sender_id
+    if not is_admin(event.sender_id):
+        await event.reply("Access denied.")
+        return
+
+    card_input = event.pattern_match.group(1)
+    if not card_input:
+        await event.reply("Format: `/pp2 cc|mm|yy|cvv`")
+        return
+
+    try:
+        parts = card_input.split('|')
+        cc = parts[0].strip()
+        mm = parts[1].strip()
+        yy = parts[2].strip()
+        cvc = parts[3].strip()
+    except IndexError:
+        await event.reply("Format: `/pp2 cc|mm|yy|cvv`")
+        return
+
+    status_msg = await event.reply("<b>Processing PayPal Commerce ($10.00)...</b>", parse_mode="html")
+
+    proxies = load_proxies(user_id)
+    proxy = random.choice(proxies) if proxies else None
+
+    start_time = time.time()
+    st, msg, brand_raw = await check_card_paypal_lounsbury(cc, mm, yy, cvc, proxy_url=proxy)
+    time_taken = round(time.time() - start_time, 2)
+    brand, bin_type, level, bank, country, flag = await get_bin_info(cc[:6])
+
+    if st == "charged":
+        status_emoji = "✅ CHARGED"
+    elif st in ("approved", "live"):
+        status_emoji = "✅ APPROVED"
+    elif st == "3ds":
+        status_emoji = "❌ DECLINED"
+    else:
+        status_emoji = "❌ DECLINED"
+
+    res = f"""<b>AUTO PAYPAL COMMERCE $10.00 CHECKOUT</b>
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+<b>Card:</b> <code>{cc}|{mm}|{yy}|{cvc}</code>
+<b>Status:</b> {status_emoji}
+<b>Response:</b> <code>{msg}</code>
+<b>Amount:</b> <code>$10.00 USD</code>
+
+<b>Brand:</b> {brand} - {bin_type} ({level})
+<b>Bank:</b> {bank}
+<b>Country:</b> {country} {flag}
+<b>Time:</b> {time_taken}s"""
+
+    await status_msg.edit(res, parse_mode="html")
 
 
 # ==================== BRAINTREE VBV ENGINE ====================
+
 @bot.on(events.NewMessage(pattern=r'^/vbv(?:\s+(.+))?$'))
 async def process_vbv_cmd(event):
     user_id = event.sender_id
@@ -2738,8 +2796,12 @@ async def charge_info_handler(event):
 <b><i>Square Charge ($1.00)</i></b>
 <code>/sq cc|mm|yy|cvv</code>
 
+<b><i>PayPal Commerce ($10.00)</i></b>
+<code>/pp2 cc|mm|yy|cvv</code>
+
 <b><i>PayPal Commerce ($1.00)</i></b>
 <code>/pp cc|mm|yy|cvv</code>
+
 
 <b><i>Clover Auto Gate ($1.00)</i></b>
 <code>/cl site_url|cc|mm|yy|cvv</code>
