@@ -3333,14 +3333,14 @@ async def mass_chk_control_handler(event):
 
 # ==================== PORTED MASS & SK COMMANDS (NON-DESTRUCTIVE) ====================
 
-@bot.on(events.NewMessage(pattern=r'^/mst1(?:\s+(.+))?$'))
+@bot.on(events.NewMessage(pattern=r'^/mst1(?:\s+([\s\S]+))?$'))
 async def process_mst1_cmd(event):
     user_id = event.sender_id
     if not is_admin(event.sender_id):
         await event.reply("Access denied.")
         return
-    text = event.pattern_match.group(1) or ""
-    cards = extract_cc(text)
+    raw_text = event.raw_text
+    cards = extract_cc(raw_text)
     if not cards:
         await event.reply("Format: `/mst1 cc|mm|yy|cvv cc|mm|yy|cvv...`")
         return
@@ -3356,14 +3356,14 @@ async def process_mst1_cmd(event):
     res = f"<b>Mass Stripe $1 Results ({len(cards)})</b>\n" + "\n".join(results)
     await status_msg.edit(res, parse_mode="html")
 
-@bot.on(events.NewMessage(pattern=r'^/mst6(?:\s+(.+))?$'))
+@bot.on(events.NewMessage(pattern=r'^/mst6(?:\s+([\s\S]+))?$'))
 async def process_mst6_cmd(event):
     user_id = event.sender_id
     if not is_admin(event.sender_id):
         await event.reply("Access denied.")
         return
-    text = event.pattern_match.group(1) or ""
-    cards = extract_cc(text)
+    raw_text = event.raw_text
+    cards = extract_cc(raw_text)
     if not cards:
         await event.reply("Format: `/mst6 cc|mm|yy|cvv cc|mm|yy|cvv...`")
         return
@@ -3380,15 +3380,14 @@ async def process_mst6_cmd(event):
     res = f"<b>Mass Stripe Bloomerang $1 Results ({len(cards)})</b>\n" + "\n".join(results)
     await status_msg.edit(res, parse_mode="html")
 
-@bot.on(events.NewMessage(pattern=r'^/mbt1(?:\s+(.+))?$'))
-
+@bot.on(events.NewMessage(pattern=r'^/mbt1(?:\s+([\s\S]+))?$'))
 async def process_mbt1_cmd(event):
     user_id = event.sender_id
     if not is_admin(event.sender_id):
         await event.reply("Access denied.")
         return
-    text = event.pattern_match.group(1) or ""
-    cards = extract_cc(text)
+    raw_text = event.raw_text
+    cards = extract_cc(raw_text)
     if not cards:
         await event.reply("Format: `/mbt1 cc|mm|yy|cvv cc|mm|yy|cvv...`")
         return
@@ -3406,14 +3405,14 @@ async def process_mbt1_cmd(event):
     await status_msg.edit(res, parse_mode="html")
 
 
-@bot.on(events.NewMessage(pattern=r'^/mpp2(?:\s+(.+))?$'))
+@bot.on(events.NewMessage(pattern=r'^/mpp2(?:\s+([\s\S]+))?$'))
 async def process_mpp2_cmd(event):
     user_id = event.sender_id
     if not is_admin(event.sender_id):
         await event.reply("Access denied.")
         return
-    text = event.pattern_match.group(1) or ""
-    cards = extract_cc(text)
+    raw_text = event.raw_text
+    cards = extract_cc(raw_text)
     if not cards:
         await event.reply("Format: `/mpp2 cc|mm|yy|cvv cc|mm|yy|cvv...`")
         return
@@ -3429,6 +3428,7 @@ async def process_mpp2_cmd(event):
             results.append(f"<code>{card}</code> -> {st.upper()} ({msg})")
     res = f"<b>Mass PayPal $10 Results ({len(cards)})</b>\n" + "\n".join(results)
     await status_msg.edit(res, parse_mode="html")
+
 
 
 
