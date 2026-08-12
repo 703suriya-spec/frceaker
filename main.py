@@ -2838,7 +2838,11 @@ Reply to .txt file: <code>/chk</code>
 Inline: <code>/mst1 cc|mm|yy|cvv cc...</code>
 
 <b><i>Mass Braintree ($1.00)</i></b>
-Inline: <code>/mbt1 cc|mm|yy|cvv cc...</code>"""
+Inline: <code>/mbt1 cc|mm|yy|cvv cc...</code>
+
+<b><i>Mass PayPal ($10.00)</i></b>
+Inline: <code>/mpp2 cc|mm|yy|cvv cc...</code>"""
+
 
     buttons = [
         [Button.inline("Back", b"checker")]
@@ -3318,6 +3322,32 @@ async def process_mbt1_cmd(event):
             results.append(f"<code>{card}</code> -> {st.upper()} ({msg})")
     res = f"<b>Mass Braintree $1 Results ({len(cards)})</b>\n" + "\n".join(results)
     await status_msg.edit(res, parse_mode="html")
+
+
+@bot.on(events.NewMessage(pattern=r'^/mpp2(?:\s+(.+))?$'))
+async def process_mpp2_cmd(event):
+    user_id = event.sender_id
+    if not is_admin(event.sender_id):
+        await event.reply("Access denied.")
+        return
+    text = event.pattern_match.group(1) or ""
+    cards = extract_cc(text)
+    if not cards:
+        await event.reply("Format: `/mpp2 cc|mm|yy|cvv cc|mm|yy|cvv...`")
+        return
+    cards = cards[:20]
+    status_msg = await event.reply(f"<b>Mass PayPal $10 Check ({len(cards)})</b>\n<i>Processing...</i>", parse_mode="html")
+    proxies = load_proxies(user_id)
+    results = []
+    for card in cards:
+        parts = card.split("|")
+        if len(parts) >= 4:
+            proxy = random.choice(proxies) if proxies else None
+            st, msg, brand = await check_card_paypal_lounsbury(parts[0], parts[1], parts[2], parts[3], proxy_url=proxy)
+            results.append(f"<code>{card}</code> -> {st.upper()} ({msg})")
+    res = f"<b>Mass PayPal $10 Results ({len(cards)})</b>\n" + "\n".join(results)
+    await status_msg.edit(res, parse_mode="html")
+
 
 
 
