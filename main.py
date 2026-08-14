@@ -2799,21 +2799,21 @@ Browse the available categories:
 async def auth_info_handler(event):
     auth_msg = """<b>AUTH GATES</b>
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-<b><i>Shopify Auto ($0.00)</i></b>
+<b><i>Shopify Auth</i></b>
 <code>/cc cc|mm|yy|cvv</code>
 
-<b><i>Stripe Auth 1 ($0.00)</i></b>
+<b><i>Stripe Auth 1</i></b>
 <code>/st2 cc|mm|yy|cvv</code>
 
-<b><i>Stripe Auth 2 ($0.00)</i></b>
+<b><i>Stripe Auth 2</i></b>
 <code>/st3 cc|mm|yy|cvv</code>
 
-<b><i>Stripe Auth 3 ($0.00)</i></b>
+<b><i>Stripe Auth 3</i></b>
 <code>/st5 cc|mm|yy|cvv</code>
 
-
-<b><i>Braintree 3DS VBV ($0.00)</i></b>
+<b><i>Braintree 3DS VBV</i></b>
 <code>/vbv cc|mm|yy|cvv</code>"""
+
 
     buttons = [
         [Button.inline("Back", b"checker")]
