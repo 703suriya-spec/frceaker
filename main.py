@@ -1746,7 +1746,7 @@ async def single_chk_cc(event):
         response_msg = str(result.get('message', 'Declined'))[:150]
         price = result.get('price', 'Auto')
 
-        res_msg = f"""<b>SHOPIFY CHECKOUT</b>
+        res_msg = f"""<b>SHOPIFY</b>
 ━━━━━━━━━━━━━━━━━━━━
 <b>Card:</b> <code>{card}</code>
 <b>Status:</b> {status_emoji}
@@ -1826,7 +1826,7 @@ async def single_razorpay_cc(event):
         response_msg = str(result.get('message', 'Unknown'))[:150]
 
         status_emoji = "✅ CHARGED" if result.get("status") == "Charged" else "❌ DECLINED"
-        res_msg = f"""<b>RAZORPAY CHECKOUT</b>
+        res_msg = f"""<b>RAZORPAY</b>
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 <b>Card:</b> <code>{card}</code>
 <b>Status:</b> {status_emoji}
@@ -1944,7 +1944,7 @@ async def process_stripe1_cmd(event):
     time_taken = round(time.time() - start_time, 2)
     brand, bin_type, level, bank, country, flag = await get_bin_info(cc[:6])
     status_emoji = "✅ CHARGED" if st in ("charged", "approved") else "❌ DECLINED"
-    res = f"""<b>STRIPE $1.00 CHECKOUT</b>
+    res = f"""<b>STRIPE $1.00</b>
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 <b>Card:</b> <code>{cc}|{mm}|{yy}|{cvc}</code>
 <b>Status:</b> {status_emoji}
@@ -1993,7 +1993,7 @@ async def process_st6_cmd(event):
     else:
         status_emoji = "❌ DECLINED"
 
-    res = f"""<b>STRIPE BLOOMERANG $1.00 CHECKOUT</b>
+    res = f"""<b>STRIPE BLOOMERANG $1.00</b>
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 <b>Card:</b> <code>{cc}|{mm}|{yy}|{cvc}</code>
 <b>Status:</b> {status_emoji}
@@ -2039,7 +2039,7 @@ async def process_br1_cmd(event):
     time_taken = round(time.time() - start_time, 2)
     brand, bin_type, level, bank, country, flag = await get_bin_info(cc[:6])
     status_emoji = "✅ APPROVED" if st in ("charged", "approved") else f"❌ {st.upper()}"
-    res = f"""<b>BRAINTREE $1.00 CHECKOUT</b>
+    res = f"""<b>BRAINTREE $1.00</b>
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 <b>Card:</b> <code>{cc}|{mm}|{yy}|{cvc}</code>
 <b>Status:</b> {status_emoji}
@@ -2084,7 +2084,7 @@ async def process_rz1_cmd(event):
     time_taken = round(time.time() - start_time, 2)
     brand, bin_type, level, bank, country, flag = await get_bin_info(cc[:6])
     status_emoji = "✅ LIVE / CHARGED" if st == "live" else f"❌ {st.upper()}"
-    res = f"""<b>RAZORPAY $1.00 CHECKOUT</b>
+    res = f"""<b>RAZORPAY $1.00</b>
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 <b>Card:</b> <code>{cc}|{mm}|{yy}|{cvc}</code>
 <b>Status:</b> {status_emoji}
@@ -2135,7 +2135,7 @@ async def process_st3_cmd(event):
     else:
         status_emoji = "❌ DECLINED"
 
-    res = f"""<b>STRIPE SETUP INTENT CHECKOUT</b>
+    res = f"""<b>STRIPE SETUP INTENT</b>
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 <b>Card:</b> <code>{cc}|{mm}|{yy}|{cvc}</code>
 <b>Status:</b> {status_emoji}
@@ -2185,7 +2185,7 @@ async def process_st4_cmd(event):
     else:
         status_emoji = "❌ DECLINED"
 
-    res = f"""<b>STRIPE $15.00 CHECKOUT</b>
+    res = f"""<b>STRIPE $15.00</b>
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 <b>Card:</b> <code>{cc}|{mm}|{yy}|{cvc}</code>
 <b>Status:</b> {status_emoji}
@@ -2235,7 +2235,7 @@ async def process_st5_cmd(event):
     else:
         status_emoji = "❌ DECLINED"
 
-    res = f"""<b>STRIPE $0.00 AUTH CHECKOUT</b>
+    res = f"""<b>STRIPE $0.00 AUTH</b>
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 <b>Card:</b> <code>{cc}|{mm}|{yy}|{cvc}</code>
 <b>Status:</b> {status_emoji}
@@ -2285,7 +2285,7 @@ async def process_br2_cmd(event):
     else:
         status_emoji = "❌ DECLINED"
 
-    res = f"""<b>BRAINTREE $10.00 CHECKOUT</b>
+    res = f"""<b>BRAINTREE $10.00</b>
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 <b>Card:</b> <code>{cc}|{mm}|{yy}|{cvc}</code>
 <b>Status:</b> {status_emoji}
@@ -2338,7 +2338,7 @@ async def process_cl_cmd(event):
     else:
         status_emoji = "❌ DECLINED"
 
-    res = f"""<b>CLOVER $1.00 CHECKOUT</b>
+    res = f"""<b>CLOVER $1.00</b>
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 <b>Card:</b> <code>{cc}|{mm}|{yy}|{cvc}</code>
 <b>Status:</b> {status_emoji}
@@ -2389,7 +2389,7 @@ async def process_an_cmd(event):
     else:
         status_emoji = "❌ DECLINED"
 
-    res = f"""<b>AUTHORIZE.NET $0.10 CHECKOUT</b>
+    res = f"""<b>AUTHORIZE.NET $0.10</b>
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 <b>Card:</b> <code>{cc}|{mm}|{yy}|{cvc}</code>
 <b>Status:</b> {status_emoji}
@@ -2430,7 +2430,7 @@ async def process_st2_cmd(event):
     cc_first = card_input.split('|')[0][:6] if '|' in card_input else card_input[:6]
     brand, bin_type, level, bank, country, flag = await get_bin_info(cc_first)
     status_emoji = "✅ APPROVED" if msg == "Card Added" else "❌ DECLINED"
-    res = f"""<b>STRIPE WCPAY CHECKOUT</b>
+    res = f"""<b>STRIPE WCPAY</b>
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 <b>Card:</b> <code>{card_input}</code>
 <b>Status:</b> {status_emoji}
@@ -2484,7 +2484,7 @@ async def process_paypal_cmd(event):
     else:
         status_emoji = "❌ DECLINED"
 
-    res = f"""<b>PAYPAL COMMERCE $1.00 CHECKOUT</b>
+    res = f"""<b>PAYPAL COMMERCE $1.00</b>
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 <b>Card:</b> <code>{cc}|{mm}|{yy}|{cvc}</code>
 <b>Status:</b> {status_emoji}
@@ -2541,7 +2541,7 @@ async def process_paypal2_cmd(event):
     else:
         status_emoji = "❌ DECLINED"
 
-    res = f"""<b>PAYPAL COMMERCE $10.00 CHECKOUT</b>
+    res = f"""<b>PAYPAL COMMERCE $10.00</b>
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 <b>Card:</b> <code>{cc}|{mm}|{yy}|{cvc}</code>
 <b>Status:</b> {status_emoji}
@@ -2657,7 +2657,7 @@ async def sq_check_cmd(event):
 
     status_emoji = "CHARGED ✅" if is_charged else "DECLINED ❌"
 
-    res_msg = f"""<b>SQUARE $1 CHECKOUT</b>
+    res_msg = f"""<b>SQUARE $1</b>
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 <b>Card:</b> <code>{cc}|{mes}|{ano}|{cvv}</code>
 <b>Status:</b> {status_emoji}
