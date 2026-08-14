@@ -2135,7 +2135,7 @@ async def process_st3_cmd(event):
     else:
         status_emoji = "❌ DECLINED"
 
-    res = f"""<b>STRIPE SETUP INTENT</b>
+    res = f"""<b>STRIPE AUTH 2</b>
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 <b>Card:</b> <code>{cc}|{mm}|{yy}|{cvc}</code>
 <b>Status:</b> {status_emoji}
@@ -2147,6 +2147,7 @@ async def process_st3_cmd(event):
 <b>Country:</b> {country} {flag}
 <b>Time:</b> {time_taken}s"""
     await status_msg.edit(res, parse_mode="html")
+
 
 
 # ==================== STRIPE CHARGE NANTUCKET (st4) ENGINE ====================
@@ -2235,7 +2236,7 @@ async def process_st5_cmd(event):
     else:
         status_emoji = "❌ DECLINED"
 
-    res = f"""<b>STRIPE $0.00 AUTH</b>
+    res = f"""<b>STRIPE AUTH 3</b>
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 <b>Card:</b> <code>{cc}|{mm}|{yy}|{cvc}</code>
 <b>Status:</b> {status_emoji}
@@ -2247,6 +2248,7 @@ async def process_st5_cmd(event):
 <b>Country:</b> {country} {flag}
 <b>Time:</b> {time_taken}s"""
     await status_msg.edit(res, parse_mode="html")
+
 
 
 # ==================== BRAINTREE CHARGE MIXTAPE (br2) ENGINE ====================
@@ -2430,7 +2432,7 @@ async def process_st2_cmd(event):
     cc_first = card_input.split('|')[0][:6] if '|' in card_input else card_input[:6]
     brand, bin_type, level, bank, country, flag = await get_bin_info(cc_first)
     status_emoji = "✅ APPROVED" if msg == "Card Added" else "❌ DECLINED"
-    res = f"""<b>STRIPE WCPAY</b>
+    res = f"""<b>STRIPE AUTH 1</b>
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 <b>Card:</b> <code>{card_input}</code>
 <b>Status:</b> {status_emoji}
@@ -2442,6 +2444,7 @@ async def process_st2_cmd(event):
 <b>Country:</b> {country} {flag}
 <b>Time:</b> {time_taken}s"""
     await status_msg.edit(res, parse_mode="html")
+
 
 @bot.on(events.NewMessage(pattern=r'^/pp(?:\s+(.+))?$'))
 async def process_paypal_cmd(event):
@@ -2799,14 +2802,15 @@ async def auth_info_handler(event):
 <b><i>Shopify Auto ($0.00)</i></b>
 <code>/cc cc|mm|yy|cvv</code>
 
-<b><i>Stripe WCPay Auth ($0.00)</i></b>
+<b><i>Stripe Auth 1 ($0.00)</i></b>
 <code>/st2 cc|mm|yy|cvv</code>
 
-<b><i>Stripe SetupIntent ($0.00)</i></b>
+<b><i>Stripe Auth 2 ($0.00)</i></b>
 <code>/st3 cc|mm|yy|cvv</code>
 
-<b><i>Stripe SetupIntent ($0.00)</i></b>
+<b><i>Stripe Auth 3 ($0.00)</i></b>
 <code>/st5 cc|mm|yy|cvv</code>
+
 
 <b><i>Braintree 3DS VBV ($0.00)</i></b>
 <code>/vbv cc|mm|yy|cvv</code>"""
