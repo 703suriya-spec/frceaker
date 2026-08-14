@@ -520,19 +520,19 @@ async def update_progress(user_id, message_id, results, current_attempt_count, f
 
     gateway = "" if is_razorpay else ""
 
-    text = f"""<b> FREAKY CHECKER </b>\n
-<b>   {gateway}</b>
-<b>   ...</b>
+    text = f"""<b>FREAKY CHECKER</b>\n
+<b>{gateway}</b>
+<b>...</b>
 
-<b>   {checked}/{total}</b>
-<b>   {approved}</b>
-<b>   {charged}</b>
-<b>   {dead}</b>
+<b>{checked}/{total}</b>
+<b>{approved}</b>
+<b>{charged}</b>
+<b>{dead}</b>
 <b>[WARN]   {errors}</b>
-<b>   {current_time}</b>  
+<b>{current_time}</b>  
 
-<b>    <a href="tg://user?id={user_id}">{first_name}</a></b>
-<b>    <a href="tg://user?id=1296435544">@Theonlysuui</a></b>"""
+<b><a href="tg://user?id={user_id}">{first_name}</a></b>
+<b><a href="tg://user?id=1296435544">@Theonlysuui</a></b>"""
 
     buttons = [
         [
@@ -1041,7 +1041,7 @@ async def site_check_command(event):
 <code>/mysites</code>""", parse_mode="html")
             return
 
-    msg = await event.reply(f"""<b> Site Checker Started</b>
+    msg = await event.reply(f"""<b>Site Checker Started</b>
 
  <b>Mode:</b> {site_type}
 📊 <b>Total Sites:</b> <code>{len(sites)}</code>
@@ -1070,7 +1070,7 @@ async def site_check_command(event):
             ]
         ]
         
-        await msg.edit(f"""<b> Site Check Complete</b>
+        await msg.edit(f"""<b>Site Check Complete</b>
 
  <b>Mode:</b> Admin (Both)
 📊 <b>Total Checked:</b> <code>{len(sites)}</code>
@@ -1078,12 +1078,12 @@ async def site_check_command(event):
  <b>Dead:</b> <code>{len(dead)}</code>
  <b>TXT File Sent</b> 
 
-<b> Choose which sites to use for checking:</b>""", buttons=buttons, parse_mode="html")
+<b>Choose which sites to use for checking:</b>""", buttons=buttons, parse_mode="html")
     
     else:
         user_count = len(get_user_sites_sync(user_id))
         
-        await msg.edit(f"""<b> Site Check Complete</b>
+        await msg.edit(f"""<b>Site Check Complete</b>
 
  <b>Mode:</b> Your Sites
 📊 <b>Total Checked:</b> <code>{len(sites)}</code>
@@ -1374,7 +1374,7 @@ async def add_razorpay_site(event):
             else:
                 dead_count += 1
 
-    await status_msg.edit(f"""<b> RAZORPAY SITES BATCH COMPLETE</b>
+    await status_msg.edit(f"""<b>RAZORPAY SITES BATCH COMPLETE</b>
 ━━━━━━━━━━━━━━━━━━━━
  <b>Added Active Sites:</b> <code>{alive_added}</code>
 [WARN] <b>Dead / Invalid Sites:</b> <code>{dead_count}</code>
@@ -1431,7 +1431,7 @@ async def rz_sites_check(event):
         await event.reply(" No proxies.")
         return
 
-    msg = await event.reply(f"""<b> RZ Site Checker</b>
+    msg = await event.reply(f"""<b>RZ Site Checker</b>
 
 📊 Total Sites: <code>{len(sites)}</code>
  Testing with Razorpay API...
@@ -1478,7 +1478,7 @@ async def rz_sites_check(event):
         
         if checked % 5 == 0 or checked == len(sites):
             try:
-                await msg.edit(f"""<b> RZ Site Checker</b>
+                await msg.edit(f"""<b>RZ Site Checker</b>
 
 📊 Total: <code>{len(sites)}</code>
  Working: <code>{len(alive)}</code>
@@ -1496,7 +1496,7 @@ async def rz_sites_check(event):
         await bot.send_message(user_id, f" **{len(alive)} Working RZ Sites**", file=txt_file)
         os.remove(txt_file)
 
-    await msg.edit(f"""<b> RZ Site Check Complete</b>
+    await msg.edit(f"""<b>RZ Site Check Complete</b>
 
 📊 Total: <code>{len(sites)}</code>
  Working: <code>{len(alive)}</code>
@@ -1746,7 +1746,7 @@ async def single_chk_cc(event):
         response_msg = str(result.get('message', 'Declined'))[:150]
         price = result.get('price', 'Auto')
 
-        res_msg = f"""<b>AUTO SHOPIFY CHECKOUT</b>
+        res_msg = f"""<b>SHOPIFY CHECKOUT</b>
 ━━━━━━━━━━━━━━━━━━━━
 <b>Card:</b> <code>{card}</code>
 <b>Status:</b> {status_emoji}
@@ -1816,7 +1816,7 @@ async def single_razorpay_cc(event):
         first_name = "User"
 
     card = cards[0]
-    status_msg = await event.reply("""<b> Razorpay Checking...</b>""", parse_mode='html')
+    status_msg = await event.reply("""<b>Razorpay Checking...</b>""", parse_mode='html')
 
     try:
         result = await check_card_razorpay(card, random.choice(proxies))
@@ -1826,7 +1826,7 @@ async def single_razorpay_cc(event):
         response_msg = str(result.get('message', 'Unknown'))[:150]
 
         status_emoji = "✅ CHARGED" if result.get("status") == "Charged" else "❌ DECLINED"
-        res_msg = f"""<b>AUTO RAZORPAY CHECKOUT</b>
+        res_msg = f"""<b>RAZORPAY CHECKOUT</b>
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 <b>Card:</b> <code>{card}</code>
 <b>Status:</b> {status_emoji}
@@ -1944,7 +1944,7 @@ async def process_stripe1_cmd(event):
     time_taken = round(time.time() - start_time, 2)
     brand, bin_type, level, bank, country, flag = await get_bin_info(cc[:6])
     status_emoji = "✅ CHARGED" if st in ("charged", "approved") else "❌ DECLINED"
-    res = f"""<b>AUTO STRIPE $1.00 CHECKOUT</b>
+    res = f"""<b>STRIPE $1.00 CHECKOUT</b>
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 <b>Card:</b> <code>{cc}|{mm}|{yy}|{cvc}</code>
 <b>Status:</b> {status_emoji}
@@ -1975,7 +1975,7 @@ async def process_st6_cmd(event):
     except IndexError:
         await event.reply("Format: `/st6 cc|mm|yy|cvv`")
         return
-    status_msg = await event.reply("<b>Processing Stripe Bloomerang ($1.00)...</b>", parse_mode="html")
+    status_msg = await event.reply("<b>Processing Stripe ($1.00)...</b>", parse_mode="html")
     proxies = load_proxies(user_id)
     proxy = random.choice(proxies) if proxies else None
     start_time = time.time()
@@ -1993,7 +1993,7 @@ async def process_st6_cmd(event):
     else:
         status_emoji = "❌ DECLINED"
 
-    res = f"""<b>AUTO STRIPE BLOOMERANG $1.00 CHECKOUT</b>
+    res = f"""<b>STRIPE BLOOMERANG $1.00 CHECKOUT</b>
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 <b>Card:</b> <code>{cc}|{mm}|{yy}|{cvc}</code>
 <b>Status:</b> {status_emoji}
@@ -2039,7 +2039,7 @@ async def process_br1_cmd(event):
     time_taken = round(time.time() - start_time, 2)
     brand, bin_type, level, bank, country, flag = await get_bin_info(cc[:6])
     status_emoji = "✅ APPROVED" if st in ("charged", "approved") else f"❌ {st.upper()}"
-    res = f"""<b>AUTO BRAINTREE $1.00 CHECKOUT</b>
+    res = f"""<b>BRAINTREE $1.00 CHECKOUT</b>
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 <b>Card:</b> <code>{cc}|{mm}|{yy}|{cvc}</code>
 <b>Status:</b> {status_emoji}
@@ -2084,7 +2084,7 @@ async def process_rz1_cmd(event):
     time_taken = round(time.time() - start_time, 2)
     brand, bin_type, level, bank, country, flag = await get_bin_info(cc[:6])
     status_emoji = "✅ LIVE / CHARGED" if st == "live" else f"❌ {st.upper()}"
-    res = f"""<b>AUTO RAZORPAY $1.00 CHECKOUT</b>
+    res = f"""<b>RAZORPAY $1.00 CHECKOUT</b>
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 <b>Card:</b> <code>{cc}|{mm}|{yy}|{cvc}</code>
 <b>Status:</b> {status_emoji}
@@ -2135,7 +2135,7 @@ async def process_st3_cmd(event):
     else:
         status_emoji = "❌ DECLINED"
 
-    res = f"""<b>AUTO STRIPE SETUP INTENT CHECKOUT</b>
+    res = f"""<b>STRIPE SETUP INTENT CHECKOUT</b>
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 <b>Card:</b> <code>{cc}|{mm}|{yy}|{cvc}</code>
 <b>Status:</b> {status_emoji}
@@ -2185,7 +2185,7 @@ async def process_st4_cmd(event):
     else:
         status_emoji = "❌ DECLINED"
 
-    res = f"""<b>AUTO STRIPE $15.00 CHECKOUT</b>
+    res = f"""<b>STRIPE $15.00 CHECKOUT</b>
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 <b>Card:</b> <code>{cc}|{mm}|{yy}|{cvc}</code>
 <b>Status:</b> {status_emoji}
@@ -2235,7 +2235,7 @@ async def process_st5_cmd(event):
     else:
         status_emoji = "❌ DECLINED"
 
-    res = f"""<b>AUTO STRIPE $0.00 AUTH CHECKOUT</b>
+    res = f"""<b>STRIPE $0.00 AUTH CHECKOUT</b>
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 <b>Card:</b> <code>{cc}|{mm}|{yy}|{cvc}</code>
 <b>Status:</b> {status_emoji}
@@ -2285,7 +2285,7 @@ async def process_br2_cmd(event):
     else:
         status_emoji = "❌ DECLINED"
 
-    res = f"""<b>AUTO BRAINTREE $10.00 CHECKOUT</b>
+    res = f"""<b>BRAINTREE $10.00 CHECKOUT</b>
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 <b>Card:</b> <code>{cc}|{mm}|{yy}|{cvc}</code>
 <b>Status:</b> {status_emoji}
@@ -2320,7 +2320,7 @@ async def process_cl_cmd(event):
         return
 
 
-    status_msg = await event.reply("<b>Processing Clover Auto Gate...</b>", parse_mode="html")
+    status_msg = await event.reply("<b>Processing Clover Gate...</b>", parse_mode="html")
     proxies = load_proxies(user_id)
     proxy = random.choice(proxies) if proxies else None
     start_time = time.time()
@@ -2338,7 +2338,7 @@ async def process_cl_cmd(event):
     else:
         status_emoji = "❌ DECLINED"
 
-    res = f"""<b>AUTO CLOVER $1.00 CHECKOUT</b>
+    res = f"""<b>CLOVER $1.00 CHECKOUT</b>
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 <b>Card:</b> <code>{cc}|{mm}|{yy}|{cvc}</code>
 <b>Status:</b> {status_emoji}
@@ -2389,7 +2389,7 @@ async def process_an_cmd(event):
     else:
         status_emoji = "❌ DECLINED"
 
-    res = f"""<b>AUTO AUTHORIZE.NET $0.10 CHECKOUT</b>
+    res = f"""<b>AUTHORIZE.NET $0.10 CHECKOUT</b>
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 <b>Card:</b> <code>{cc}|{mm}|{yy}|{cvc}</code>
 <b>Status:</b> {status_emoji}
@@ -2430,7 +2430,7 @@ async def process_st2_cmd(event):
     cc_first = card_input.split('|')[0][:6] if '|' in card_input else card_input[:6]
     brand, bin_type, level, bank, country, flag = await get_bin_info(cc_first)
     status_emoji = "✅ APPROVED" if msg == "Card Added" else "❌ DECLINED"
-    res = f"""<b>AUTO STRIPE WCPAY CHECKOUT</b>
+    res = f"""<b>STRIPE WCPAY CHECKOUT</b>
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 <b>Card:</b> <code>{card_input}</code>
 <b>Status:</b> {status_emoji}
@@ -2484,7 +2484,7 @@ async def process_paypal_cmd(event):
     else:
         status_emoji = "❌ DECLINED"
 
-    res = f"""<b>AUTO PAYPAL COMMERCE $1.00 CHECKOUT</b>
+    res = f"""<b>PAYPAL COMMERCE $1.00 CHECKOUT</b>
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 <b>Card:</b> <code>{cc}|{mm}|{yy}|{cvc}</code>
 <b>Status:</b> {status_emoji}
@@ -2541,7 +2541,7 @@ async def process_paypal2_cmd(event):
     else:
         status_emoji = "❌ DECLINED"
 
-    res = f"""<b>AUTO PAYPAL COMMERCE $10.00 CHECKOUT</b>
+    res = f"""<b>PAYPAL COMMERCE $10.00 CHECKOUT</b>
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 <b>Card:</b> <code>{cc}|{mm}|{yy}|{cvc}</code>
 <b>Status:</b> {status_emoji}
@@ -2595,7 +2595,7 @@ async def process_vbv_cmd(event):
     brand, bin_type, level, bank, country, flag = await get_bin_info(cc[:6])
 
     status_emoji = "✅ PASSED (NON-VBV)" if is_live else "❌ DECLINED"
-    res = f"""<b>AUTO BRAINTREE VBV LOOKUP</b>
+    res = f"""<b>BRAINTREE VBV LOOKUP</b>
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 <b>Card:</b> <code>{cc}|{mm}|{yy}|{cvc}</code>
 <b>Status:</b> {status_emoji}
@@ -2644,7 +2644,7 @@ async def sq_check_cmd(event):
         await event.reply(f"Site config error: {e}")
         return
 
-    status_msg = await event.reply(f"<b>AUTO SQUARE $1 GATEWAY</b>\n━━━━━━━━━━━━━━━━━━━━\nCard: <code>{cc}|{mes}|{ano}|{cvv}</code>\n<i>Processing payment...</i>", parse_mode="html")
+    status_msg = await event.reply(f"<b>SQUARE $1 GATEWAY</b>\n━━━━━━━━━━━━━━━━━━━━\nCard: <code>{cc}|{mes}|{ano}|{cvv}</code>\n<i>Processing payment...</i>", parse_mode="html")
 
 
     proxies = load_proxies(user_id)
@@ -2657,7 +2657,7 @@ async def sq_check_cmd(event):
 
     status_emoji = "CHARGED ✅" if is_charged else "DECLINED ❌"
 
-    res_msg = f"""<b>AUTO SQUARE $1 CHECKOUT</b>
+    res_msg = f"""<b>SQUARE $1 CHECKOUT</b>
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 <b>Card:</b> <code>{cc}|{mes}|{ano}|{cvv}</code>
 <b>Status:</b> {status_emoji}
@@ -2695,7 +2695,7 @@ async def add_sq_site(event):
 @bot.on(events.NewMessage(pattern=r'^/sqsites$'))
 async def view_sq_sites(event):
     sites = get_square_sites()
-    text = f"<b> SQUARE $1 SITES ({len(sites)})</b>\n━━━━━━━━━━━━━━━━━━━━\n"
+    text = f"<b>SQUARE $1 SITES ({len(sites)})</b>\n━━━━━━━━━━━━━━━━━━━━\n"
     for i, s in enumerate(sites, 1):
         text += f"{i}. <code>{s}</code>\n"
     text += "\n━━━━━━━━━━━━━━━━━━━━\n💡 <i>Use /addsqsites url to add more!</i>"
@@ -2704,7 +2704,7 @@ async def view_sq_sites(event):
 async def sq_tools_menu(event):
     await event.answer(" Square Tools!", alert=False)
 
-    sq_msg = f"""<b> Auto Square $1 Tools</b>
+    sq_msg = f"""<b>Auto Square $1 Tools</b>
 
 <code>/sq card|mm|yy|cvv</code>
  Check card on Square $1 Gateway
@@ -2802,10 +2802,10 @@ async def auth_info_handler(event):
 <b><i>Stripe WCPay Auth ($0.00)</i></b>
 <code>/st2 cc|mm|yy|cvv</code>
 
-<b><i>Stripe SetupIntent Dilaboards ($0.00)</i></b>
+<b><i>Stripe SetupIntent ($0.00)</i></b>
 <code>/st3 cc|mm|yy|cvv</code>
 
-<b><i>Stripe SetupIntent Nemaneide ($0.00)</i></b>
+<b><i>Stripe SetupIntent ($0.00)</i></b>
 <code>/st5 cc|mm|yy|cvv</code>
 
 <b><i>Braintree 3DS VBV ($0.00)</i></b>
@@ -2830,17 +2830,17 @@ async def charge_info_handler(event):
 <b><i>Stripe WCPay Charge ($22.00)</i></b>
 <code>/st cc|mm|yy|cvv</code>
 
-<b><i>Stripe Charge Nantucket ($15.00)</i></b>
+<b><i>Stripe Charge ($15.00)</i></b>
 <code>/st4 cc|mm|yy|cvv</code>
 
 <b><i>Stripe Charge ($1.00)</i></b>
 <code>/st1 cc|mm|yy|cvv</code>
 
-<b><i>Stripe Bloomerang ($1.00)</i></b>
+<b><i>Stripe ($1.00)</i></b>
 <code>/st6 cc|mm|yy|cvv</code>
 
 
-<b><i>Braintree Charge Mixtape ($10.00)</i></b>
+<b><i>Braintree Charge ($10.00)</i></b>
 <code>/br2 cc|mm|yy|cvv</code>
 
 <b><i>Braintree Charge ($1.00)</i></b>
@@ -2890,7 +2890,7 @@ Reply to .txt file: <code>/chk</code>
 <b><i>Mass Stripe ($1.00)</i></b>
 Inline: <code>/mst1 cc|mm|yy|cvv cc...</code>
 
-<b><i>Mass Stripe Bloomerang ($1.00)</i></b>
+<b><i>Mass Stripe ($1.00)</i></b>
 Inline: <code>/mst6 cc|mm|yy|cvv cc...</code>
 
 
@@ -3368,7 +3368,7 @@ async def process_mst6_cmd(event):
         await event.reply("Format: `/mst6 cc|mm|yy|cvv cc|mm|yy|cvv...`")
         return
     cards = cards[:20]
-    status_msg = await event.reply(f"<b>Mass Stripe Bloomerang $1 Check ({len(cards)})</b>\n<i>Processing...</i>", parse_mode="html")
+    status_msg = await event.reply(f"<b>Mass Stripe $1 Check ({len(cards)})</b>\n<i>Processing...</i>", parse_mode="html")
     proxies = load_proxies(user_id)
     results = []
     for card in cards:
@@ -3377,7 +3377,7 @@ async def process_mst6_cmd(event):
             proxy = random.choice(proxies) if proxies else None
             st, msg, brand = await check_card_bloomerang(parts[0], parts[1], parts[2], parts[3], proxy_url=proxy)
             results.append(f"<code>{card}</code> -> {st.upper()} ({msg})")
-    res = f"<b>Mass Stripe Bloomerang $1 Results ({len(cards)})</b>\n" + "\n".join(results)
+    res = f"<b>Mass Stripe $1 Results ({len(cards)})</b>\n" + "\n".join(results)
     await status_msg.edit(res, parse_mode="html")
 
 @bot.on(events.NewMessage(pattern=r'^/mbt1(?:\s+([\s\S]+))?$'))
