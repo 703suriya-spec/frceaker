@@ -1580,11 +1580,19 @@ async def add_proxy_command(event):
         proxies_to_add = []
 
         def extract_proxies_from_string(text_content):
+            if not text_content:
+                return []
             cleaned_text = re.sub(r'[\r\t\u200b\u200c\u200d\ufeff\xa0]', '', text_content)
             cleaned_text = re.sub(r'^[•\-\*\s]+', '', cleaned_text, flags=re.MULTILINE)
-            pattern = r'(?:(?:socks4|socks5|http|https)://)?(?:[0-9]{1,3}\.){3}[0-9]{1,3}:\d{2,5}(?::[a-zA-Z0-9_\-]+:[a-zA-Z0-9_\-]+)?'
-            return [p.strip() for p in re.findall(pattern, cleaned_text) if p.strip()]
-
+            # Universal pattern: handles IP:port, host:port, user:pass@host:port, host:port:user:pass, socks/http scheme
+            pattern = r'(?:(?:socks4|socks5|http|https)://)?(?:[a-zA-Z0-9_\-\.]+:[a-zA-Z0-9_\-\.]+@)?[a-zA-Z0-9_\-\.]+:\d{2,5}(?::[a-zA-Z0-9_\-\.]+:[a-zA-Z0-9_\-\.]+)?'
+            extracted = []
+            for token in re.findall(pattern, cleaned_text):
+                token = token.strip()
+                if token and token not in extracted and not token.startswith(('/addproxy', '/proxy')):
+                    if ":" in token:
+                        extracted.append(token)
+            return extracted
 
         if raw_text:
             proxies_to_add.extend(extract_proxies_from_string(raw_text))
@@ -1616,10 +1624,10 @@ async def add_proxy_command(event):
 💡 <b>Usage:</b>
 <code>/addproxy ip:port</code>
 <code>/addproxy ip:port:user:pass</code>
+<code>/addproxy user:pass@host:port</code>
 
-Or send multiline / reply to a file:
+Or send multiline / reply to a message or file:
 <code>/addproxy</code>
-<code>ip:port:user:pass</code>
 
 ✅ <b>Supported Formats:</b>
 • <code>HTTP/S</code>
@@ -1661,18 +1669,6 @@ Or send multiline / reply to a file:
 ♻️ <b>Duplicates Skipped:</b> <code>{duplicates_count}</code>
 💀 <b>Dead Dropped:</b> <code>{dead_count}</code>
 📊 <b>Your Personal Active Proxies:</b> <code>{total_now}</code>""", parse_mode="html")
-
-
-
-    except Exception as e:
-        await event.reply(f" Error: {e}")
-
-
-
-
-
-
-
 
     except Exception as e:
         await event.reply(f" Error: {e}")
