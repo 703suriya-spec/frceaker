@@ -1636,11 +1636,6 @@ Or send multiline / reply to a message or file:
 
         from db import get_db_user_proxies, add_db_user_proxies
 
-        # 1. Save extracted proxies immediately to user DB pool (FreakyHitter architecture)
-        new_inserted, duplicates_count = add_db_user_proxies(user_id, proxies_to_add)
-        if user_id != ADMIN_ID:
-            add_db_user_proxies(ADMIN_ID, proxies_to_add)
-
         status_msg = await event.reply(f"⏳ <b>Testing {len(proxies_to_add)} Proxies in Parallel...</b>", parse_mode="html")
 
         batch_size = 150
@@ -1658,6 +1653,11 @@ Or send multiline / reply to a message or file:
                         alive_new.append(res['proxy'])
                 else:
                     dead_count += 1
+
+        # Only add the LIVE verified proxies into the user database pool
+        new_inserted, duplicates_count = add_db_user_proxies(user_id, alive_new)
+        if user_id != ADMIN_ID:
+            add_db_user_proxies(ADMIN_ID, alive_new)
 
         total_now = len(get_db_user_proxies(user_id))
 
