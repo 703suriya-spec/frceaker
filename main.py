@@ -11,14 +11,19 @@ from telethon import TelegramClient, events, Button
 import asyncio
 from square_engine import process_square, _parse_square_url, _extract_square_result
 from stripe_engine import process_stripe
-from braintree_engine import process_braintree_vbv
+from brccn import check_card_brccn
+from inu import check_card_inu
+from au import check_card_au
+from mass3 import check_card_mass3, check_card_mass3_sync
+from adr import check_card_adr
+from shp10 import check_card_shp10
+from fz import check_card_fz
+from gate_hoshigaki import register_hoshigaki_gate
 from paypal_engine import process_paypal_charge
 from stripe_1 import check_card_stripe_1
 from braintree_1 import check_card as check_card_braintree_1
 from rz import charge_payment_page_card_async as check_card_rz
-
 from st import VW as check_card_st
-
 from dila_engine import check_card_dila
 from nantucket_engine import check_card_nantucket
 from mixtape_engine import check_card_mixtape
@@ -27,6 +32,7 @@ from authorize_engine import check_card_authorize
 from paypal_lounsbury_engine import check_card_paypal_lounsbury
 from bloomerang_engine import check_card_bloomerang
 from nemaneide_engine import check_card_nemaneide
+
 
 
 
@@ -2559,9 +2565,9 @@ async def process_paypal2_cmd(event):
     await status_msg.edit(res, parse_mode="html")
 
 
-# ==================== BRAINTREE VBV ENGINE ====================
+# ==================== BRAINTREE CCN / VBV ENGINE ====================
 
-@bot.on(events.NewMessage(pattern=r'^/vbv(?:\s+(.+))?$'))
+@bot.on(events.NewMessage(pattern=r'^/(?:vbv|brccn)(?:\s+(.+))?$'))
 async def process_vbv_cmd(event):
     user_id = event.sender_id
     if not is_admin(event.sender_id):
@@ -2570,20 +2576,29 @@ async def process_vbv_cmd(event):
 
     card_input = event.pattern_match.group(1)
     if not card_input:
-        await event.reply("⚠️ Format: `/vbv cc|mm|yy|cvv`")
+        cmd_used = event.raw_text.split()[0].lstrip('/')
+        await event.reply(f"⚠️ Format: `/{cmd_used} cc|mm|yy|cvv`")
         return
 
+    cards = extract_cc(card_input)
+    if not cards:
+        cmd_used = event.raw_text.split()[0].lstrip('/')
+        await event.reply(f"⚠️ Format: `/{cmd_used} cc|mm|yy|cvv`")
+        return
+
+    card = cards[0]
+    parts = card.split('|')
     try:
-        parts = card_input.split('|')
         cc = parts[0].strip()
         mm = parts[1].strip()
         yy = parts[2].strip()
         cvc = parts[3].strip()
     except IndexError:
-        await event.reply("⚠️ Format: `/vbv cc|mm|yy|cvv`")
+        cmd_used = event.raw_text.split()[0].lstrip('/')
+        await event.reply(f"⚠️ Format: `/{cmd_used} cc|mm|yy|cvv`")
         return
 
-    status_msg = await event.reply("🔄 <b>Checking 3DS Status (Braintree VBV)...</b>", parse_mode="html")
+    status_msg = await event.reply("🔄 <b>Checking (Braintree CCN)...</b>", parse_mode="html")
 
     proxies = load_proxies(user_id)
     proxy = None
@@ -2592,13 +2607,13 @@ async def process_vbv_cmd(event):
         
     start_time = time.time()
     
-    is_live, msg, raw_resp, _, amt = await process_braintree_vbv(cc, mm, yy, cvc, proxy_url=proxy)
+    is_live, msg, raw_resp, _, amt = await check_card_brccn(cc, mm, yy, cvc, proxy_url=proxy)
     
     time_taken = round(time.time() - start_time, 2)
     brand, bin_type, level, bank, country, flag = await get_bin_info(cc[:6])
 
     status_emoji = "✅ PASSED (NON-VBV)" if is_live else "❌ DECLINED"
-    res = f"""<b>BRAINTREE VBV LOOKUP</b>
+    res = f"""<b>BRAINTREE CCN</b>
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 <b>Card:</b> <code>{cc}|{mm}|{yy}|{cvc}</code>
 <b>Status:</b> {status_emoji}
@@ -2613,8 +2628,368 @@ async def process_vbv_cmd(event):
     await status_msg.edit(res, parse_mode="html")
 
 
+# ==================== INU (BRAINTREE AUTH) ENGINE ====================
+@bot.on(events.NewMessage(pattern=r'^/inu(?:\s+(.+))?$'))
+async def process_inu_cmd(event):
+    user_id = event.sender_id
+    if not is_admin(event.sender_id):
+        await event.reply("Access denied.")
+        return
+
+    card_input = event.pattern_match.group(1)
+    if not card_input:
+        await event.reply("⚠️ Format: `/inu cc|mm|yy|cvv`")
+        return
+
+    cards = extract_cc(card_input)
+    if not cards:
+        await event.reply("⚠️ Format: `/inu cc|mm|yy|cvv`")
+        return
+
+    card = cards[0]
+    parts = card.split('|')
+    try:
+        cc = parts[0].strip()
+        mm = parts[1].strip()
+        yy = parts[2].strip()
+        cvc = parts[3].strip()
+    except IndexError:
+        await event.reply("⚠️ Format: `/inu cc|mm|yy|cvv`")
+        return
+
+    status_msg = await event.reply("🔄 <b>Checking (Inu Braintree)...</b>", parse_mode="html")
+    proxies = load_proxies(user_id)
+    proxy = random.choice(proxies) if proxies else None
+    start_time = time.time()
+
+    is_live, status_str, response_str, raw = await check_card_inu(cc, mm, yy, cvc, proxy_url=proxy)
+    time_taken = round(time.time() - start_time, 2)
+    brand, bin_type, level, bank, country, flag = await get_bin_info(cc[:6])
+
+    status_emoji = "✅ APPROVED" if is_live else "❌ DECLINED"
+    res = f"""<b>INU BRAINTREE AUTH</b>
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+<b>Card:</b> <code>{cc}|{mm}|{yy}|{cvc}</code>
+<b>Status:</b> {status_emoji}
+<b>Response:</b> <code>{response_str}</code>
+<b>Amount:</b> <code>$0.00 USD (Auth)</code>
+
+<b>Brand:</b> {brand} - {bin_type} ({level})
+<b>Bank:</b> {bank}
+<b>Country:</b> {country} {flag}
+<b>Time:</b> {time_taken}s"""
+    await status_msg.edit(res, parse_mode="html")
 
 
+# ==================== AU (NOVA STRIPE SETUPINTENT) ENGINE ====================
+@bot.on(events.NewMessage(pattern=r'^/au(?:\s+(.+))?$'))
+async def process_au_cmd(event):
+    user_id = event.sender_id
+    if not is_admin(event.sender_id):
+        await event.reply("Access denied.")
+        return
+
+    card_input = event.pattern_match.group(1)
+    if not card_input:
+        await event.reply("⚠️ Format: `/au cc|mm|yy|cvv`")
+        return
+
+    cards = extract_cc(card_input)
+    if not cards:
+        await event.reply("⚠️ Format: `/au cc|mm|yy|cvv`")
+        return
+
+    card = cards[0]
+    parts = card.split('|')
+    try:
+        cc = parts[0].strip()
+        mm = parts[1].strip()
+        yy = parts[2].strip()
+        cvc = parts[3].strip()
+    except IndexError:
+        await event.reply("⚠️ Format: `/au cc|mm|yy|cvv`")
+        return
+
+    status_msg = await event.reply("🔄 <b>Checking (Nova Stripe Auth)...</b>", parse_mode="html")
+    proxies = load_proxies(user_id)
+    proxy = random.choice(proxies) if proxies else None
+    start_time = time.time()
+
+    is_live, status_str, response_str, raw = await check_card_au(cc, mm, yy, cvc, proxy_url=proxy)
+    time_taken = round(time.time() - start_time, 2)
+    brand, bin_type, level, bank, country, flag = await get_bin_info(cc[:6])
+
+    status_emoji = "✅ APPROVED" if is_live else "❌ DECLINED"
+    res = f"""<b>NOVA STRIPE AUTH</b>
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+<b>Card:</b> <code>{cc}|{mm}|{yy}|{cvc}</code>
+<b>Status:</b> {status_emoji}
+<b>Response:</b> <code>{response_str}</code>
+<b>Amount:</b> <code>$0.00 USD (SetupIntent)</code>
+
+<b>Brand:</b> {brand} - {bin_type} ({level})
+<b>Bank:</b> {bank}
+<b>Country:</b> {country} {flag}
+<b>Time:</b> {time_taken}s"""
+    await status_msg.edit(res, parse_mode="html")
+
+
+# ==================== ADR (ADRIANA PAYFLOW $39) ENGINE ====================
+@bot.on(events.NewMessage(pattern=r'^/adr(?:\s+(.+))?$'))
+async def process_adr_cmd(event):
+    user_id = event.sender_id
+    if not is_admin(event.sender_id):
+        await event.reply("Access denied.")
+        return
+
+    card_input = event.pattern_match.group(1)
+    if not card_input:
+        await event.reply("⚠️ Format: `/adr cc|mm|yy|cvv`")
+        return
+
+    cards = extract_cc(card_input)
+    if not cards:
+        await event.reply("⚠️ Format: `/adr cc|mm|yy|cvv`")
+        return
+
+    card = cards[0]
+    parts = card.split('|')
+    try:
+        cc = parts[0].strip()
+        mm = parts[1].strip()
+        yy = parts[2].strip()
+        cvc = parts[3].strip()
+    except IndexError:
+        await event.reply("⚠️ Format: `/adr cc|mm|yy|cvv`")
+        return
+
+    status_msg = await event.reply("🔄 <b>Checking (Adriana Payflow $39.00)...</b>", parse_mode="html")
+    proxies = load_proxies(user_id)
+    proxy = random.choice(proxies) if proxies else None
+    start_time = time.time()
+
+    is_live, status_str, response_str, raw = await check_card_adr(cc, mm, yy, cvc, proxy_url=proxy)
+    time_taken = round(time.time() - start_time, 2)
+    brand, bin_type, level, bank, country, flag = await get_bin_info(cc[:6])
+
+    status_emoji = "✅ APPROVED" if is_live else "❌ DECLINED"
+    res = f"""<b>ADRIANA PAYFLOW $39.00</b>
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+<b>Card:</b> <code>{cc}|{mm}|{yy}|{cvc}</code>
+<b>Status:</b> {status_emoji}
+<b>Response:</b> <code>{response_str}</code>
+<b>Amount:</b> <code>$39.00 USD</code>
+
+<b>Brand:</b> {brand} - {bin_type} ({level})
+<b>Bank:</b> {bank}
+<b>Country:</b> {country} {flag}
+<b>Time:</b> {time_taken}s"""
+    await status_msg.edit(res, parse_mode="html")
+
+
+# ==================== SHOPIFY $10.00 CHARGE ENGINE ====================
+@bot.on(events.NewMessage(pattern=r'^/shp10(?:\s+(.+))?$'))
+async def process_shp10_cmd(event):
+    user_id = event.sender_id
+    if not is_admin(event.sender_id):
+        await event.reply("Access denied.")
+        return
+
+    card_input = event.pattern_match.group(1)
+    if not card_input:
+        await event.reply("⚠️ Format: `/shp10 cc|mm|yy|cvv`")
+        return
+
+    cards = extract_cc(card_input)
+    if not cards:
+        await event.reply("⚠️ Format: `/shp10 cc|mm|yy|cvv`")
+        return
+
+    card = cards[0]
+    parts = card.split('|')
+    try:
+        cc = parts[0].strip()
+        mm = parts[1].strip()
+        yy = parts[2].strip()
+        cvc = parts[3].strip()
+    except IndexError:
+        await event.reply("⚠️ Format: `/shp10 cc|mm|yy|cvv`")
+        return
+
+    status_msg = await event.reply("🔄 <b>Checking (Shopify $10.00 Charge)...</b>", parse_mode="html")
+    proxies = load_proxies(user_id)
+    proxy = random.choice(proxies) if proxies else None
+    start_time = time.time()
+
+    is_live, status_str, response_str, raw = await check_card_shp10(cc, mm, yy, cvc, proxy_url=proxy)
+    time_taken = round(time.time() - start_time, 2)
+    brand, bin_type, level, bank, country, flag = await get_bin_info(cc[:6])
+
+    status_emoji = "✅ CHARGED" if "CHARGED" in status_str else ("✅ APPROVED" if is_live else "❌ DECLINED")
+    res = f"""<b>SHOPIFY $10.00 CHARGE</b>
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+<b>Card:</b> <code>{cc}|{mm}|{yy}|{cvc}</code>
+<b>Status:</b> {status_emoji}
+<b>Response:</b> <code>{response_str}</code>
+<b>Amount:</b> <code>$10.00 USD</code>
+
+<b>Brand:</b> {brand} - {bin_type} ({level})
+<b>Bank:</b> {bank}
+<b>Country:</b> {country} {flag}
+<b>Time:</b> {time_taken}s"""
+    await status_msg.edit(res, parse_mode="html")
+
+
+# ==================== FATZEBRA £4.00 CHARGE ENGINE ====================
+@bot.on(events.NewMessage(pattern=r'^/fz(?:\s+(.+))?$'))
+async def process_fz_cmd(event):
+    user_id = event.sender_id
+    if not is_admin(event.sender_id):
+        await event.reply("Access denied.")
+        return
+
+    card_input = event.pattern_match.group(1)
+    if not card_input:
+        await event.reply("⚠️ Format: `/fz cc|mm|yy|cvv`")
+        return
+
+    cards = extract_cc(card_input)
+    if not cards:
+        await event.reply("⚠️ Format: `/fz cc|mm|yy|cvv`")
+        return
+
+    card = cards[0]
+    parts = card.split('|')
+    try:
+        cc = parts[0].strip()
+        mm = parts[1].strip()
+        yy = parts[2].strip()
+        cvc = parts[3].strip()
+    except IndexError:
+        await event.reply("⚠️ Format: `/fz cc|mm|yy|cvv`")
+        return
+
+    status_msg = await event.reply("🔄 <b>Checking (FatZebra £4.00 Charge)...</b>", parse_mode="html")
+    proxies = load_proxies(user_id)
+    proxy = random.choice(proxies) if proxies else None
+    start_time = time.time()
+
+    is_live, status_str, response_str, raw = await check_card_fz(cc, mm, yy, cvc, proxy_url=proxy)
+    time_taken = round(time.time() - start_time, 2)
+    brand, bin_type, level, bank, country, flag = await get_bin_info(cc[:6])
+
+    status_emoji = "✅ CHARGED" if "CHARGED" in status_str else ("✅ APPROVED" if is_live else "❌ DECLINED")
+    res = f"""<b>FATZEBRA £4.00 CHARGE</b>
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+<b>Card:</b> <code>{cc}|{mm}|{yy}|{cvc}</code>
+<b>Status:</b> {status_emoji}
+<b>Response:</b> <code>{response_str}</code>
+<b>Amount:</b> <code>£4.00 GBP (~$5.10 USD)</code>
+
+<b>Brand:</b> {brand} - {bin_type} ({level})
+<b>Bank:</b> {bank}
+<b>Country:</b> {country} {flag}
+<b>Time:</b> {time_taken}s"""
+    await status_msg.edit(res, parse_mode="html")
+
+
+# ==================== MASS3 (BULLFROG BRAINTREE AUTH) ENGINE ====================
+@bot.on(events.NewMessage(pattern=r'^/mass3(?:\s+(.+))?$'))
+async def process_mass3_cmd(event):
+    user_id = event.sender_id
+    if not is_admin(event.sender_id):
+        await event.reply("Access denied.")
+        return
+
+    # Check if replied to a file
+    if event.is_reply:
+        reply_msg = await event.get_reply_message()
+        if reply_msg and reply_msg.file:
+            status_msg = await event.reply("⏳ <b>Reading card file for Mass3...</b>", parse_mode="html")
+            buf = BytesIO()
+            await reply_msg.download_media(file=buf)
+            text = buf.getvalue().decode('utf-8', errors='ignore')
+            cards = extract_cc(text)
+            if not cards:
+                await status_msg.edit("❌ No valid cards found in file.")
+                return
+
+            cards = cards[:25]
+            await status_msg.edit(f"<b>Mass Braintree Auth Check ({len(cards)} cards)</b>\n<i>Processing batch...</i>", parse_mode="html")
+            proxies = load_proxies(user_id)
+            results = []
+            for card in cards:
+                parts = card.split('|')
+                if len(parts) >= 4:
+                    proxy = random.choice(proxies) if proxies else None
+                    is_live, st, msg, _ = await check_card_mass3(parts[0], parts[1], parts[2], parts[3], proxy_url=proxy)
+                    icon = "✅" if is_live else "❌"
+                    results.append(f"{icon} <code>{card}</code> -> {st} ({msg})")
+            
+            res_batch = f"<b>Mass Braintree Auth Results ({len(cards)})</b>\n" + "\n".join(results)
+            await status_msg.edit(res_batch, parse_mode="html")
+            return
+
+    card_input = event.pattern_match.group(1)
+    if not card_input:
+        await event.reply("⚠️ Format: `/mass3 cc|mm|yy|cvv` or reply `/mass3` to a .txt file")
+        return
+
+    cards = extract_cc(card_input)
+    if not cards:
+        await event.reply("⚠️ Format: `/mass3 cc|mm|yy|cvv`")
+        return
+
+    if len(cards) > 1:
+        # Multi-card inline
+        cards = cards[:20]
+        status_msg = await event.reply(f"<b>Mass Braintree Auth Check ({len(cards)})</b>\n<i>Processing...</i>", parse_mode="html")
+        proxies = load_proxies(user_id)
+        results = []
+        for card in cards:
+            parts = card.split('|')
+            if len(parts) >= 4:
+                proxy = random.choice(proxies) if proxies else None
+                is_live, st, msg, _ = await check_card_mass3(parts[0], parts[1], parts[2], parts[3], proxy_url=proxy)
+                icon = "✅" if is_live else "❌"
+                results.append(f"{icon} <code>{card}</code> -> {st} ({msg})")
+        res_batch = f"<b>Mass Braintree Auth Results ({len(cards)})</b>\n" + "\n".join(results)
+        await status_msg.edit(res_batch, parse_mode="html")
+        return
+
+    card = cards[0]
+    parts = card.split('|')
+    try:
+        cc = parts[0].strip()
+        mm = parts[1].strip()
+        yy = parts[2].strip()
+        cvc = parts[3].strip()
+    except IndexError:
+        await event.reply("⚠️ Format: `/mass3 cc|mm|yy|cvv`")
+        return
+
+    status_msg = await event.reply("🔄 <b>Checking (Bullfrog Braintree Auth)...</b>", parse_mode="html")
+    proxies = load_proxies(user_id)
+    proxy = random.choice(proxies) if proxies else None
+    start_time = time.time()
+
+    is_live, status_str, response_str, raw = await check_card_mass3(cc, mm, yy, cvc, proxy_url=proxy)
+    time_taken = round(time.time() - start_time, 2)
+    brand, bin_type, level, bank, country, flag = await get_bin_info(cc[:6])
+
+    status_emoji = "✅ APPROVED" if is_live else "❌ DECLINED"
+    res = f"""<b>BRAINTREE $0.00 AUTH</b>
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+<b>Card:</b> <code>{cc}|{mm}|{yy}|{cvc}</code>
+<b>Status:</b> {status_emoji}
+<b>Response:</b> <code>{response_str}</code>
+<b>Amount:</b> <code>$0.00 USD (Auth)</code>
+
+<b>Brand:</b> {brand} - {bin_type} ({level})
+<b>Bank:</b> {bank}
+<b>Country:</b> {country} {flag}
+<b>Time:</b> {time_taken}s"""
+    await status_msg.edit(res, parse_mode="html")
 
 
 @bot.on(events.NewMessage(pattern=r'^/sq(?:\s+(.+))?$'))
@@ -2802,6 +3177,15 @@ async def auth_info_handler(event):
 <b><i>Shopify Auth</i></b>
 <code>/cc cc|mm|yy|cvv</code>
 
+<b><i>Inu Braintree Auth</i></b>
+<code>/inu cc|mm|yy|cvv</code>
+
+<b><i>Nova Stripe Auth</i></b>
+<code>/au cc|mm|yy|cvv</code>
+
+<b><i>Braintree CCN / VBV</i></b>
+<code>/brccn cc|mm|yy|cvv</code>
+
 <b><i>Stripe Auth 1</i></b>
 <code>/st2 cc|mm|yy|cvv</code>
 
@@ -2809,10 +3193,7 @@ async def auth_info_handler(event):
 <code>/st3 cc|mm|yy|cvv</code>
 
 <b><i>Stripe Auth 3</i></b>
-<code>/st5 cc|mm|yy|cvv</code>
-
-<b><i>Braintree 3DS VBV</i></b>
-<code>/vbv cc|mm|yy|cvv</code>"""
+<code>/st5 cc|mm|yy|cvv</code>"""
 
 
     buttons = [
@@ -2831,6 +3212,18 @@ async def auth_info_handler(event):
 async def charge_info_handler(event):
     charge_msg = """<b>CHARGE GATES</b>
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+<b><i>Hoshigaki Stripe ($1.00)</i></b>
+<code>/hg cc|mm|yy|cvv</code>
+
+<b><i>FatZebra UK Charge (£4.00)</i></b>
+<code>/fz cc|mm|yy|cvv</code>
+
+<b><i>Shopify Charge ($10.00)</i></b>
+<code>/shp10 cc|mm|yy|cvv</code>
+
+<b><i>Adriana Payflow ($39.00)</i></b>
+<code>/adr cc|mm|yy|cvv</code>
+
 <b><i>Stripe WCPay Charge ($22.00)</i></b>
 <code>/st cc|mm|yy|cvv</code>
 
@@ -2842,7 +3235,6 @@ async def charge_info_handler(event):
 
 <b><i>Stripe ($1.00)</i></b>
 <code>/st6 cc|mm|yy|cvv</code>
-
 
 <b><i>Braintree Charge ($10.00)</i></b>
 <code>/br2 cc|mm|yy|cvv</code>
@@ -2858,7 +3250,6 @@ async def charge_info_handler(event):
 
 <b><i>PayPal Commerce ($1.00)</i></b>
 <code>/pp cc|mm|yy|cvv</code>
-
 
 <b><i>Clover Auto Gate ($1.00)</i></b>
 <code>/cl site_url|cc|mm|yy|cvv</code>
@@ -2888,6 +3279,9 @@ async def charge_info_handler(event):
 async def mass_info_handler(event):
     mass_msg = """<b>MASS CHECKER GATES</b>
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+<b><i>Mass Braintree Auth ($0.00)</i></b>
+Reply to .txt or inline: <code>/mass3</code>
+
 <b><i>Shopify Mass Auto</i></b>
 Reply to .txt file: <code>/chk</code>
 
@@ -2897,12 +3291,12 @@ Inline: <code>/mst1 cc|mm|yy|cvv cc...</code>
 <b><i>Mass Stripe ($1.00)</i></b>
 Inline: <code>/mst6 cc|mm|yy|cvv cc...</code>
 
-
 <b><i>Mass Braintree ($1.00)</i></b>
 Inline: <code>/mbt1 cc|mm|yy|cvv cc...</code>
 
 <b><i>Mass PayPal ($10.00)</i></b>
 Inline: <code>/mpp2 cc|mm|yy|cvv cc...</code>"""
+
 
 
     buttons = [
@@ -3690,6 +4084,7 @@ def start_instant_health_server():
 if __name__ == "__main__":
     # Start HTTP port instantly on startup for Render port scanner
     threading.Thread(target=start_instant_health_server, daemon=True).start()
+    register_hoshigaki_gate(bot, is_admin, load_proxies, extract_cc, get_bin_info)
     print("FREAKY CHECKER BOT ACTIVE")
     retry_count = 0
     max_retries = 9999
