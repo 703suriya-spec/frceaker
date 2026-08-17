@@ -2895,9 +2895,9 @@ async def checker_menu_handler(event):
     gates_msg = """<b>Gates Menu</b>
 
 Browse the available categories:
-• <b>Auth Gates:</b> 5
-• <b>Charge Gates:</b> 11
-• <b>Mass Checker:</b> 3"""
+• <b>Auth Gates:</b> 7
+• <b>Charge Gates:</b> 15
+• <b>Mass Checker:</b> 6"""
 
     buttons = [
         [Button.inline("Auth Gates", b"auth_info"),
@@ -2915,27 +2915,26 @@ Browse the available categories:
 async def auth_info_handler(event):
     auth_msg = """<b>AUTH GATES</b>
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-<b><i>Shopify Auth</i></b>
-<code>/cc cc|mm|yy|cvv</code>
+<b><i>Shopify Auth Gate</i></b>
+<code>/chk cc|mm|yy|cvv</code> (or <code>/cc</code>)
+
+<b><i>Stripe Nova Auth (SetupIntent)</i></b>
+<code>/au cc|mm|yy|cvv</code>
+
+<b><i>Stripe WCPay Auth</i></b>
+<code>/st2 cc|mm|yy|cvv</code>
+
+<b><i>Stripe Dila Auth</i></b>
+<code>/st3 cc|mm|yy|cvv</code>
+
+<b><i>Stripe Nemaneide Auth</i></b>
+<code>/st5 cc|mm|yy|cvv</code>
 
 <b><i>Inu Braintree Auth</i></b>
 <code>/inu cc|mm|yy|cvv</code>
 
-<b><i>Nova Stripe Auth</i></b>
-<code>/au cc|mm|yy|cvv</code>
-
-<b><i>Braintree CCN / VBV</i></b>
-<code>/brccn cc|mm|yy|cvv</code>
-
-<b><i>Stripe Auth 1</i></b>
-<code>/st2 cc|mm|yy|cvv</code>
-
-<b><i>Stripe Auth 2</i></b>
-<code>/st3 cc|mm|yy|cvv</code>
-
-<b><i>Stripe Auth 3</i></b>
-<code>/st5 cc|mm|yy|cvv</code>"""
-
+<b><i>Braintree CCN / VBV Lookup</i></b>
+<code>/brccn cc|mm|yy|cvv</code> (or <code>/vbv</code>)"""
 
     buttons = [
         [Button.inline("Back", b"checker")]
@@ -2953,38 +2952,32 @@ async def auth_info_handler(event):
 async def charge_info_handler(event):
     charge_msg = """<b>CHARGE GATES</b>
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-<b><i>Hoshigaki Stripe ($1.00)</i></b>
-<code>/hg cc|mm|yy|cvv</code>
-
-<b><i>FatZebra UK Charge (£4.00)</i></b>
-<code>/fz cc|mm|yy|cvv</code>
-
 <b><i>Shopify Charge ($10.00)</i></b>
 <code>/shp10 cc|mm|yy|cvv</code>
-
-<b><i>Adriana Payflow ($39.00)</i></b>
-<code>/adr cc|mm|yy|cvv</code>
 
 <b><i>Stripe WCPay Charge ($22.00)</i></b>
 <code>/st cc|mm|yy|cvv</code>
 
-<b><i>Stripe Charge ($15.00)</i></b>
+<b><i>Stripe Nantucket Charge ($15.00)</i></b>
 <code>/st4 cc|mm|yy|cvv</code>
 
-<b><i>Stripe Charge ($1.00)</i></b>
-<code>/st1 cc|mm|yy|cvv</code>
+<b><i>Hoshigaki Stripe Donation ($1.00)</i></b>
+<code>/hg cc|mm|yy|cvv</code>
 
-<b><i>Stripe ($1.00)</i></b>
+<b><i>Stripe Bloomerang Charge ($1.00)</i></b>
 <code>/st6 cc|mm|yy|cvv</code>
 
-<b><i>Braintree Charge ($10.00)</i></b>
+<b><i>Stripe Direct Charge ($1.00)</i></b>
+<code>/st1 cc|mm|yy|cvv</code>
+
+<b><i>Braintree Mixtape Charge ($10.00)</i></b>
 <code>/br2 cc|mm|yy|cvv</code>
 
-<b><i>Braintree Charge ($1.00)</i></b>
+<b><i>Braintree Direct Charge ($1.00)</i></b>
 <code>/br1 cc|mm|yy|cvv</code>
 
-<b><i>Square Charge ($1.00)</i></b>
-<code>/sq cc|mm|yy|cvv</code>
+<b><i>Adriana Payflow ($39.00)</i></b>
+<code>/adr cc|mm|yy|cvv</code>
 
 <b><i>PayPal Commerce ($10.00)</i></b>
 <code>/pp2 cc|mm|yy|cvv</code>
@@ -2992,16 +2985,19 @@ async def charge_info_handler(event):
 <b><i>PayPal Commerce ($1.00)</i></b>
 <code>/pp cc|mm|yy|cvv</code>
 
-<b><i>Clover Auto Gate ($1.00)</i></b>
+<b><i>FatZebra UK Charge (£4.00 / ~$5.10)</i></b>
+<code>/fz cc|mm|yy|cvv</code>
+
+<b><i>Square Web Charge ($1.00)</i></b>
+<code>/sq cc|mm|yy|cvv</code>
+
+<b><i>Clover Hosted Gate ($1.00)</i></b>
 <code>/cl site_url|cc|mm|yy|cvv</code>
 
 <b><i>Razorpay Auto ($1.00)</i></b>
-<code>/rz1 cc|mm|yy|cvv</code>
+<code>/rz1 cc|mm|yy|cvv</code> (or <code>/rz</code>)
 
-<b><i>Razorpay Charge (₹1.00)</i></b>
-<code>/rz cc|mm|yy|cvv</code>
-
-<b><i>Authorize.Net ($0.10)</i></b>
+<b><i>Authorize.Net Charge ($0.10)</i></b>
 <code>/an cc|mm|yy|cvv</code>"""
 
     buttons = [
@@ -3020,25 +3016,23 @@ async def charge_info_handler(event):
 async def mass_info_handler(event):
     mass_msg = """<b>MASS CHECKER GATES</b>
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-<b><i>Mass Braintree Auth ($0.00)</i></b>
-Reply to .txt or inline: <code>/mass3</code>
-
 <b><i>Shopify Mass Auto</i></b>
 Reply to .txt file: <code>/chk</code>
 
 <b><i>Mass Stripe ($1.00)</i></b>
 Inline: <code>/mst1 cc|mm|yy|cvv cc...</code>
 
-<b><i>Mass Stripe ($1.00)</i></b>
+<b><i>Mass Stripe Bloomerang ($1.00)</i></b>
 Inline: <code>/mst6 cc|mm|yy|cvv cc...</code>
+
+<b><i>Mass Braintree Auth ($0.00)</i></b>
+Reply to .txt or inline: <code>/mass3</code>
 
 <b><i>Mass Braintree ($1.00)</i></b>
 Inline: <code>/mbt1 cc|mm|yy|cvv cc...</code>
 
 <b><i>Mass PayPal ($10.00)</i></b>
 Inline: <code>/mpp2 cc|mm|yy|cvv cc...</code>"""
-
-
 
     buttons = [
         [Button.inline("Back", b"checker")]
