@@ -204,18 +204,31 @@ def register_hoshigaki_gate(bot, is_admin_fn, load_proxies_fn, extract_cc_fn, ge
         time_taken = round(time.time() - start_time, 2)
         brand, bin_type, level, bank, country, flag = await get_bin_info_fn(cc[:6])
 
-        status_emoji = "✅ CHARGED" if "CHARGED" in status_str else ("✅ APPROVED" if is_live else "❌ DECLINED")
-        res = f"""<b>HOSHIGAKI STRIPE $1.00</b>
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-<b>Card:</b> <code>{cc}|{mm}|{yy}|{cvc}</code>
-<b>Status:</b> {status_emoji}
-<b>Response:</b> <code>{response_str}</code>
-<b>Amount:</b> <code>$1.00 USD</code>
+        status_emoji = "Approved! ✅ -» charged!" if "CHARGED" in status_str else ("Approved! ✅" if is_live else "Dead! ❌")
 
-<b>Brand:</b> {brand} - {bin_type} ({level})
-<b>Bank:</b> {bank}
-<b>Country:</b> {country} {flag}
-<b>Time:</b> {time_taken}s"""
+        user_tag = ""
+        if event.sender:
+            first_n = getattr(event.sender, "first_name", "User") or "User"
+            uid = getattr(event.sender, "id", None)
+            if uid:
+                user_tag = f"\nᥫ᭡ <b>𝘾𝙝𝙚𝙘𝙠𝙚𝙙 𝙗𝙮</b> -» <a href='tg://user?id={uid}'>{first_n}</a>"
+
+        bin_desc = f"{brand}"
+        if bin_type and bin_type != "-":
+            bin_desc += f" - {bin_type}"
+        if level and level != "-":
+            bin_desc += f" - {level}"
+
+        res = f"""<b>ア 𝘾𝘾</b> -» <code>{cc}|{mm}|{yy}|{cvc}</code>
+<b>カ 𝙎𝙩𝙖𝙩𝙪𝙨</b> -» <code>{status_emoji}</code>
+<b>ツ 𝙍𝙚𝙨𝙪𝙡𝙩</b> -» <code>{response_str}</code>
+
+<b>キ 𝘽𝙞𝙣</b> -» <code>{bin_desc}</code>
+<b>朱 𝘽𝙖𝙣𝙠</b> -» <code>{bank}</code>
+<b>零 𝘾𝙤𝙪𝙣𝙩𝙧𝙮</b> -» <code>{country} {flag}</code>
+
+<b>⸙ 𝙂𝙖𝙩𝙚𝙬𝙖𝙮</b> -» <code>Hoshigaki Stripe -» $1.00</code>
+<b>꫟ 𝙏𝙞𝙢𝙚</b> -» <code>{time_taken}'s</code>{user_tag}"""
         await status_msg.edit(res, parse_mode="html")
 
 if __name__ == '__main__':
