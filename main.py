@@ -2482,10 +2482,8 @@ async def process_paypal_cmd(event):
 
     if st == "charged":
         status_emoji = "✅ CHARGED"
-    elif st in ("approved", "live"):
+    elif st in ("approved", "live", "3ds"):
         status_emoji = "✅ APPROVED"
-    elif st == "3ds":
-        status_emoji = "❌ DECLINED"
     else:
         status_emoji = "❌ DECLINED"
 
@@ -2539,10 +2537,8 @@ async def process_paypal2_cmd(event):
 
     if st == "charged":
         status_emoji = "✅ CHARGED"
-    elif st in ("approved", "live"):
+    elif st in ("approved", "live", "3ds"):
         status_emoji = "✅ APPROVED"
-    elif st == "3ds":
-        status_emoji = "❌ DECLINED"
     else:
         status_emoji = "❌ DECLINED"
 

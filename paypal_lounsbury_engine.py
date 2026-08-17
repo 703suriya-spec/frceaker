@@ -170,16 +170,19 @@ def check_card_paypal_lounsbury_sync(cc, mm, yy, cvc, proxy_url=None):
 
         res_text = r_gql.text
 
-        if "ISSUER_DECLINE" in res_text or "CARD_GENERIC_ERROR" in res_text:
-            return "declined", "Card Declined (Issuer Decline)", brand
-        elif "INVALID_SECURITY_CODE" in res_text:
-            return "live", "CVV Mismatch", brand
+        res_text_upper = res_text.upper()
+        if "INSUFFICIENT_FUNDS" in res_text_upper or "INSUFFICIENT" in res_text_upper:
+            return "live", "Insufficient Funds (Card Live)", brand
+        elif "INVALID_SECURITY_CODE" in res_text or "CVV" in res_text_upper or "CVC" in res_text_upper:
+            return "live", "CVV Mismatch (CCN Live)", brand
         elif "GUEST_CARD_COUNTRY_MISMATCH" in res_text:
             return "live", "Card Approved (Country Mismatch)", brand
         elif "is3DSecureRequired" in res_text and "true" in res_text.lower():
-            return "3ds", "3D Secure / Verification Required", brand
+            return "live", "3D Secure Required (Card Live)", brand
         elif "onboardAccount" in res_text or "accessToken" in res_text:
             return "charged", "Charge Successful ($10.00)", brand
+        elif "ISSUER_DECLINE" in res_text or "CARD_GENERIC_ERROR" in res_text:
+            return "declined", "Card Declined by Issuer", brand
         else:
             msg = re.search(r'"message":"([^"]+)"', res_text)
             err_txt = msg.group(1) if msg else res_text[:80]

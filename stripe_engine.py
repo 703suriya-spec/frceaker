@@ -381,16 +381,29 @@ async def process_stripe(cc, mm, yy, cvc, proxy_url=None):
                 if err_msg.startswith("Error: "):
                     err_msg = err_msg[7:]
                 err_low = err_msg.lower()
-                
-                if any(k in err_low for k in ("insufficient", "do not honor", "security code", "incorrect", "cvv", "cvc", "declined")):
-                    return False, f"Declined - {err_msg}" if "declined" not in err_low else err_msg, str(res_json), None, "$22.00"
-                    
+
+                if "insufficient" in err_low:
+                    return True, "Insufficient Funds (Card Live)", str(res_json), None, "$22.00"
+                elif any(k in err_low for k in ("security code", "incorrect_cvc", "cvv", "cvc")):
+                    return True, "CVV Mismatch (CCN Live)", str(res_json), None, "$22.00"
+                elif "3d" in err_low or "requires_action" in err_low or "authentication" in err_low:
+                    return True, "3D Secure Required (Card Live)", str(res_json), None, "$22.00"
+                elif any(k in err_low for k in ("do not honor", "declined", "stolen", "lost")):
+                    return False, err_msg if "declined" in err_low else f"Declined ({err_msg})", str(res_json), None, "$22.00"
+
                 return False, err_msg, str(res_json), None, "$22.00"
-                
+
             elif 'message' in res_json:
                 msg_txt = res_json['message']
                 if msg_txt.startswith("Error: "):
                     msg_txt = msg_txt[7:]
+                msg_low = msg_txt.lower()
+                if "insufficient" in msg_low:
+                    return True, "Insufficient Funds (Card Live)", str(res_json), None, "$22.00"
+                elif any(k in msg_low for k in ("security code", "incorrect_cvc", "cvv", "cvc")):
+                    return True, "CVV Mismatch (CCN Live)", str(res_json), None, "$22.00"
+                elif "3d" in msg_low or "requires_action" in msg_low:
+                    return True, "3D Secure Required (Card Live)", str(res_json), None, "$22.00"
                 return False, msg_txt, str(res_json), None, "$22.00"
             else:
                 return False, "Unknown Checkout Response", str(res_json), None, "$22.00"

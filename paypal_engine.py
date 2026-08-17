@@ -220,6 +220,9 @@ async def process_paypal_charge(cc, mm, yy, cvv, proxy_url=None):
                 "INVALID_BILLING_ADDRESS",
                 "EXISTING_ACCOUNT_RESTRICTED",
                 "is3DSecureRequired",
+                "INSUFFICIENT_FUNDS",
+                "CARD_DECLINED_INSUFFICIENT_FUNDS",
+                "GUEST_CARD_COUNTRY_MISMATCH",
             ]
 
             cash = "Unknown Response"
@@ -246,18 +249,33 @@ async def process_paypal_charge(cc, mm, yy, cvv, proxy_url=None):
                     cash = "Approved!"
 
             is_live = False
-            if any(live_code in cash for live_code in lives):
-                status_res = f"Live ({cash})"
+            cash_upper = str(cash).upper()
+            if "INSUFFICIENT_FUNDS" in cash_upper or "INSUFFICIENT" in cash_upper:
+                status_res = "Insufficient Funds (Card Live)"
                 is_live = True
-            elif "Approved" in cash:
-                status_res = "Charged ($1.00)"
+            elif "INVALID_SECURITY_CODE" in cash_upper or "SECURITY CODE" in cash_upper or "CVV" in cash_upper or "CVC" in cash_upper:
+                status_res = "CVV Mismatch (CCN Live)"
                 is_live = True
-            elif "INVALID_RESOURCE_ID" in cash:
-                status_res = "Retry (Invalid Token)"
-            elif "GUEST_PAYMENT_INTEGRITY_VALIDATION_FAILED" in cash:
-                status_res = "Integrity Validation Failed / Risk Block"
+            elif "IS3DSECUREREQUIRED" in cash_upper or "3D" in cash_upper or "AUTHENTICATION" in cash_upper:
+                status_res = "3D Secure Required (Card Live)"
+                is_live = True
+            elif "COUNTRY_MISMATCH" in cash_upper:
+                status_res = "Card Live (Country Mismatch)"
+                is_live = True
+            elif any(live_code in cash for live_code in lives):
+                status_res = f"Approved ({cash})"
+                is_live = True
+            elif "Approved" in cash or "CHARGED" in cash_upper:
+                status_res = "Payment Completed ($1.00)"
+                is_live = True
+            elif "INVALID_RESOURCE_ID" in cash_upper:
+                status_res = "Session Expired (Retry)"
+            elif "GUEST_PAYMENT_INTEGRITY_VALIDATION_FAILED" in cash_upper or "RISK" in cash_upper:
+                status_res = "Risk Validation Triggered"
+            elif "ISSUER_DECLINE" in cash_upper or "CARD_GENERIC_ERROR" in cash_upper or "DECLINED" in cash_upper:
+                status_res = "Card Declined by Issuer"
             else:
-                status_res = f"Declined ({cash})"
+                status_res = f"Declined - {cash}"
 
             return is_live, status_res, json.dumps(response3), None, "$1.00"
 

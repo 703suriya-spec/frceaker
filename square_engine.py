@@ -430,13 +430,24 @@ def _extract_square_result(result) -> tuple[bool, str]:
     if not code:
         code = (data.get("payment") or {}).get("card_details", {}).get("errors", [{}])[0].get("code")
     detail = errors[0].get("detail") if errors else ""
-    
+
     if detail:
         detail = detail.replace("Authorization error:", "").replace("'", "").strip()
-    
+
     if code and detail and detail.upper() != code.upper():
         msg = f"{code} - {detail}"
     else:
         msg = code or detail or "DECLINED"
+
+    msg_upper = str(msg).upper()
+    if "INSUFFICIENT_FUNDS" in msg_upper or "INSUFFICIENT" in msg_upper:
+        return True, "Insufficient Funds (Card Live)"
+    elif any(k in msg_upper for k in ("CVV", "CVC", "SECURITY_CODE", "INCORRECT_CVC", "VERIFICATION_FAILED")):
+        return True, "CVV Mismatch (CCN Live)"
+    elif any(k in msg_upper for k in ("3D", "AUTHENTICATION_REQUIRED", "CHALLENGE_REQUIRED")):
+        return True, "3D Secure Required (Card Live)"
+    elif "ADDRESS" in msg_upper or "AVS" in msg_upper:
+        return True, f"Approved ({msg})"
+
     return False, msg
 
