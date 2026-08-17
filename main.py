@@ -1268,46 +1268,23 @@ async def remove_user_site_cmd(event):
 async def view_user_sites(event):
     user_id = event.sender_id
     
-    # 1. Shopify sites
     user_shopify = get_user_sites_sync(user_id)
     global_shopify = load_sites()
     total_shopify = len(user_shopify) if user_shopify else len(global_shopify)
-    shopify_type = "Personal Sites" if user_shopify else "Default Bot Sites"
+    shopify_type = "Personal Sites Active" if user_shopify else "Default Bot Sites Active"
     
-    # 2. Razorpay sites
-    from db import get_db_rz_sites
-    rz_sites = get_db_rz_sites()
-    total_rz = len(rz_sites) if rz_sites else len(load_razorpay_sites())
-    
-    # 3. Square sites
-    sq_sites = get_square_sites()
-    total_sq = len(sq_sites)
-    
-    # 4. WooCommerce / Stripe Custom sites
-    st_sites = get_user_stsites(user_id)
-    total_st = len(st_sites)
-
-    total_all = total_shopify + total_rz + total_sq + total_st
-
-    summary_msg = f"""<b>⚡ LOADED GATEWAY SITES OVERVIEW</b>
+    summary_msg = f"""<b>⚡ LOADED SHOPIFY SITES</b>
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🛒 <b>Shopify Gate:</b>
-   • <b>Loaded Sites:</b> <code>{total_shopify}</code> ({shopify_type})
-   • <b>Commands:</b> <code>/addsites</code> | <code>/site</code> | <code>/clearsites</code>
+🛒 <b>Status:</b> <code>{shopify_type}</code>
+📊 <b>Total Loaded Sites:</b> <code>{total_shopify}</code>
+🌐 <b>Bot Global Backup:</b> <code>{len(global_shopify)}</code>
 
-🇮🇳 <b>Razorpay Gate:</b>
-   • <b>Loaded Sites:</b> <code>{total_rz}</code>
-   • <b>Commands:</b> <code>/addrzsites</code> | <code>/rzsites</code> | <code>/rmrzsites</code>
-
-⬛ <b>Square Gate:</b>
-   • <b>Loaded Sites:</b> <code>{total_sq}</code>
-   • <b>Commands:</b> <code>/addsqsites</code> | <code>/sqsites</code>
-
-💳 <b>WooCommerce / Stripe Custom:</b>
-   • <b>Loaded Sites:</b> <code>{total_st}</code>
-   • <b>Commands:</b> <code>/sadd</code> | <code>/smysite</code> | <code>/stest</code>
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-📊 <b>Total Active Merchant Sites:</b> <code>{total_all}</code>"""
+💡 <b>Management Commands:</b>
+• <code>/addsite url</code> - Add a single Shopify checkout
+• Reply <code>/addsites</code> to <code>.txt</code> - Add bulk sites
+• <code>/site</code> - Run live health check on all sites
+• <code>/clearsites</code> - Clear your personal site list
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━"""
 
     await event.reply(summary_msg, parse_mode="html")
 
@@ -2811,56 +2788,7 @@ async def sq_check_cmd(event):
     await status_msg.edit(res_msg, parse_mode="html")
 
 
-async def add_sq_site(event):
-    user_id = event.sender_id
-    url = event.pattern_match.group(1).strip()
-    try:
-        m_id, c_id = _parse_square_url(url)
-    except ValueError as e:
-        await event.reply(f" Invalid Square URL!\n{e}")
-        return
 
-    sites = get_square_sites()
-    if url in sites:
-        await event.reply("[WARN] Site already in Square list!")
-        return
-
-    async with aiofiles.open(SQUARE_SITES_FILE, "a", encoding="utf-8") as f:
-        await f.write(f"{url}\n")
-
-    await event.reply(f" <b>Square Site Added!</b>\nMerchant ID: <code>{m_id}</code>\nTotal Sites: <code>{len(sites) + 1}</code>", parse_mode="html")
-
-
-@bot.on(events.NewMessage(pattern=r'^/sqsites$'))
-async def view_sq_sites(event):
-    sites = get_square_sites()
-    text = f"<b>SQUARE $1 SITES ({len(sites)})</b>\n━━━━━━━━━━━━━━━━━━━━\n"
-    for i, s in enumerate(sites, 1):
-        text += f"{i}. <code>{s}</code>\n"
-    text += "\n━━━━━━━━━━━━━━━━━━━━\n💡 <i>Use /addsqsites url to add more!</i>"
-    await event.reply(text, parse_mode="html")
-@bot.on(events.CallbackQuery(data=b"sq_tools"))
-async def sq_tools_menu(event):
-    await event.answer(" Square Tools!", alert=False)
-
-    sq_msg = f"""<b>Auto Square $1 Tools</b>
-
-<code>/sq card|mm|yy|cvv</code>
- Check card on Square $1 Gateway
-
-<code>/sqsites</code>
- View active Square checkout sites
-
-<code>/addsqsites url</code>
- Add new Square hosted-checkout URL
-
-<b>💡 Square $1 Supported Merchant Checkouts!</b>"""
-
-    await event.edit(
-        (sq_msg),
-        buttons=[[Button.inline("BACK", b"checker")]],
-        parse_mode="html"
-    )
 
 
 
@@ -3083,9 +3011,8 @@ async def tools_menu_handler(event):
 <code>/proxy</code> - View proxies
 <code>/addproxy ip:port</code> - Add proxy
 
-\U0001f30d <b>Site Management:</b>
-<code>/site</code> | <code>/addsite url</code> | <code>/mysites</code>
-<code>/sadd url</code> | <code>/smysite</code> | <code>/srem url</code> | <code>/stest</code>
+🌐 <b>Shopify Site Management:</b>
+<code>/addsite url</code> | <code>/site</code> | <code>/mysites</code> | <code>/clearsites</code>
 
 <b>CC Utilities:</b>
 <code>/clean</code> - Extract & deduplicate CCs
@@ -3096,7 +3023,6 @@ async def tools_menu_handler(event):
 <code>/broadcast msg</code> | <code>/stats</code>"""
 
     buttons = [
-        [Button.inline("\U0001f4b3 Square Tools", b"sq_tools")],
         [Button.inline("🔙 𝘽𝙖𝙘𝙠", b"back_to_start")]
     ]
 
@@ -3616,88 +3542,7 @@ async def process_skcvv_cmd(event):
         return
     await event.reply(f"<b>Processing SK Charge...</b>\nSK: <code>{sk_data['sk'][:15]}...</code>\nCard: <code>{cards[0]}</code>", parse_mode="html")
 
-@bot.on(events.NewMessage(pattern=r'^/sadd(?:\s+(.+))?$'))
-async def process_sadd_cmd(event):
-    url = event.pattern_match.group(1) or ""
-    if not url:
-        await event.reply("Format: `/sadd example.com`")
-        return
-    add_user_stsite(event.sender_id, url.strip())
-    await event.reply(f"<b>WooCommerce Site Added!</b>\nSite: <code>{url.strip()}</code>", parse_mode="html")
 
-@bot.on(events.NewMessage(pattern=r'^/smysite$'))
-async def process_smysite_cmd(event):
-    sites = get_user_stsites(event.sender_id)
-    if not sites:
-        await event.reply("No WooCommerce sites saved! Use `/sadd url` to add one.")
-        return
-    res = f"<b>Saved WooCommerce Sites ({len(sites)})</b>\n" + "\n".join([f"• <code>{s}</code>" for s in sites])
-    await event.reply(res, parse_mode="html")
-
-@bot.on(events.NewMessage(pattern=r'^/srem(?:\s+(.+))?$'))
-async def process_srem_cmd(event):
-    url = event.pattern_match.group(1) or ""
-    if not url:
-        await event.reply("Format: `/srem example.com`")
-        return
-    if remove_user_stsite(event.sender_id, url.strip()):
-        await event.reply(f"<b>Site Removed!</b>\nSite: <code>{url.strip()}</code>", parse_mode="html")
-    else:
-        await event.reply("Site not found in your saved list.")
-
-
-# ==================== LICENSE KEY SYSTEM ====================
-
-@bot.on(events.NewMessage(pattern=r'^/genkey(?:\s+(.+))?$'))
-async def process_genkey_cmd(event):
-    if not is_admin(event.sender_id):
-        await event.reply("Access denied.")
-        return
-    args = (event.pattern_match.group(1) or "").strip().split()
-    days = 1
-    max_uses = 1
-    if len(args) >= 1 and args[0].isdigit():
-        days = int(args[0])
-    if len(args) >= 2 and args[1].isdigit():
-        max_uses = int(args[1])
-    
-    key = generate_key(days=days, max_uses=max_uses, created_by=event.sender_id)
-    await event.reply(
-        f"<b>License Key Generated!</b>\n"
-        f"Key: <code>{key}</code>\n"
-        f"Duration: {days} day(s)\n"
-        f"Max Uses: {max_uses}",
-        parse_mode="html"
-    )
-
-@bot.on(events.NewMessage(pattern=r'^/redeem(?:\s+(.+))?$'))
-async def process_redeem_cmd(event):
-    key = (event.pattern_match.group(1) or "").strip()
-    if not key:
-        await event.reply("Format: `/redeem FREAKY-xxxxx`")
-        return
-    success, msg = redeem_key(event.sender_id, key)
-    prefix = "<b>Key Redeemed!</b>\n" if success else "<b>Redemption Failed!</b>\n"
-    await event.reply(f"{prefix}{msg}", parse_mode="html")
-
-
-# ==================== BATCH SITE TESTING ====================
-
-@bot.on(events.NewMessage(pattern=r'^/stest$'))
-async def process_stest_cmd(event):
-    sites = get_user_stsites(event.sender_id)
-    if not sites:
-        await event.reply("No WooCommerce sites saved! Use `/sadd example.com` first.")
-        return
-    status_msg = await event.reply(f"<b>Testing Saved Sites ({len(sites)})...</b>", parse_mode="html")
-    results = []
-    for site in sites[:25]:
-        ok, msg = await test_merchant_site(site)
-        status_symbol = "ONLINE" if ok else "OFFLINE"
-        results.append(f"• <code>{site}</code> -> {status_symbol} ({msg})")
-    
-    res = f"<b>WooCommerce Site Test Results</b>\n" + "\n".join(results)
-    await status_msg.edit(res, parse_mode="html")
 
 
 # ==================== CC CLEANER & FILTER COMMANDS ====================
