@@ -779,49 +779,87 @@ SITES_FILE = 'sites.txt'              # Terminal global sites (admin edit)
 PROXY_FILE = 'proxy.txt'              # Terminal global proxies (admin edit)  
 USER_SITES_FILE = 'user_sites.json'   # User personal sites (auto-managed)
 
-# ==================== USER SITE FUNCTIONS ====================
+# ==================== USER SITE FUNCTIONS (SUPABASE DB + LOCAL FILE SYNC) ====================
 async def load_user_sites():
-    if not os.path.exists(USER_SITES_FILE):
-        return {}
-    try:
-        with open(USER_SITES_FILE, 'r', encoding='utf-8') as f:
-            return json.load(f)
-    except:
-        return {}
+    data = {}
+    if os.path.exists(USER_SITES_FILE):
+        try:
+            with open(USER_SITES_FILE, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+        except:
+            data = {}
+    return data
 
 async def save_user_sites(data):
-    with open(USER_SITES_FILE, 'w', encoding='utf-8') as f:
-        json.dump(data, f, indent=4)
+    try:
+        with open(USER_SITES_FILE, 'w', encoding='utf-8') as f:
+            json.dump(data, f, indent=4)
+    except:
+        pass
 
 def get_user_sites_sync(user_id):
-    if not os.path.exists(USER_SITES_FILE):
-        return []
+    uid = str(user_id)
+    # 1. Check Supabase DB
     try:
-        with open(USER_SITES_FILE, 'r', encoding='utf-8') as f:
-            data = json.load(f)
-        return data.get(str(user_id), [])
-    except:
-        return []
+        from db import get_db_user_sites
+        db_sites = get_db_user_sites(user_id)
+        if db_sites:
+            return db_sites
+    except Exception:
+        pass
+
+    # 2. Check Local File
+    if os.path.exists(USER_SITES_FILE):
+        try:
+            with open(USER_SITES_FILE, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            sites = data.get(uid, [])
+            if sites:
+                try:
+                    from db import save_db_user_sites
+                    save_db_user_sites(user_id, sites)
+                except Exception:
+                    pass
+                return sites
+        except Exception:
+            pass
+    return []
 
 
 async def add_user_sites_batch(user_id, new_sites):
-    """Batch adds multiple sites to user's list in a single I/O write."""
+    """Batch adds multiple sites to user's list in both Supabase DB and local file."""
+    # 1. DB Add
+    added_count = 0
+    try:
+        from db import add_db_user_sites
+        added_count = add_db_user_sites(user_id, new_sites)
+    except Exception as e:
+        print(f"DB add_user_sites_batch error: {e}")
+
+    # 2. Local File Add
     data = await load_user_sites()
     user_sites = data.get(str(user_id), [])
-    added_count = 0
+    file_added = 0
     for site in new_sites:
         if site not in user_sites:
             user_sites.append(site)
-            added_count += 1
-    if added_count > 0:
+            file_added += 1
+    if file_added > 0:
         data[str(user_id)] = user_sites
         await save_user_sites(data)
-    return added_count
+
+    return added_count if added_count > 0 else file_added
 
 async def add_user_site(user_id, site):
     return await add_user_sites_batch(user_id, [site]) > 0
 
 async def remove_user_site(user_id, site):
+    try:
+        from db import remove_db_user_site
+        remove_db_user_site(user_id, site)
+    except Exception:
+        pass
+
     data = await load_user_sites()
     user_sites = data.get(str(user_id), [])
     if site in user_sites:
@@ -893,6 +931,12 @@ async def test_proxy(proxy: str):
 
 
 async def clear_user_sites(user_id):
+    try:
+        from db import clear_db_user_sites
+        clear_db_user_sites(user_id)
+    except Exception:
+        pass
+
     data = await load_user_sites()
     if str(user_id) in data:
         del data[str(user_id)]

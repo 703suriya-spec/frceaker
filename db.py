@@ -426,12 +426,106 @@ def remove_db_user_proxy(user_id: int, proxy_url: str) -> bool:
     return False
 
 
-def clear_db_user_proxies(user_id: int):
-    save_db_user_proxies(user_id, [])
-
-
 def sync_db_user_proxies(user_id: int, alive_proxies: list[str]):
     save_db_user_proxies(user_id, alive_proxies)
+
+
+# ==================== PER-USER SHOPIFY SITES (SUPABASE DB + CACHE) ====================
+USER_SITES_CACHE: dict[str, list[str]] = {}
+
+def save_db_user_sites(user_id: int, sites: list[str]) -> bool:
+    uid = str(user_id)
+    USER_SITES_CACHE[uid] = list(sites)
+
+    conn = get_db_connection()
+    if not conn:
+        return False
+    try:
+        now = int(time.time())
+        data = json.dumps(sites)
+        with conn.cursor() as cur:
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS user_sites (
+                    user_id TEXT PRIMARY KEY,
+                    sites JSONB,
+                    updated_at BIGINT
+                );
+            """)
+            cur.execute("""
+                INSERT INTO user_sites (user_id, sites, updated_at)
+                VALUES (%s, %s, %s)
+                ON CONFLICT (user_id) DO UPDATE SET sites = EXCLUDED.sites, updated_at = EXCLUDED.updated_at;
+            """, (uid, data, now))
+            conn.commit()
+            return True
+    except Exception as e:
+        print(f"[Supabase DB Error] save_db_user_sites: {e}")
+        return False
+    finally:
+        conn.close()
+
+
+def get_db_user_sites(user_id: int) -> list[str]:
+    uid = str(user_id)
+    conn = get_db_connection()
+    if conn:
+        try:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    CREATE TABLE IF NOT EXISTS user_sites (
+                        user_id TEXT PRIMARY KEY,
+                        sites JSONB,
+                        updated_at BIGINT
+                    );
+                """)
+                conn.commit()
+                cur.execute("SELECT sites FROM user_sites WHERE user_id = %s;", (uid,))
+                row = cur.fetchone()
+                if row and row[0]:
+                    res = json.loads(row[0]) if isinstance(row[0], str) else row[0]
+                    USER_SITES_CACHE[uid] = res
+                    return res
+        except Exception as e:
+            print(f"[Supabase DB Error] get_db_user_sites: {e}")
+        finally:
+            conn.close()
+
+    return USER_SITES_CACHE.get(uid, [])
+
+
+def add_db_user_sites(user_id: int, new_sites: list[str]) -> int:
+    existing = get_db_user_sites(user_id)
+    existing_set = set(existing)
+    added_count = 0
+
+    for s in new_sites:
+        s_clean = s.strip()
+        if not s_clean:
+            continue
+        if s_clean not in existing_set:
+            existing.append(s_clean)
+            existing_set.add(s_clean)
+            added_count += 1
+
+    if added_count > 0:
+        save_db_user_sites(user_id, existing)
+
+    return added_count
+
+
+def remove_db_user_site(user_id: int, site: str) -> bool:
+    existing = get_db_user_sites(user_id)
+    target = site.strip()
+    new_list = [s for s in existing if s != target and target not in s]
+    if len(new_list) != len(existing):
+        save_db_user_sites(user_id, new_list)
+        return True
+    return False
+
+
+def clear_db_user_sites(user_id: int):
+    save_db_user_sites(user_id, [])
+
 
 
 
