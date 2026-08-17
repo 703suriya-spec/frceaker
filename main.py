@@ -1267,48 +1267,49 @@ async def remove_user_site_cmd(event):
 @bot.on(events.NewMessage(pattern=r'(?i)^[./]mysites?(?:@\w+)?$'))
 async def view_user_sites(event):
     user_id = event.sender_id
-    user_sites = get_user_sites_sync(user_id)
-    global_sites = load_sites()
     
-    if not user_sites:
-        await event.reply(f"""<b>Shopify Site Status</b>
-━━━━━━━━━━━━━━━━━━━━
-📁 <b>Your Sites:</b> <code>0</code>
-🌐 <b>Global Sites:</b> <code>{len(global_sites)}</code>
-
-💡 <code>/addsite url</code> - Add personal site
-⚡ <code>/site</code> - Check all sites""", parse_mode="html")
-        return
+    # 1. Shopify sites
+    user_shopify = get_user_sites_sync(user_id)
+    global_shopify = load_sites()
+    total_shopify = len(user_shopify) if user_shopify else len(global_shopify)
+    shopify_type = "Personal Sites" if user_shopify else "Default Bot Sites"
     
-    if len(user_sites) <= 30:
-        sites_text = "\n".join([f"{i+1}. <code>{s[:60]}</code>" for i, s in enumerate(user_sites)])
-        await event.reply(f"""<b>Your Saved Shopify Sites ({len(user_sites)})</b>
-━━━━━━━━━━━━━━━━━━━━
-{sites_text}
+    # 2. Razorpay sites
+    from db import get_db_rz_sites
+    rz_sites = get_db_rz_sites()
+    total_rz = len(rz_sites) if rz_sites else len(load_razorpay_sites())
+    
+    # 3. Square sites
+    sq_sites = get_square_sites()
+    total_sq = len(sq_sites)
+    
+    # 4. WooCommerce / Stripe Custom sites
+    st_sites = get_user_stsites(user_id)
+    total_st = len(st_sites)
 
-💡 <code>/rm url</code> | <code>/clearsites</code>
-⚡ <code>/site</code> - Check all sites""", parse_mode="html")
-    else:
-        filename = f"mysites_{user_id}_{int(time.time())}.txt"
-        try:
-            with open(filename, "w", encoding="utf-8") as f:
-                for s in user_sites:
-                    f.write(f"{s}\n")
-            await bot.send_file(
-                event.chat_id,
-                file=filename,
-                caption=f"📁 <b>Your Saved Shopify Sites ({len(user_sites)} total)</b>",
-                parse_mode="html",
-                reply_to=event.id
-            )
-        except Exception as e:
-            await event.reply(f"📁 <b>Total Saved Sites:</b> <code>{len(user_sites)}</code>\n<i>(File upload error: {e})</i>", parse_mode="html")
-        finally:
-            if os.path.exists(filename):
-                try:
-                    os.remove(filename)
-                except Exception:
-                    pass
+    total_all = total_shopify + total_rz + total_sq + total_st
+
+    summary_msg = f"""<b>⚡ LOADED GATEWAY SITES OVERVIEW</b>
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🛒 <b>Shopify Gate:</b>
+   • <b>Loaded Sites:</b> <code>{total_shopify}</code> ({shopify_type})
+   • <b>Commands:</b> <code>/addsites</code> | <code>/site</code> | <code>/clearsites</code>
+
+🇮🇳 <b>Razorpay Gate:</b>
+   • <b>Loaded Sites:</b> <code>{total_rz}</code>
+   • <b>Commands:</b> <code>/addrzsites</code> | <code>/rzsites</code> | <code>/rmrzsites</code>
+
+⬛ <b>Square Gate:</b>
+   • <b>Loaded Sites:</b> <code>{total_sq}</code>
+   • <b>Commands:</b> <code>/addsqsites</code> | <code>/sqsites</code>
+
+💳 <b>WooCommerce / Stripe Custom:</b>
+   • <b>Loaded Sites:</b> <code>{total_st}</code>
+   • <b>Commands:</b> <code>/sadd</code> | <code>/smysite</code> | <code>/stest</code>
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📊 <b>Total Active Merchant Sites:</b> <code>{total_all}</code>"""
+
+    await event.reply(summary_msg, parse_mode="html")
 
 
 # ==================== /clearsites ====================
