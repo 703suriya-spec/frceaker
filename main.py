@@ -1060,7 +1060,7 @@ async def remove_shopify_site(event):
 
 💡 /addsites url | /mysites""", parse_mode="html")
 
-@bot.on(events.NewMessage(pattern=r'^/site$'))
+@bot.on(events.NewMessage(pattern=r'(?i)^[./]site(?:@\w+)?$'))
 async def site_check_command(event):
     user_id = event.sender_id
 
@@ -1123,7 +1123,7 @@ async def site_check_command(event):
  <b>Mode:</b> Admin (Both)
 📊 <b>Total Checked:</b> <code>{len(sites)}</code>
  <b>Working:</b> <code>{len(alive)}</code>
- <b>Dead:</b> <code>{len(dead)}</code>
+ <b>Dead:</b> <code>{dead}</code>
  <b>TXT File Sent</b> 
 
 <b>Choose which sites to use for checking:</b>""", buttons=buttons, parse_mode="html")
@@ -1136,7 +1136,7 @@ async def site_check_command(event):
  <b>Mode:</b> Your Sites
 📊 <b>Total Checked:</b> <code>{len(sites)}</code>
  <b>Working:</b> <code>{len(alive)}</code>
- <b>Dead:</b> <code>{len(dead)}</code>
+ <b>Dead:</b> <code>{dead}</code>
  <b>TXT File Sent</b> 
 
  <b>Your Sites:</b> <code>{user_count}</code>
@@ -1264,7 +1264,7 @@ async def remove_user_site_cmd(event):
 
 
 # ==================== /mysites ====================
-@bot.on(events.NewMessage(pattern=r'^/mysites$'))
+@bot.on(events.NewMessage(pattern=r'(?i)^[./]mysites?(?:@\w+)?$'))
 async def view_user_sites(event):
     user_id = event.sender_id
     user_sites = get_user_sites_sync(user_id)
