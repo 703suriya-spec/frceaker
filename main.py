@@ -221,6 +221,20 @@ def get_file_lines(filepath):
         print(f"Error reading {filepath}: {e}")
         return []
 
+def load_sites():
+    return get_file_lines(SITES_FILE)
+
+def load_proxies(user_id=None):
+    if user_id:
+        try:
+            from db import get_db_user_proxies
+            u_proxies = get_db_user_proxies(user_id)
+            if u_proxies:
+                return u_proxies
+        except Exception:
+            pass
+    return get_file_lines(PROXY_FILE)
+
 def load_premium_users():
     return get_file_lines(PREMIUM_FILE)
   
