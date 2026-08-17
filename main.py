@@ -1060,26 +1060,35 @@ async def add_shopify_site(event):
             added = await add_user_sites_batch(user_id, alive_batch)
             alive_added += added
 
-        # Only update status message every 5 batches (250 sites) to avoid FloodWaitError
+        # Update status message progressively to avoid FloodWaitError
         if (i // batch_size) % 5 == 0 or i + batch_size >= len(sites_to_test):
             try:
-                await status_msg.edit(f"""<b>TESTING SHOPIFY SITES...</b>
-━━━━━━━━━━━━━━━━━━━━
-📊 <b>Progress:</b> <code>{min(i + batch_size, len(sites_to_test))}/{len(sites_to_test)}</code>
-✅ <b>Live Added:</b> <code>{alive_added}</code>
-❌ <b>Dead/Failed:</b> <code>{dead_count}</code>""", parse_mode="html")
+                cur_total = len(get_user_sites_sync(user_id))
+                await status_msg.edit(f"""<b>ア 𝙂𝙖𝙩𝙚𝙬𝙖𝙮</b> -» <code>Shopify Checkout Network</code>
+<b>カ 𝙎𝙩𝙖𝙩𝙪𝙨</b> -» <code>Testing & Adding Sites... ⏳</code>
+<b>ツ 𝙋𝙧𝙤𝙜𝙧𝙚𝙨𝙨</b> -» <code>{min(i + batch_size, len(sites_to_test))}/{len(sites_to_test)}</code>
+
+<b>キ 𝘼𝙙𝙙𝙚𝙙 𝙉𝙚𝙬</b> -» <code>{alive_added}</code>
+<b>朱 𝘿𝙚𝙖𝙙 / 𝙁𝙖𝙞𝙡𝙚𝙙</b> -» <code>{dead_count}</code>
+<b>零 𝙔𝙤𝙪𝙧 𝙏𝙤𝙩𝙖𝙡 𝙎𝙞𝙩𝙚𝙨</b> -» <code>{cur_total}</code>""", parse_mode="html")
             except:
                 pass
 
-    total_now = len(get_user_sites_sync(user_id))
-    await status_msg.edit(f"""✅ <b>SHOPIFY SITES ADD PROCESS COMPLETE!</b>
-━━━━━━━━━━━━━━━━━━━━
-📊 <b>Total Tested:</b> <code>{len(sites_to_test)}</code>
-✅ <b>Working Added:</b> <code>{alive_added}</code>
-❌ <b>Dead/Failed:</b> <code>{dead_count}</code>
-📁 <b>Your Total Sites:</b> <code>{total_now}</code>
-━━━━━━━━━━━━━━━━━━━━
-💡 <i>Use /mysites to view your active site list</i>""", parse_mode="html")
+    final_total = len(get_user_sites_sync(user_id))
+    sender_user = event.sender
+    uname = getattr(sender_user, 'first_name', 'User') if sender_user else 'User'
+    uid = event.sender_id
+
+    await status_msg.edit(f"""<b>ア 𝙂𝙖𝙩𝙚𝙬𝙖𝙮</b> -» <code>Shopify Checkout Network</code>
+<b>カ 𝙎𝙩𝙖𝙩𝙪𝙨</b> -» <code>Sites Added Successfully! ✅</code>
+<b>ツ 𝙏𝙚𝙨𝙩𝙚𝙙</b> -» <code>{len(sites_to_test)} Sites</code>
+
+<b>キ 𝘼𝙙𝙙𝙚𝙙 𝙉𝙚𝙬</b> -» <code>{alive_added}</code>
+<b>朱 𝘿𝙚𝙖𝙙 / 𝙁𝙖𝙞𝙡𝙚𝙙</b> -» <code>{dead_count}</code>
+<b>零 𝙔𝙤𝙪𝙧 𝙏𝙤𝙩𝙖𝙡 𝙎𝙞𝙩𝙚𝙨</b> -» <code>{final_total}</code>
+ᥫ᭡ <b>𝙇𝙤𝙖𝙙𝙚𝙙 𝙗𝙮</b> -» <a href='tg://user?id={uid}'>{uname}</a>
+
+💡 <i>Use /mysites to view your live breakdown anytime</i>""", parse_mode="html")
 # ==================== /rmsites - REMOVE USER'S SHOPIFY SITE ====================
 @bot.on(events.NewMessage(pattern=r'^/rmsites\s+(.+)'))
 async def remove_shopify_site(event):
@@ -1329,20 +1338,22 @@ async def view_user_sites(event):
     user_shopify = get_user_sites_sync(user_id)
     global_shopify = load_sites()
     total_shopify = len(user_shopify) if user_shopify else len(global_shopify)
-    shopify_type = "Personal Sites Active" if user_shopify else "Default Bot Sites Active"
+    shopify_type = "Personal Pool Active" if user_shopify else "Default Bot Pool Active"
     
-    summary_msg = f"""<b>⚡ LOADED SHOPIFY SITES</b>
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🛒 <b>Status:</b> <code>{shopify_type}</code>
-📊 <b>Total Loaded Sites:</b> <code>{total_shopify}</code>
-🌐 <b>Bot Global Backup:</b> <code>{len(global_shopify)}</code>
+    sender_user = event.sender
+    uname = getattr(sender_user, 'first_name', 'User') if sender_user else 'User'
+    uid = event.sender_id
 
-💡 <b>Management Commands:</b>
-• <code>/addsite url</code> - Add a single Shopify checkout
-• Reply <code>/addsites</code> to <code>.txt</code> - Add bulk sites
-• <code>/site</code> - Run live health check on all sites
-• <code>/clearsites</code> - Clear your personal site list
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━"""
+    summary_msg = f"""<b>ア 𝙂𝙖𝙩𝙚𝙬𝙖𝙮</b> -» <code>Shopify Checkout Network</code>
+<b>カ 𝙎𝙩𝙖𝙩𝙪𝙨</b> -» <code>{shopify_type}</code>
+<b>ツ 𝙇𝙤𝙖𝙙𝙚𝙙 𝙎𝙞𝙩𝙚𝙨</b> -» <code>{total_shopify} Sites</code>
+
+<b>キ 𝙋𝙚𝙧𝙨𝙤𝙣𝙖𝙡 𝙋𝙤𝙤𝙡</b> -» <code>{len(user_shopify)} Active</code>
+<b>朱 𝘽𝙤𝙩 𝘽𝙖𝙘𝙠𝙪𝙥</b> -» <code>{len(global_shopify)} Global</code>
+<b>零 𝙎𝙩𝙤𝙧𝙖𝙜𝙚</b> -» <code>Supabase Cloud Database</code>
+ᥫ᭡ <b>𝙊𝙬𝙣𝙚𝙧</b> -» <a href='tg://user?id={uid}'>{uname}</a>
+
+💡 <b>Commands:</b> <code>/addsite url</code> | Reply <code>/addsites</code> to <code>.txt</code> | <code>/site</code> | <code>/clearsites</code>"""
 
     await event.reply(summary_msg, parse_mode="html")
 
