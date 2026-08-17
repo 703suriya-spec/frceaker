@@ -1271,53 +1271,81 @@ async def view_user_sites(event):
     global_sites = load_sites()
     
     if not user_sites:
-        await event.reply(f""" Site Status
+        await event.reply(f"""<b>Shopify Site Status</b>
+━━━━━━━━━━━━━━━━━━━━
+📁 <b>Your Sites:</b> <code>0</code>
+🌐 <b>Global Sites:</b> <code>{len(global_sites)}</code>
 
- Your Sites: <code>0</code>
- Global Sites: <code>{len(global_sites)}</code>
-
-💡 /addsite url - Add personal site
- /site - Check all sites""", parse_mode="html")
+💡 <code>/addsite url</code> - Add personal site
+⚡ <code>/site</code> - Check all sites""", parse_mode="html")
         return
     
     if len(user_sites) <= 30:
         sites_text = "\n".join([f"{i+1}. <code>{s[:60]}</code>" for i, s in enumerate(user_sites)])
-        await event.reply(f""" Your Sites: <code>{len(user_sites)}</code>
-
+        await event.reply(f"""<b>Your Saved Shopify Sites ({len(user_sites)})</b>
+━━━━━━━━━━━━━━━━━━━━
 {sites_text}
 
- /rm url |  /clearsites
- /site - Check all""", parse_mode="html")
+💡 <code>/rm url</code> | <code>/clearsites</code>
+⚡ <code>/site</code> - Check all sites""", parse_mode="html")
     else:
         filename = f"mysites_{user_id}_{int(time.time())}.txt"
-        with open(filename, "w") as f:
-            for s in user_sites:
-                f.write(f"{s}\n")
-        await event.reply(f" {len(user_sites)} Sites", file=filename)
-        os.remove(filename)
+        try:
+            with open(filename, "w", encoding="utf-8") as f:
+                for s in user_sites:
+                    f.write(f"{s}\n")
+            await bot.send_file(
+                event.chat_id,
+                file=filename,
+                caption=f"📁 <b>Your Saved Shopify Sites ({len(user_sites)} total)</b>",
+                parse_mode="html",
+                reply_to=event.id
+            )
+        except Exception as e:
+            await event.reply(f"📁 <b>Total Saved Sites:</b> <code>{len(user_sites)}</code>\n<i>(File upload error: {e})</i>", parse_mode="html")
+        finally:
+            if os.path.exists(filename):
+                try:
+                    os.remove(filename)
+                except Exception:
+                    pass
 
 
 # ==================== /clearsites ====================
-@bot.on(events.NewMessage(pattern=r'^/clearsites$'))
+@bot.on(events.NewMessage(pattern=r'(?i)^[./]clearsites?(?:@\w+)?$'))
 async def clear_user_sites_cmd(event):
     user_id = event.sender_id
     user_sites = get_user_sites_sync(user_id)
     
     if not user_sites:
-        await event.reply(" No sites to clear!", parse_mode="html")
+        await event.reply("⚠️ No saved sites to clear!", parse_mode="html")
         return
     
     count = len(user_sites)
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     backup_file = f"sites_backup_{user_id}_{timestamp}.txt"
-    with open(backup_file, "w") as f:
-        for s in user_sites:
+    try:
+        with open(backup_file, "w", encoding="utf-8") as f:
+            for s in user_sites:
                 f.write(f"{s}\n")
-    
-    await clear_user_sites(user_id)
-    await event.reply(f" Cleared {count} sites! Backup attached.", file=backup_file)
-    try: os.remove(backup_file)
-    except: pass
+        
+        await clear_user_sites(user_id)
+        await bot.send_file(
+            event.chat_id,
+            file=backup_file,
+            caption=f"✅ <b>Cleared {count} Shopify sites!</b>\n<i>Backup file attached above.</i>",
+            parse_mode="html",
+            reply_to=event.id
+        )
+    except Exception as e:
+        await clear_user_sites(user_id)
+        await event.reply(f"✅ <b>Cleared {count} sites!</b>", parse_mode="html")
+    finally:
+        if os.path.exists(backup_file):
+            try:
+                os.remove(backup_file)
+            except Exception:
+                pass
 
 
 # ==================== /site ====================
