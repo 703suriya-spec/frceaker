@@ -227,7 +227,7 @@ def register_hoshigaki_gate(bot, is_admin_fn, load_proxies_fn, extract_cc_fn, ge
 <b>朱 𝘽𝙖𝙣𝙠</b> -» <code>{bank}</code>
 <b>零 𝘾𝙤𝙪𝙣𝙩𝙧𝙮</b> -» <code>{country} {flag}</code>
 
-<b>⸙ 𝙂𝙖𝙩𝙚𝙬𝙖𝙮</b> -» <code>Hoshigaki Stripe -» $1.00</code>
+<b>⸙ 𝙂𝙖𝙩𝙚𝙬𝙖𝙮</b> -» <code>Stripe Charge 3 -» $1.00</code>
 <b>꫟ 𝙏𝙞𝙢𝙚</b> -» <code>{time_taken}'s</code>{user_tag}"""
         await status_msg.edit(res, parse_mode="html")
 
