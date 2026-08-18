@@ -3357,8 +3357,8 @@ async def mass_chk_reply(event):
 
         ticker_task = asyncio.create_task(ui_ticker())
 
-        # Optimized card checking worker pool (Semaphore=5 with fast jitter)
-        sem = asyncio.Semaphore(5)
+        # Optimized card checking worker pool (Semaphore=10 concurrent workers)
+        sem = asyncio.Semaphore(10)
 
         async def worker(card):
             nonlocal checked_count, charged, approved, declined, errors
@@ -3481,28 +3481,81 @@ async def mass_chk_control_handler(event):
 
 # ==================== PORTED MASS & SK COMMANDS (NON-DESTRUCTIVE) ====================
 
+# ==================== PORTED MASS & SK COMMANDS (10 WORKERS + FILE SUPPORT) ====================
+
+async def _extract_mass_cards(event):
+    cards = []
+    if event.is_reply:
+        reply_msg = await event.get_reply_message()
+        if reply_msg and reply_msg.file:
+            try:
+                file_path = await reply_msg.download_media()
+                async with aiofiles.open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                    file_content = await f.read()
+                try: os.remove(file_path)
+                except: pass
+                cards.extend(extract_cc(file_content))
+            except Exception:
+                pass
+        elif reply_msg and reply_msg.text:
+            cards.extend(extract_cc(reply_msg.text))
+    raw_text = event.raw_text or ""
+    cards.extend(extract_cc(raw_text))
+    return list(dict.fromkeys(cards))
+
 @bot.on(events.NewMessage(pattern=r'^/mst1(?:\s+([\s\S]+))?$'))
 async def process_mst1_cmd(event):
     user_id = event.sender_id
     if not is_admin(event.sender_id):
         await event.reply("Access denied.")
         return
-    raw_text = event.raw_text
-    cards = extract_cc(raw_text)
+
+    cards = await _extract_mass_cards(event)
     if not cards:
-        await event.reply("Format: `/mst1 cc|mm|yy|cvv cc|mm|yy|cvv...`")
+        await event.reply("<b>Stripe Mass Charge 1 ($1.00)</b>\n━━━━━━━━━━━━━━━━━━━━\n<b>Usage:</b> Reply <code>/mst1</code> to a <code>.txt</code> file or send <code>/mst1 cc|mm|yy|cvv...</code>", parse_mode="html")
         return
-    cards = cards[:20]
-    status_msg = await event.reply(f"<b>Mass Stripe $1 Check ({len(cards)})</b>\n<i>Processing...</i>", parse_mode="html")
+
+    cards = cards[:100]
     proxies = load_proxies(user_id)
+    status_msg = await event.reply(f"<b>ア 𝙂𝙖𝙩𝙚𝙬𝙖𝙮</b> -» <code>Stripe Mass Charge 1 ($1.00)</code>\n<b>カ 𝙎𝙩𝙖𝙩𝙪𝙨</b> -» <code>Processing {len(cards)} Cards (10 Workers)... ⏳</code>", parse_mode="html")
+
+    sem = asyncio.Semaphore(10)
     results = []
-    for card in cards:
-        proxy = random.choice(proxies) if proxies else None
-        st, msg, code = await check_card_stripe_1(card, proxy_url=proxy)
-        results.append(f"<code>{card}</code> -> {st.upper()} ({msg})")
-    
-    res = f"<b>Mass Stripe $1 Results ({len(cards)})</b>\n" + "\n".join(results)
-    await status_msg.edit(res, parse_mode="html")
+    approved_count = 0
+    dead_count = 0
+
+    async def worker(card):
+        nonlocal approved_count, dead_count
+        async with sem:
+            proxy = random.choice(proxies) if proxies else None
+            try:
+                st, msg, code = await check_card_stripe_1(card, proxy_url=proxy)
+                is_app = st.lower() in ("charged", "approved", "live")
+                if is_app: approved_count += 1
+                else: dead_count += 1
+                symbol = "✅" if is_app else "❌"
+                results.append(f"{symbol} <code>{card}</code> -> <b>{st.upper()}</b> ({msg})")
+            except Exception as e:
+                dead_count += 1
+                results.append(f"❌ <code>{card}</code> -> <b>ERROR</b> ({str(e)[:30]})")
+
+    tasks = [worker(card) for card in cards]
+    await asyncio.gather(*tasks)
+
+    out_text = "\n".join(results[:50])
+    if len(results) > 50:
+        out_text += f"\n\n<i>Showing first 50 of {len(results)} results</i>"
+
+    summary = f"""<b>ア 𝙂𝙖𝙩𝙚𝙬𝙖𝙮</b> -» <code>Stripe Mass Charge 1 ($1.00)</code>
+<b>カ 𝙎𝙩𝙖𝙩𝙪𝙨</b> -» <code>Mass Check Complete! ✅</code>
+<b>ツ 𝙏𝙤𝙩𝙖𝙡 𝘾𝙝𝙚𝙘𝙠𝙚𝙙</b> -» <code>{len(cards)} Cards</code>
+
+<b>キ 𝘼𝙥𝙥𝙧𝙤𝙫𝙚𝙙</b> -» <code>{approved_count}</code>
+<b>朱 𝘿𝙚𝙖𝙙 / 𝙀𝙧𝙧𝙤𝙧</b> -» <code>{dead_count}</code>
+<b>零 𝙒𝙤𝙧𝙠𝙚𝙧𝙨</b> -» <code>10 Parallel Async Workers</code>
+━━━━━━━━━━━━━━━━━━━━
+{out_text}"""
+    await status_msg.edit(summary, parse_mode="html")
 
 @bot.on(events.NewMessage(pattern=r'^/mst6(?:\s+([\s\S]+))?$'))
 async def process_mst6_cmd(event):
@@ -3510,23 +3563,55 @@ async def process_mst6_cmd(event):
     if not is_admin(event.sender_id):
         await event.reply("Access denied.")
         return
-    raw_text = event.raw_text
-    cards = extract_cc(raw_text)
+
+    cards = await _extract_mass_cards(event)
     if not cards:
-        await event.reply("Format: `/mst6 cc|mm|yy|cvv cc|mm|yy|cvv...`")
+        await event.reply("<b>Stripe Mass Charge 2 ($1.00)</b>\n━━━━━━━━━━━━━━━━━━━━\n<b>Usage:</b> Reply <code>/mst6</code> to a <code>.txt</code> file or send <code>/mst6 cc|mm|yy|cvv...</code>", parse_mode="html")
         return
-    cards = cards[:20]
-    status_msg = await event.reply(f"<b>Mass Stripe $1 Check ({len(cards)})</b>\n<i>Processing...</i>", parse_mode="html")
+
+    cards = cards[:100]
     proxies = load_proxies(user_id)
+    status_msg = await event.reply(f"<b>ア 𝙂𝙖𝙩𝙚𝙬𝙖𝙮</b> -» <code>Stripe Mass Charge 2 ($1.00)</code>\n<b>カ 𝙎𝙩𝙖𝙩𝙪𝙨</b> -» <code>Processing {len(cards)} Cards (10 Workers)... ⏳</code>", parse_mode="html")
+
+    sem = asyncio.Semaphore(10)
     results = []
-    for card in cards:
-        parts = card.split("|")
-        if len(parts) >= 4:
-            proxy = random.choice(proxies) if proxies else None
-            st, msg, brand = await check_card_bloomerang(parts[0], parts[1], parts[2], parts[3], proxy_url=proxy)
-            results.append(f"<code>{card}</code> -> {st.upper()} ({msg})")
-    res = f"<b>Mass Stripe $1 Results ({len(cards)})</b>\n" + "\n".join(results)
-    await status_msg.edit(res, parse_mode="html")
+    approved_count = 0
+    dead_count = 0
+
+    async def worker(card):
+        nonlocal approved_count, dead_count
+        async with sem:
+            parts = card.split("|")
+            if len(parts) >= 4:
+                proxy = random.choice(proxies) if proxies else None
+                try:
+                    st, msg, brand = await check_card_bloomerang(parts[0], parts[1], parts[2], parts[3], proxy_url=proxy)
+                    is_app = st.lower() in ("charged", "approved", "live")
+                    if is_app: approved_count += 1
+                    else: dead_count += 1
+                    symbol = "✅" if is_app else "❌"
+                    results.append(f"{symbol} <code>{card}</code> -> <b>{st.upper()}</b> ({msg})")
+                except Exception as e:
+                    dead_count += 1
+                    results.append(f"❌ <code>{card}</code> -> <b>ERROR</b> ({str(e)[:30]})")
+
+    tasks = [worker(card) for card in cards]
+    await asyncio.gather(*tasks)
+
+    out_text = "\n".join(results[:50])
+    if len(results) > 50:
+        out_text += f"\n\n<i>Showing first 50 of {len(results)} results</i>"
+
+    summary = f"""<b>ア 𝙂𝙖𝙩𝙚𝙬𝙖𝙮</b> -» <code>Stripe Mass Charge 2 ($1.00)</code>
+<b>カ 𝙎𝙩𝙖𝙩𝙪𝙨</b> -» <code>Mass Check Complete! ✅</code>
+<b>ツ 𝙏𝙤𝙩𝙖𝙡 𝘾𝙝𝙚𝙘𝙠𝙚𝙙</b> -» <code>{len(cards)} Cards</code>
+
+<b>キ 𝘼𝙥𝙥𝙧𝙤𝙫𝙚𝙙</b> -» <code>{approved_count}</code>
+<b>朱 𝘿𝙚𝙖𝙙 / 𝙀𝙧𝙧𝙤𝙧</b> -» <code>{dead_count}</code>
+<b>零 𝙒𝙤𝙧𝙠𝙚𝙧𝙨</b> -» <code>10 Parallel Async Workers</code>
+━━━━━━━━━━━━━━━━━━━━
+{out_text}"""
+    await status_msg.edit(summary, parse_mode="html")
 
 @bot.on(events.NewMessage(pattern=r'^/mbt1(?:\s+([\s\S]+))?$'))
 async def process_mbt1_cmd(event):
@@ -3534,23 +3619,55 @@ async def process_mbt1_cmd(event):
     if not is_admin(event.sender_id):
         await event.reply("Access denied.")
         return
-    raw_text = event.raw_text
-    cards = extract_cc(raw_text)
+
+    cards = await _extract_mass_cards(event)
     if not cards:
-        await event.reply("Format: `/mbt1 cc|mm|yy|cvv cc|mm|yy|cvv...`")
+        await event.reply("<b>Braintree Mass Charge ($1.00)</b>\n━━━━━━━━━━━━━━━━━━━━\n<b>Usage:</b> Reply <code>/mbt1</code> to a <code>.txt</code> file or send <code>/mbt1 cc|mm|yy|cvv...</code>", parse_mode="html")
         return
-    cards = cards[:20]
-    status_msg = await event.reply(f"<b>Mass Braintree $1 Check ({len(cards)})</b>\n<i>Processing...</i>", parse_mode="html")
+
+    cards = cards[:100]
     proxies = load_proxies(user_id)
+    status_msg = await event.reply(f"<b>ア 𝙂𝙖𝙩𝙚𝙬𝙖𝙮</b> -» <code>Braintree Mass Charge ($1.00)</code>\n<b>カ 𝙎𝙩𝙖𝙩𝙪𝙨</b> -» <code>Processing {len(cards)} Cards (10 Workers)... ⏳</code>", parse_mode="html")
+
+    sem = asyncio.Semaphore(10)
     results = []
-    for card in cards:
-        parts = card.split("|")
-        if len(parts) >= 4:
-            proxy = random.choice(proxies) if proxies else None
-            st, msg, code = await check_card_braintree_1(parts[0], parts[1], parts[2], parts[3], proxy=proxy)
-            results.append(f"<code>{card}</code> -> {st.upper()} ({msg})")
-    res = f"<b>Mass Braintree $1 Results ({len(cards)})</b>\n" + "\n".join(results)
-    await status_msg.edit(res, parse_mode="html")
+    approved_count = 0
+    dead_count = 0
+
+    async def worker(card):
+        nonlocal approved_count, dead_count
+        async with sem:
+            parts = card.split("|")
+            if len(parts) >= 4:
+                proxy = random.choice(proxies) if proxies else None
+                try:
+                    st, msg, code = await check_card_braintree_1(parts[0], parts[1], parts[2], parts[3], proxy=proxy)
+                    is_app = st.lower() in ("charged", "approved", "live")
+                    if is_app: approved_count += 1
+                    else: dead_count += 1
+                    symbol = "✅" if is_app else "❌"
+                    results.append(f"{symbol} <code>{card}</code> -> <b>{st.upper()}</b> ({msg})")
+                except Exception as e:
+                    dead_count += 1
+                    results.append(f"❌ <code>{card}</code> -> <b>ERROR</b> ({str(e)[:30]})")
+
+    tasks = [worker(card) for card in cards]
+    await asyncio.gather(*tasks)
+
+    out_text = "\n".join(results[:50])
+    if len(results) > 50:
+        out_text += f"\n\n<i>Showing first 50 of {len(results)} results</i>"
+
+    summary = f"""<b>ア 𝙂𝙖𝙩𝙚𝙬𝙖𝙮</b> -» <code>Braintree Mass Charge ($1.00)</code>
+<b>カ 𝙎𝙩𝙖𝙩𝙪𝙨</b> -» <code>Mass Check Complete! ✅</code>
+<b>ツ 𝙏𝙤𝙩𝙖𝙡 𝘾𝙝𝙚𝙘𝙠𝙚𝙙</b> -» <code>{len(cards)} Cards</code>
+
+<b>キ 𝘼𝙥𝙥𝙧𝙤𝙫𝙚𝙙</b> -» <code>{approved_count}</code>
+<b>朱 𝘿𝙚𝙖𝙙 / 𝙀𝙧𝙧𝙤𝙧</b> -» <code>{dead_count}</code>
+<b>零 𝙒𝙤𝙧𝙠𝙚𝙧𝙨</b> -» <code>10 Parallel Async Workers</code>
+━━━━━━━━━━━━━━━━━━━━
+{out_text}"""
+    await status_msg.edit(summary, parse_mode="html")
 
 
 @bot.on(events.NewMessage(pattern=r'^/mpp2(?:\s+([\s\S]+))?$'))
@@ -3559,23 +3676,55 @@ async def process_mpp2_cmd(event):
     if not is_admin(event.sender_id):
         await event.reply("Access denied.")
         return
-    raw_text = event.raw_text
-    cards = extract_cc(raw_text)
+
+    cards = await _extract_mass_cards(event)
     if not cards:
-        await event.reply("Format: `/mpp2 cc|mm|yy|cvv cc|mm|yy|cvv...`")
+        await event.reply("<b>PayPal Mass Charge ($10.00)</b>\n━━━━━━━━━━━━━━━━━━━━\n<b>Usage:</b> Reply <code>/mpp2</code> to a <code>.txt</code> file or send <code>/mpp2 cc|mm|yy|cvv...</code>", parse_mode="html")
         return
-    cards = cards[:20]
-    status_msg = await event.reply(f"<b>Mass PayPal $10 Check ({len(cards)})</b>\n<i>Processing...</i>", parse_mode="html")
+
+    cards = cards[:100]
     proxies = load_proxies(user_id)
+    status_msg = await event.reply(f"<b>ア 𝙂𝙖𝙩𝙚𝙬𝙖𝙮</b> -» <code>PayPal Mass Charge ($10.00)</code>\n<b>カ 𝙎𝙩𝙖𝙩𝙪𝙨</b> -» <code>Processing {len(cards)} Cards (10 Workers)... ⏳</code>", parse_mode="html")
+
+    sem = asyncio.Semaphore(10)
     results = []
-    for card in cards:
-        parts = card.split("|")
-        if len(parts) >= 4:
-            proxy = random.choice(proxies) if proxies else None
-            st, msg, brand = await check_card_paypal_lounsbury(parts[0], parts[1], parts[2], parts[3], proxy_url=proxy)
-            results.append(f"<code>{card}</code> -> {st.upper()} ({msg})")
-    res = f"<b>Mass PayPal $10 Results ({len(cards)})</b>\n" + "\n".join(results)
-    await status_msg.edit(res, parse_mode="html")
+    approved_count = 0
+    dead_count = 0
+
+    async def worker(card):
+        nonlocal approved_count, dead_count
+        async with sem:
+            parts = card.split("|")
+            if len(parts) >= 4:
+                proxy = random.choice(proxies) if proxies else None
+                try:
+                    st, msg, brand = await check_card_paypal_lounsbury(parts[0], parts[1], parts[2], parts[3], proxy_url=proxy)
+                    is_app = st.lower() in ("charged", "approved", "live")
+                    if is_app: approved_count += 1
+                    else: dead_count += 1
+                    symbol = "✅" if is_app else "❌"
+                    results.append(f"{symbol} <code>{card}</code> -> <b>{st.upper()}</b> ({msg})")
+                except Exception as e:
+                    dead_count += 1
+                    results.append(f"❌ <code>{card}</code> -> <b>ERROR</b> ({str(e)[:30]})")
+
+    tasks = [worker(card) for card in cards]
+    await asyncio.gather(*tasks)
+
+    out_text = "\n".join(results[:50])
+    if len(results) > 50:
+        out_text += f"\n\n<i>Showing first 50 of {len(results)} results</i>"
+
+    summary = f"""<b>ア 𝙂𝙖𝙩𝙚𝙬𝙖𝙮</b> -» <code>PayPal Mass Charge ($10.00)</code>
+<b>カ 𝙎𝙩𝙖𝙩𝙪𝙨</b> -» <code>Mass Check Complete! ✅</code>
+<b>ツ 𝙏𝙤𝙩𝙖𝙡 𝘾𝙝𝙚𝙘𝙠𝙚𝙙</b> -» <code>{len(cards)} Cards</code>
+
+<b>キ 𝘼𝙥𝙥𝙧𝙤𝙫𝙚𝙙</b> -» <code>{approved_count}</code>
+<b>朱 𝘿𝙚𝙖𝙙 / 𝙀𝙧𝙧𝙤𝙧</b> -» <code>{dead_count}</code>
+<b>零 𝙒𝙤𝙧𝙠𝙚𝙧𝙨</b> -» <code>10 Parallel Async Workers</code>
+━━━━━━━━━━━━━━━━━━━━
+{out_text}"""
+    await status_msg.edit(summary, parse_mode="html")
 
 
 
