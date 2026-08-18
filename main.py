@@ -2665,6 +2665,7 @@ async def process_shp10_cmd(event):
 
     is_live, status_str, response_str, raw = await check_card_shp10(cc, mm, yy, cvc, proxy_url=proxy)
     time_taken = round(time.time() - start_time, 2)
+    brand, bin_type, level, bank, country, flag = await get_bin_info(cc[:6])
     status_emoji = "Approved! ✅ -» charged!" if "CHARGED" in status_str else ("Approved! ✅" if is_live else "Dead! ❌")
     res = format_anime_result(f"{cc}|{mm}|{yy}|{cvc}", status_emoji, response_str, "Shopify Charge -» $10.00", brand, bin_type, level, bank, country, flag, time_taken, event.sender)
     await status_msg.edit(res, parse_mode="html")
