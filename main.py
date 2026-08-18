@@ -3382,11 +3382,8 @@ async def mass_chk_reply(event):
                         response_msg = str(result.get('message', ''))[:100]
                         price = result.get('price', 'Auto')
 
-                        hit_msg = f"""<b>CHARGED</b>
-<b>CC:</b> {card}
-<b>Response:</b> {response_msg}
-<b>Price:</b> {price}
-<b>Bin:</b> {brand} | {bank} | {country}"""
+                        status_emoji = "Approved! ✅ -» charged!" if status_str == 'Charged' else "Approved! ✅"
+                        hit_msg = format_anime_result(card, status_emoji, response_msg, f"Shopify Auth -» {price}", brand, bin_type, level, bank, country, flag, "Live", event.sender)
                         await event.reply(hit_msg, parse_mode="html")
 
                         try:
