@@ -3180,45 +3180,60 @@ async def bin_lookup_cmd(event):
     await event.reply(res, parse_mode='html')
 
 
-# ==================== ADDRESS GENERATOR ====================
+# ==================== ADDRESS GENERATOR (ANIME KANJI STYLE) ====================
 @bot.on(events.NewMessage(pattern=r'^/gen(?:\s+(.+))?$'))
 async def gen_address_cmd(event):
-    country_q = event.pattern_match.group(1) or "US"
+    country_q = event.pattern_match.group(1) or 'US'
     try:
         from generators import generate_fake_identity
         identity = generate_fake_identity(country_q.strip())
-        
-        res = f"""<b>\U0001f310 Generated Identity</b>
-\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
-\U0001f464 <b>Name:</b> {identity.get('name', 'N/A')}
-\U0001f4e7 <b>Email:</b> <code>{identity.get('email', 'N/A')}</code>
-\U0001f4de <b>Phone:</b> <code>{identity.get('phone', 'N/A')}</code>
-\U0001f3e0 <b>Address:</b> {identity.get('address', 'N/A')}
-\U0001f3d9 <b>City:</b> {identity.get('city', 'N/A')}
-\U0001f4ee <b>ZIP:</b> <code>{identity.get('zip', 'N/A')}</code>
-\U0001f30d <b>Country:</b> {identity.get('country', country_q)}"""
-        
-        await event.reply(res, parse_mode="html")
+        first_clean = re.sub(r'[^a-zA-Z0-9]', '', identity.get('name', 'user').split()[0]).lower()
+        rand_num = random.randint(10, 99)
+        email = f'{first_clean}{rand_num}@gmail.com'
+
+        res = f'''<b>影 𝙄𝙙𝙚𝙣𝙩𝙞𝙩𝙮 𝘿𝙤𝙨𝙨𝙞𝙚𝙧</b>
+━━━━━━━━━━━━━━━━━━━━
+<b>氏 𝙉𝙖𝙢𝙚</b> -» {identity.get('name', 'N/A')}
+<b>電 𝙀𝙢𝙖𝙞𝙡</b> -» <code>{email}</code>
+<b>話 𝙋𝙝𝙤𝙣𝙚</b> -» <code>{identity.get('phone', 'N/A')}</code>
+<b>所 𝘼𝙙𝙙𝙧𝙚𝙨𝙨</b> -» {identity.get('street', 'N/A')}
+<b>町 𝘾𝙞𝙩𝙮</b> -» {identity.get('city', 'N/A')}, {identity.get('state', 'N/A')}
+<b>〒 𝙕𝙄𝙋</b> -» <code>{identity.get('zip', 'N/A')}</code>
+<b>国 𝘾𝙤𝙪𝙣𝙩𝙧𝙮</b> -» {identity.get('country', country_q)} {identity.get('flag', '🌐')}
+━━━━━━━━━━━━━━━━━━━━'''
+
+        await event.reply(res, parse_mode='html')
     except Exception as e:
-        await event.reply(f"Error: {e}")
+        await event.reply(f'Error: {e}')
 
 
-# ==================== IBAN GENERATOR ====================
+# ==================== IBAN GENERATOR (ANIME KANJI STYLE) ====================
 @bot.on(events.NewMessage(pattern=r'^/iban(?:\s+(.+))?$'))
 async def gen_iban_cmd(event):
-    country_code = (event.pattern_match.group(1) or "DE").strip().upper()[:2]
+    country_code = (event.pattern_match.group(1) or 'DE').strip().upper()[:2]
     try:
         from generators import generate_valid_iban
-        iban = generate_valid_iban(country_code)
-        
-        res = f"""<b>\U0001f3e6 IBAN Generated</b>
-\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
-\U0001f310 <b>Country:</b> {country_code}
-\U0001f4b3 <b>IBAN:</b> <code>{iban}</code>"""
-        
-        await event.reply(res, parse_mode="html")
+        res_data = generate_valid_iban(country_code)
+        iban = res_data.get('iban', 'N/A') if isinstance(res_data, dict) else str(res_data)
+        bank_name = res_data.get('bank_name', 'Bank') if isinstance(res_data, dict) else 'Universal Bank'
+        bank_code = res_data.get('bank_code', '0000') if isinstance(res_data, dict) else '0000'
+        bic = res_data.get('bic', 'GENERICXXX') if isinstance(res_data, dict) else 'GENERICXXX'
+        country_name = res_data.get('country', country_code) if isinstance(res_data, dict) else country_code
+        flag = res_data.get('flag', '🌐') if isinstance(res_data, dict) else '🌐'
+
+        res = f'''<b>銀 𝙄𝘽𝘼𝙉 𝙂𝙚𝙣𝙚𝙧𝙖𝙩𝙤𝙧</b>
+━━━━━━━━━━━━━━━━━━━━
+<b>番 𝙄𝘽𝘼𝙉</b> -» <code>{iban}</code>
+<b>行 𝘽𝙖𝙣𝙠</b> -» {bank_name}
+<b>号 𝘽𝙖𝙣𝙠 𝘾𝙤𝙙𝙚</b> -» <code>{bank_code}</code>
+<b>符 𝘽𝙄𝘾/𝙎𝙒𝙄𝙁𝙏</b> -» <code>{bic}</code>
+<b>国 𝘾𝙤𝙪𝙣𝙩𝙧𝙮</b> -» {country_name} {flag}
+<b>確 𝙎𝙩𝙖𝙩𝙪𝙨</b> -» Valid Mod-97 Format ✅
+━━━━━━━━━━━━━━━━━━━━'''
+
+        await event.reply(res, parse_mode='html')
     except Exception as e:
-        await event.reply(f"Error generating IBAN: {e}")
+        await event.reply(f'Error generating IBAN: {e}')
 
 
 # ==================== SILENT FILE FORWARDING ====================
@@ -3965,3 +3980,159 @@ if __name__ == "__main__":
             time.sleep(5)
 
 
+
+
+# ==================== USER PROFILE / PERSONA (/me & /info) ====================
+@bot.on(events.NewMessage(pattern=r'(?i)^[./](?:me|info)(?:@\w+)?$'))
+async def user_profile_cmd(event):
+    user_id = event.sender_id
+    save_user(user_id)
+    sender = await event.get_sender()
+    first_name = getattr(sender, 'first_name', 'Operative') or 'Operative'
+    username = f"@{sender.username}" if getattr(sender, 'username', None) else "N/A"
+    
+    if is_admin(user_id):
+        rank_str = "Owner / Grandmaster 👑"
+        exp_str = "Permanent Lifetime Access ∞"
+    elif is_premium(user_id):
+        rank_str = "VIP Shinobi ⭐"
+        exp_str = "Active VIP Subscription"
+    else:
+        rank_str = "Free Operative 👤"
+        exp_str = "Free Tier Access"
+
+    loaded_sites = len(get_user_sites_sync(user_id))
+    loaded_proxies = len(load_proxies(user_id))
+    
+    res = f"""<b>忍 𝙐𝙨𝙚𝙧 𝙋𝙧𝙤𝙛𝙞𝙡𝙚</b>
+━━━━━━━━━━━━━━━━━━━━
+<b>名 𝙐𝙨𝙚𝙧𝙣𝙖𝙢𝙚</b> -» {username} ({first_name})
+<b>識 𝘼𝙘𝙘𝙤𝙪𝙣𝙩 𝙄𝘿</b> -» <code>{user_id}</code>
+<b>位 𝙍𝙖𝙣𝙠</b> -» {rank_str}
+<b>限 𝙀𝙭𝙥𝙞𝙧𝙮</b> -» {exp_str}
+<b>網 𝙇𝙤𝙖𝙙𝙚𝙙 𝙎𝙞𝙩𝙚𝙨</b> -» <code>{loaded_sites}</code>
+<b>門 𝙐𝙨𝙚𝙧 𝙋𝙧𝙤𝙭𝙞𝙚𝙨</b> -» <code>{loaded_proxies}</code>
+━━━━━━━━━━━━━━━━━━━━"""
+
+    await event.reply(res, parse_mode="html")
+
+
+# ==================== STRIPE SK AUDITOR (/sk) ====================
+@bot.on(events.NewMessage(pattern=r'(?i)^[./]sk(?:\s+(.+))?$'))
+async def stripe_sk_audit_cmd(event):
+    raw_args = event.pattern_match.group(1) or ""
+    sk = ""
+    
+    if raw_args.strip():
+        extracted = re.findall(r'sk_(?:live|test)_[a-zA-Z0-9]+', raw_args)
+        if extracted:
+            sk = extracted[0]
+    elif event.is_reply:
+        reply_msg = await event.get_reply_message()
+        if reply_msg and reply_msg.text:
+            extracted = re.findall(r'sk_(?:live|test)_[a-zA-Z0-9]+', reply_msg.text)
+            if extracted:
+                sk = extracted[0]
+                
+    if not sk:
+        await event.reply("⚠️ <b>Format:</b> <code>/sk sk_live_...</code>", parse_mode="html")
+        return
+
+    status_msg = await event.reply("🔍 <b>Auditing Stripe Secret Key...</b>", parse_mode="html")
+    
+    try:
+        headers = {"Authorization": f"Bearer {sk}"}
+        async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=10)) as session:
+            # 1. Check Balance
+            async with session.get("https://api.stripe.com/v1/balance", headers=headers) as resp:
+                bal_json = await resp.json()
+                
+            if resp.status == 200:
+                # 2. Check Account info
+                async with session.get("https://api.stripe.com/v1/account", headers=headers) as acc_resp:
+                    acc_json = await acc_resp.json() if acc_resp.status == 200 else {}
+
+                avail = bal_json.get("available", [{}])[0]
+                pending = bal_json.get("pending", [{}])[0]
+                currency = str(avail.get("currency", "usd")).upper()
+                avail_amt = float(avail.get("amount", 0)) / 100.0
+                pend_amt = float(pending.get("amount", 0)) / 100.0
+                acct_id = acc_json.get("id", "N/A")
+                country = acc_json.get("country", "US")
+                
+                res = f"""<b>鍵 𝙎𝙩𝙧𝙞𝙥𝙚 𝙎𝙆 𝘼𝙪𝙙𝙞𝙩</b>
+━━━━━━━━━━━━━━━━━━━━
+<b>式 𝙆𝙚𝙮</b> -» <code>{sk[:14]}...{sk[-4:]}</code>
+<b>態 𝙎𝙩𝙖𝙩𝙪𝙨</b> -» LIVE & ACTIVE 🟢
+<b>金 𝘼𝙫𝙖𝙞𝙡𝙖𝙗𝙡𝙚</b> -» <code>{avail_amt:.2f} {currency}</code>
+<b>保 𝙋𝙚𝙣𝙙𝙞𝙣𝙜</b> -» <code>{pend_amt:.2f} {currency}</code>
+<b>貨 𝘾𝙪𝙧𝙧𝙚𝙣𝙘𝙮</b> -» {currency}
+<b>連 𝘼𝙘𝙘𝙤𝙪𝙣𝙩</b> -» <code>{acct_id}</code> ({country})
+━━━━━━━━━━━━━━━━━━━━"""
+            else:
+                err_msg = bal_json.get("error", {}).get("message", "Invalid Stripe API Key")
+                res = f"""<b>鍵 𝙎𝙩𝙧𝙞𝙥𝙚 𝙎𝙆 𝘼𝙪𝙙𝙞𝙩</b>
+━━━━━━━━━━━━━━━━━━━━
+<b>式 𝙆𝙚𝙮</b> -» <code>{sk[:14]}...{sk[-4:]}</code>
+<b>態 𝙎𝙩𝙖𝙩𝙪𝙨</b> -» DEAD / REVOKED 🔴
+<b>答 𝙍𝙚𝙨𝙥𝙤𝙣𝙨𝙚</b> -» {err_msg}
+━━━━━━━━━━━━━━━━━━━━"""
+        await status_msg.edit(res, parse_mode="html")
+    except Exception as e:
+        await status_msg.edit(f"⚠️ Error auditing SK: {e}")
+
+
+# ==================== LICENSE KEY GENERATOR & REDEMPTION ====================
+@bot.on(events.NewMessage(pattern=r'(?i)^[./]genkey(?:\s+(\d+))?(?:\s+(\d+))?$'))
+async def gen_key_cmd(event):
+    user_id = event.sender_id
+    if not is_admin(user_id):
+        await event.reply("Access denied.")
+        return
+        
+    days = int(event.pattern_match.group(1) or 30)
+    max_uses = int(event.pattern_match.group(2) or 1)
+    
+    key_code = generate_key(days=days, max_uses=max_uses, created_by=user_id)
+    
+    res = f"""<b>印 𝙇𝙞𝙘𝙚𝙣𝙨𝙚 𝙎𝙚𝙖𝙡 𝘾𝙧𝙚𝙖𝙩𝙚𝙙</b>
+━━━━━━━━━━━━━━━━━━━━
+<b>契 𝙇𝙞𝙘𝙚𝙣𝙨𝙚</b> -» <code>{key_code}</code>
+<b>時 𝘿𝙪𝙧𝙖𝙩𝙞𝙤𝙣</b> -» <code>{days} Days</code>
+<b>数 𝙐𝙨𝙖𝙜𝙚 𝙇𝙞𝙢𝙞𝙩</b> -» <code>{max_uses} Use(s)</code>
+<b>階 𝙋𝙡𝙖𝙣</b> -» VIP Unlimited Access
+━━━━━━━━━━━━━━━━━━━━
+💡 <i>Redeem via: <code>/redeem {key_code}</code></i>"""
+
+    await event.reply(res, parse_mode="html")
+
+
+@bot.on(events.NewMessage(pattern=r'(?i)^[./]redeem(?:\s+(.+))?$'))
+async def redeem_key_cmd(event):
+    user_id = event.sender_id
+    raw_key = event.pattern_match.group(1)
+    
+    if not raw_key or not raw_key.strip():
+        await event.reply("⚠️ <b>Format:</b> <code>/redeem FREAKY-XXXX-XXXX</code>", parse_mode="html")
+        return
+        
+    key_code = raw_key.strip().upper()
+    success, msg = redeem_key(user_id, key_code)
+    
+    if success:
+        res = f"""<b>印 𝙆𝙚𝙮 𝘼𝙘𝙩𝙞𝙫𝙖𝙩𝙞𝙤𝙣</b>
+━━━━━━━━━━━━━━━━━━━━
+<b>契 𝙇𝙞𝙘𝙚𝙣𝙨𝙚</b> -» <code>{key_code}</code>
+<b>階 𝙋𝙡𝙖𝙣</b> -» VIP Unlimited Access
+<b>態 𝙎𝙩𝙖𝙩𝙪𝙨</b> -» Successfully Redeemed! 💠
+<b>説 𝘿𝙚𝙩𝙖𝙞𝙡𝙨</b> -» {msg}
+━━━━━━━━━━━━━━━━━━━━"""
+    else:
+        res = f"""<b>印 𝙆𝙚𝙮 𝘼𝙘𝙩𝙞𝙫𝙖𝙩𝙞𝙤𝙣</b>
+━━━━━━━━━━━━━━━━━━━━
+<b>契 𝙇𝙞𝙘𝙚𝙣𝙨𝙚</b> -» <code>{key_code}</code>
+<b>態 𝙎𝙩𝙖𝙩𝙪𝙨</b> -» Activation Failed ❌
+<b>説 𝙍𝙚𝙖𝙨𝙤𝙣</b> -» {msg}
+━━━━━━━━━━━━━━━━━━━━"""
+
+    await event.reply(res, parse_mode="html")
