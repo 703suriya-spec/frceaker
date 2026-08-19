@@ -799,36 +799,60 @@ async def save_user_sites(data):
 
 def get_user_sites_sync(user_id):
     uid = str(user_id)
-    # 1. Check Supabase DB
+    # 1. Fetch from Supabase Database
+    db_sites = []
     try:
         from db import get_db_user_sites
-        db_sites = get_db_user_sites(user_id)
-        if db_sites:
-            return db_sites
-    except Exception:
-        pass
+        db_sites = get_db_user_sites(user_id) or []
+    except Exception as e:
+        print(f"[get_user_sites_sync] DB lookup error: {e}")
 
-    # 2. Check Local File
+    # 2. Fetch from Local Backup File
+    file_sites = []
     if os.path.exists(USER_SITES_FILE):
         try:
             with open(USER_SITES_FILE, 'r', encoding='utf-8') as f:
                 data = json.load(f)
-            sites = data.get(uid, [])
-            if sites:
+            file_sites = data.get(uid, []) or []
+        except Exception as e:
+            print(f"[get_user_sites_sync] File lookup error: {e}")
+
+    # 3. Resilient merge (Deduplicated union preserving order)
+    merged = list(dict.fromkeys(db_sites + file_sites))
+
+    # Auto-repair local file if database has more sites
+    if len(db_sites) > len(file_sites):
+        try:
+            data = {}
+            if os.path.exists(USER_SITES_FILE):
                 try:
-                    from db import save_db_user_sites
-                    save_db_user_sites(user_id, sites)
-                except Exception:
-                    pass
-                return sites
+                    with open(USER_SITES_FILE, 'r', encoding='utf-8') as f:
+                        data = json.load(f)
+                except:
+                    data = {}
+            data[uid] = merged
+            with open(USER_SITES_FILE, 'w', encoding='utf-8') as f:
+                json.dump(data, f, indent=4)
         except Exception:
             pass
-    return []
+
+    # Auto-repair DB if local file had sites missing from DB
+    if len(file_sites) > len(db_sites):
+        try:
+            from db import save_db_user_sites
+            save_db_user_sites(user_id, merged)
+        except Exception:
+            pass
+
+    return merged
 
 
 async def add_user_sites_batch(user_id, new_sites):
-    """Batch adds multiple sites to user's list in both Supabase DB and local file."""
-    # 1. DB Add
+    """Batch adds multiple sites to user's list in both Supabase DB and local file with deduplication."""
+    if not new_sites:
+        return 0
+
+    # 1. DB Add & Cache sync
     added_count = 0
     try:
         from db import add_db_user_sites
@@ -837,18 +861,24 @@ async def add_user_sites_batch(user_id, new_sites):
         print(f"DB add_user_sites_batch error: {e}")
 
     # 2. Local File Add
-    data = await load_user_sites()
-    user_sites = data.get(str(user_id), [])
-    file_added = 0
-    for site in new_sites:
-        if site not in user_sites:
-            user_sites.append(site)
-            file_added += 1
-    if file_added > 0:
-        data[str(user_id)] = user_sites
-        await save_user_sites(data)
+    try:
+        data = await load_user_sites()
+        user_sites = data.get(str(user_id), [])
+        existing_set = set(user_sites)
+        file_added = 0
+        for site in new_sites:
+            s_clean = site.strip()
+            if s_clean and s_clean not in existing_set:
+                user_sites.append(s_clean)
+                existing_set.add(s_clean)
+                file_added += 1
+        if file_added > 0:
+            data[str(user_id)] = user_sites
+            await save_user_sites(data)
+    except Exception as e:
+        print(f"Local file add_user_sites_batch error: {e}")
 
-    return added_count if added_count > 0 else file_added
+    return added_count if added_count > 0 else len(new_sites)
 
 async def add_user_site(user_id, site):
     return await add_user_sites_batch(user_id, [site]) > 0

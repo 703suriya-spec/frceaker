@@ -481,10 +481,11 @@ def get_db_user_sites(user_id: int) -> list[str]:
                 conn.commit()
                 cur.execute("SELECT sites FROM user_sites WHERE user_id = %s;", (uid,))
                 row = cur.fetchone()
-                if row and row[0]:
+                if row and row[0] is not None:
                     res = json.loads(row[0]) if isinstance(row[0], str) else row[0]
-                    USER_SITES_CACHE[uid] = res
-                    return res
+                    if isinstance(res, list):
+                        USER_SITES_CACHE[uid] = list(res)
+                        return list(res)
         except Exception as e:
             print(f"[Supabase DB Error] get_db_user_sites: {e}")
         finally:
@@ -494,23 +495,25 @@ def get_db_user_sites(user_id: int) -> list[str]:
 
 
 def add_db_user_sites(user_id: int, new_sites: list[str]) -> int:
+    uid = str(user_id)
     existing = get_db_user_sites(user_id)
     existing_set = set(existing)
-    added_count = 0
+    truly_new = []
 
     for s in new_sites:
         s_clean = s.strip()
         if not s_clean:
             continue
         if s_clean not in existing_set:
-            existing.append(s_clean)
+            truly_new.append(s_clean)
             existing_set.add(s_clean)
-            added_count += 1
 
-    if added_count > 0:
-        save_db_user_sites(user_id, existing)
+    if truly_new:
+        updated_list = existing + truly_new
+        USER_SITES_CACHE[uid] = updated_list
+        save_db_user_sites(user_id, updated_list)
 
-    return added_count
+    return len(truly_new)
 
 
 def remove_db_user_site(user_id: int, site: str) -> bool:
