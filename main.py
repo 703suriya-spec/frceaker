@@ -1370,12 +1370,6 @@ async def view_user_sites(event):
 🛒 <b>Status:</b> <code>{shopify_type}</code>
 📊 <b>Total Loaded Sites:</b> <code>{total_shopify}</code>
 🌐 <b>Bot Global Backup:</b> <code>{len(global_shopify)}</code>
-
-💡 <b>Management Commands:</b>
-• <code>/addsite url</code> - Add a single Shopify checkout
-• Reply <code>/addsites</code> to <code>.txt</code> - Add bulk sites
-• <code>/site</code> - Run live health check on all sites
-• <code>/clearsites</code> - Clear your personal site list
 ━━━━━━━━━━━━━━━━━━━━"""
 
     await event.reply(summary_msg, parse_mode="html")
@@ -3150,22 +3144,42 @@ async def back_to_start_handler(event):
     await event.edit(welcome, buttons=buttons, parse_mode="html")
 
 
-# ==================== BIN LOOKUP ====================
-@bot.on(events.NewMessage(pattern=r'^/bin\s+(\d{6,8})'))
+# ==================== BIN LOOKUP (ANIME KANJI STYLE) ====================
+@bot.on(events.NewMessage(pattern=r'^/bin(?:\s+(\d{6,8}))?'))
 async def bin_lookup_cmd(event):
     bin_num = event.pattern_match.group(1)
-    brand, bin_type, level, bank, country, flag = await get_bin_info(bin_num)
-    
-    res = f"""<b>BIN Lookup</b>
-\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
-\U0001f4b3 <b>BIN:</b> <code>{bin_num}</code>
-\u2139\ufe0f <b>Brand:</b> {brand}
-\U0001f4a0 <b>Type:</b> {bin_type}
-\u2b50 <b>Level:</b> {level}
-\U0001f3e6 <b>Bank:</b> {bank}
-\U0001f310 <b>Country:</b> {country} {flag}"""
-    
-    await event.reply(res, parse_mode="html")
+    if not bin_num:
+        if event.is_reply:
+            reply_msg = await event.get_reply_message()
+            if reply_msg and reply_msg.text:
+                extracted = re.findall(r'\b\d{6,8}\b', reply_msg.text)
+                if extracted:
+                    bin_num = extracted[0]
+        if not bin_num:
+            await event.reply('⚠️ <b>Format:</b> <code>/bin 411111</code>', parse_mode='html')
+            return
+
+    start_time = time.time()
+    brand, bin_type, level, bank, country, flag = await get_bin_info(bin_num[:6])
+    time_taken = round(time.time() - start_time, 2)
+
+    sender = event.sender
+    first_name = getattr(sender, 'first_name', 'User') if sender else 'User'
+    user_id = event.sender_id
+
+    res = f'''<b>妖 𝘽𝙄𝙉 𝙄𝙣𝙛𝙤𝙧𝙢𝙖𝙩𝙞𝙤𝙣</b>
+━━━━━━━━━━━━━━━━━━━━
+<b>ア 𝘽𝙄𝙉</b> -» <code>{bin_num[:6]}</code>
+<b>カ 𝙎𝙘𝙝𝙚𝙢𝙚</b> -» <code>{brand.upper()}</code>
+<b>ツ 𝙏𝙮𝙥𝙚</b> -» <code>{bin_type.upper()}</code>
+<b>キ 𝙇𝙚𝙫𝙚𝙡</b> -» <code>{level.upper()}</code>
+<b>朱 𝙄𝙨𝙨𝙪𝙚𝙧</b> -» <code>{bank.upper()}</code>
+<b>零 𝘾𝙤𝙪𝙣𝙩𝙧𝙮</b> -» <code>{country.upper()} {flag}</code>
+━━━━━━━━━━━━━━━━━━━━
+⏱️ <b>𝙏𝙞𝙢𝙚 𝙏𝙖𝙠𝙚𝙣:</b> <code>{time_taken}s</code>
+ᥫ᭡ <b>𝙍𝙚𝙦𝙪𝙚𝙨𝙩𝙚𝙙 𝘽𝙮:</b> <a href="tg://user?id={user_id}">{first_name}</a>'''
+
+    await event.reply(res, parse_mode='html')
 
 
 # ==================== ADDRESS GENERATOR ====================
