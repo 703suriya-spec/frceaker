@@ -1366,6 +1366,7 @@ async def view_user_sites(event):
     
     summary_msg = f"""<b>⚡ LOADED SHOPIFY SITES</b>
 ━━━━━━━━━━━━━━━━━━━━
+👤 <b>Account ID:</b> <code>{user_id}</code>
 🛒 <b>Status:</b> <code>{shopify_type}</code>
 📊 <b>Total Loaded Sites:</b> <code>{total_shopify}</code>
 🌐 <b>Bot Global Backup:</b> <code>{len(global_shopify)}</code>
