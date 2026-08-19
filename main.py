@@ -3175,9 +3175,7 @@ async def bin_lookup_cmd(event):
 <b>キ 𝙇𝙚𝙫𝙚𝙡</b> -» <code>{level.upper()}</code>
 <b>朱 𝙄𝙨𝙨𝙪𝙚𝙧</b> -» <code>{bank.upper()}</code>
 <b>零 𝘾𝙤𝙪𝙣𝙩𝙧𝙮</b> -» <code>{country.upper()} {flag}</code>
-━━━━━━━━━━━━━━━━━━━━
-⏱️ <b>𝙏𝙞𝙢𝙚 𝙏𝙖𝙠𝙚𝙣:</b> <code>{time_taken}s</code>
-ᥫ᭡ <b>𝙍𝙚𝙦𝙪𝙚𝙨𝙩𝙚𝙙 𝘽𝙮:</b> <a href="tg://user?id={user_id}">{first_name}</a>'''
+━━━━━━━━━━━━━━━━━━━━'''
 
     await event.reply(res, parse_mode='html')
 
