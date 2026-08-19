@@ -9,24 +9,32 @@ from datetime import datetime
 import psycopg2
 from psycopg2.extras import RealDictCursor
 
-DEFAULT_DB_URL = "postgresql://postgres:Suriya303%40303@db.fgdgauxhlnwpvkpcpsmc.supabase.co:5432/postgres"
+DEFAULT_DB_URLS = [
+    # 1. Supabase IPv4 Session Pooler (Port 5432 - fast & universal IPv4 compatibility)
+    "postgresql://postgres.fgdgauxhlnwpvkpcpsmc:Suriya303%40303@aws-0-ap-southeast-1.pooler.supabase.com:5432/postgres",
+    # 2. Supabase IPv4 Transaction Pooler (Port 6543)
+    "postgresql://postgres.fgdgauxhlnwpvkpcpsmc:Suriya303%40303@aws-0-ap-southeast-1.pooler.supabase.com:6543/postgres",
+    # 3. Supabase Direct Host (Port 5432)
+    "postgresql://postgres:Suriya303%40303@db.fgdgauxhlnwpvkpcpsmc.supabase.co:5432/postgres",
+]
 
 def get_db_connection():
     candidate_urls = []
     env_url = os.getenv("DATABASE_URL", "").strip()
     if env_url:
         candidate_urls.append(env_url)
-    if DEFAULT_DB_URL not in candidate_urls:
-        candidate_urls.append(DEFAULT_DB_URL)
+    
+    for u in DEFAULT_DB_URLS:
+        if u not in candidate_urls:
+            candidate_urls.append(u)
 
     for db_url in candidate_urls:
-        for attempt in range(2):
+        for ssl_mode in ["require", "prefer"]:
             try:
-                conn = psycopg2.connect(db_url, connect_timeout=10, sslmode="prefer")
+                conn = psycopg2.connect(db_url, connect_timeout=8, sslmode=ssl_mode)
                 return conn
             except Exception as e:
-                print(f"[Supabase DB Error] Connection attempt {attempt + 1} failed on {db_url[:35]}...: {e}")
-                time.sleep(0.3)
+                pass
     return None
 
 
