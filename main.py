@@ -2176,7 +2176,7 @@ async def process_st3_cmd(event):
     time_taken = round(time.time() - start_time, 2)
     brand, bin_type, level, bank, country, flag = await get_bin_info(cc[:6])
 
-    status_emoji = "Approved! ✅ -» auth" if st in ("approved", "live") else "Declined! ❌"
+    status_emoji = "Approved! ✅ -» Auth" if st in ("approved", "live") else ("Live! 🟡" if ("3DS" in msg or "Challenge" in msg) else "Declined! ❌")
     res = format_anime_result(f"{cc}|{mm}|{yy}|{cvc}", status_emoji, msg, "Stripe Auth 3", brand, bin_type, level, bank, country, flag, time_taken, event.sender)
     await status_msg.edit(res, parse_mode="html")
 
@@ -2241,7 +2241,7 @@ async def process_st5_cmd(event):
     time_taken = round(time.time() - start_time, 2)
     brand, bin_type, level, bank, country, flag = await get_bin_info(cc[:6])
 
-    status_emoji = "Approved! ✅ -» auth" if st in ("approved", "live") else "Declined! ❌"
+    status_emoji = "Approved! ✅ -» Auth" if st in ("approved", "live") else ("Live! 🟡" if ("3DS" in msg or "Challenge" in msg) else "Declined! ❌")
     res = format_anime_result(f"{cc}|{mm}|{yy}|{cvc}", status_emoji, msg, "Stripe Auth 4", brand, bin_type, level, bank, country, flag, time_taken, event.sender)
     await status_msg.edit(res, parse_mode="html")
 
@@ -2380,7 +2380,7 @@ async def process_st2_cmd(event):
     time_taken = round(time.time() - start_time, 2)
     cc_first = card_input.split('|')[0][:6] if '|' in card_input else card_input[:6]
     brand, bin_type, level, bank, country, flag = await get_bin_info(cc_first)
-    status_emoji = "Approved! ✅ -» auth" if msg == "Card Added" else "Declined! ❌"
+    status_emoji = "Approved! ✅ -» Auth" if msg == "Card Added" else ("Live! 🟡" if ("3DS" in msg or "Challenge" in msg) else "Declined! ❌")
     res = format_anime_result(card_input, status_emoji, msg, "Stripe Auth 2", brand, bin_type, level, bank, country, flag, time_taken, event.sender)
     await status_msg.edit(res, parse_mode="html")
 
@@ -2563,7 +2563,7 @@ async def process_inu_cmd(event):
     time_taken = round(time.time() - start_time, 2)
     brand, bin_type, level, bank, country, flag = await get_bin_info(cc[:6])
 
-    status_emoji = "Approved! ✅ -» auth" if is_live else "Declined! ❌"
+    status_emoji = "Approved! ✅ -» Auth" if is_live else ("Live! 🟡" if "3DS Challenge" in response_str else "Declined! ❌")
     res = format_anime_result(f"{cc}|{mm}|{yy}|{cvc}", status_emoji, response_str, "Braintree Auth 1", brand, bin_type, level, bank, country, flag, time_taken, event.sender)
     await status_msg.edit(res, parse_mode="html")
 
@@ -2606,7 +2606,7 @@ async def process_au_cmd(event):
     time_taken = round(time.time() - start_time, 2)
     brand, bin_type, level, bank, country, flag = await get_bin_info(cc[:6])
 
-    status_emoji = "Approved! ✅ -» auth" if is_live else "Declined! ❌"
+    status_emoji = "Approved! ✅ -» Auth" if is_live else ("Live! 🟡" if ("3DS" in response_str or "Challenge" in response_str) else "Declined! ❌")
     res = format_anime_result(f"{cc}|{mm}|{yy}|{cvc}", status_emoji, response_str, "Stripe Auth 1", brand, bin_type, level, bank, country, flag, time_taken, event.sender)
     await status_msg.edit(res, parse_mode="html")
 
@@ -2649,7 +2649,7 @@ async def process_adr_cmd(event):
     time_taken = round(time.time() - start_time, 2)
     brand, bin_type, level, bank, country, flag = await get_bin_info(cc[:6])
 
-    status_emoji = "Charged! 🟢 -» $22.00" if is_live else "Declined! ❌"
+    status_emoji = "Charged! 🟢 -» $39.00" if is_live else "Declined! ❌"
     res = format_anime_result(f"{cc}|{mm}|{yy}|{cvc}", status_emoji, response_str, "Payflow Charge -» $39.00", brand, bin_type, level, bank, country, flag, time_taken, event.sender)
     await status_msg.edit(res, parse_mode="html")
 
