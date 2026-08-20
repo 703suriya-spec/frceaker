@@ -136,6 +136,8 @@ def get_all_user_ids() -> list[int]:
     except Exception:
         return []
 
+PROXY_FILE = os.path.join(os.path.dirname(__file__), "proxy.txt")
+
 def get_system_telemetry() -> dict:
     all_users = get_all_user_ids()
     total_users = len(all_users)

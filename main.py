@@ -3912,75 +3912,18 @@ async def process_broadcast_cmd(event):
         parse_mode="html"
     )
 
-@bot.on(events.NewMessage(pattern=r'^/stats$'))
+@bot.on(events.NewMessage(pattern=r'(?i)^[./]stats(?:@\w+)?$'))
 async def process_stats_cmd(event):
     data = get_system_telemetry()
-    res = f"""<b>Freaky Checker Telemetry</b>
+    res = f"""<b>計 𝙎𝙮𝙨𝙩𝙚𝙢 𝙏𝙚𝙡𝙚𝙢𝙚𝙩𝙧𝙮</b>
 ━━━━━━━━━━━━━━━━━━━━
-<b>Total Registered Users:</b> {data['total_users']}
-<b>Active Premium Members:</b> {data['premium_users']}
-<b>Proxy Pool Count:</b> {data['proxy_count']}
-<b>Bot Status:</b> Active & Listening"""
+<b>衆 𝙏𝙤𝙩𝙖𝙡 𝙐𝙨𝙚𝙧𝙨</b> -» <code>{data.get('total_users', 0):,}</code>
+<b>星 𝙑𝙄𝙋 𝙈𝙚𝙢𝙗𝙚𝙧𝙨</b> -» <code>{data.get('premium_users', 0):,}</code>
+<b>網 𝙋𝙧𝙤𝙭𝙮 𝙋𝙤𝙤𝙡</b> -» <code>{data.get('proxy_count', 0):,} Active</code>
+<b>態 𝙎𝙮𝙨𝙩𝙚𝙢 𝙎𝙩𝙖𝙩𝙪𝙨</b> -» Online & Listening 🟢
+━━━━━━━━━━━━━━━━━━━━"""
 
     await event.reply(res, parse_mode="html")
-
-
-
-
-import threading
-from http.server import HTTPServer, BaseHTTPRequestHandler
-
-class HealthCheckHandler(BaseHTTPRequestHandler):
-    def do_GET(self):
-        self.send_response(200)
-        self.send_header("Content-type", "text/plain")
-        self.end_headers()
-        self.wfile.write(b"FREAKY CHECKER BOT ONLINE")
-
-    def log_message(self, format, *args):
-        pass
-
-def start_instant_health_server():
-    port = int(os.getenv("PORT", "10000"))
-    try:
-        server = HTTPServer(('0.0.0.0', port), HealthCheckHandler)
-        print(f"Health check HTTP server listening instantly on 0.0.0.0:{port}")
-        server.serve_forever()
-    except Exception as e:
-        print(f"Instant health server error: {e}")
-
-
-if __name__ == "__main__":
-    # Start HTTP port instantly on startup for Render port scanner
-    threading.Thread(target=start_instant_health_server, daemon=True).start()
-    register_hoshigaki_gate(bot, is_admin, load_proxies, extract_cc, get_bin_info)
-    print("FREAKY CHECKER BOT ACTIVE")
-    retry_count = 0
-    max_retries = 9999
-
-    while retry_count < max_retries:
-        try:
-            print(f"Bot running... (attempt {retry_count + 1})")
-            bot.start(bot_token=BOT_TOKEN)
-            if globals().get("FAKE_HITS_ENABLED", False):
-                try:
-                    bot.loop.create_task(start_fake_hits())
-                except:
-                    pass
-            print("Bot is online and listening!")
-            bot.run_until_disconnected()
-            break
-        except KeyboardInterrupt:
-            print("User stopped the bot manually.")
-            break
-        except Exception as e:
-            retry_count += 1
-            error_str = str(e)
-            print(f"Bot crashed: {error_str}")
-            time.sleep(5)
-
-
-
 
 # ==================== USER PROFILE / PERSONA (/me & /info) ====================
 @bot.on(events.NewMessage(pattern=r'(?i)^[./](?:me|info)(?:@\w+)?$'))
@@ -4136,3 +4079,60 @@ async def redeem_key_cmd(event):
 ━━━━━━━━━━━━━━━━━━━━"""
 
     await event.reply(res, parse_mode="html")
+
+
+import threading
+from http.server import HTTPServer, BaseHTTPRequestHandler
+
+class HealthCheckHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.send_header("Content-type", "text/plain")
+        self.end_headers()
+        self.wfile.write(b"FREAKY CHECKER BOT ONLINE")
+
+    def log_message(self, format, *args):
+        pass
+
+def start_instant_health_server():
+    port = int(os.getenv("PORT", "10000"))
+    try:
+        server = HTTPServer(('0.0.0.0', port), HealthCheckHandler)
+        print(f"Health check HTTP server listening instantly on 0.0.0.0:{port}")
+        server.serve_forever()
+    except Exception as e:
+        print(f"Instant health server error: {e}")
+
+
+if __name__ == "__main__":
+    # Start HTTP port instantly on startup for Render port scanner
+    threading.Thread(target=start_instant_health_server, daemon=True).start()
+    register_hoshigaki_gate(bot, is_admin, load_proxies, extract_cc, get_bin_info)
+    print("FREAKY CHECKER BOT ACTIVE")
+    retry_count = 0
+    max_retries = 9999
+
+    while retry_count < max_retries:
+        try:
+            print(f"Bot running... (attempt {retry_count + 1})")
+            bot.start(bot_token=BOT_TOKEN)
+            if globals().get("FAKE_HITS_ENABLED", False):
+                try:
+                    bot.loop.create_task(start_fake_hits())
+                except:
+                    pass
+            print("Bot is online and listening!")
+            bot.run_until_disconnected()
+            break
+        except KeyboardInterrupt:
+            print("User stopped the bot manually.")
+            break
+        except Exception as e:
+            retry_count += 1
+            error_str = str(e)
+            print(f"Bot crashed: {error_str}")
+            time.sleep(5)
+
+
+
+
