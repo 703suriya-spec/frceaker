@@ -219,21 +219,21 @@ async def check_card_brccn(cc, mm, yy, cvc, proxy_url=None):
                 }
                 
                 if statuscc in ['authenticate_successful', 'authenticate_attempt_successful', 'authenticate_successful_issuer_not_participating']:
-                    return True, f"3DS Passed: {statuscc}", json.dumps(bin_info), None, "Auth ($0.00)"
+                    return True, "3DS Passed (Frictionless / Non-VBV)", json.dumps(bin_info), None, "Auth ($0.00)"
                 elif statuscc in ['lookup_not_enrolled', 'lookup_bypassed']:
-                    return True, f"Non-VBV (Bypassed): {statuscc}", json.dumps(bin_info), None, "Auth ($0.00)"
+                    return True, "Non-VBV (Direct Chargeable)", json.dumps(bin_info), None, "Auth ($0.00)"
                 elif statuscc in ['challenge_required', 'authenticate_rejected']:
-                    return False, f"VBV (Challenge Required): {statuscc}", json.dumps(bin_info), None, "Auth ($0.00)"
-                elif statuscc == 'lookup_error':
-                    return False, f"Lookup Error: {statuscc}", json.dumps(bin_info), None, "Auth ($0.00)"
+                    return False, "3DS Challenge Required (OTP Enforced)", json.dumps(bin_info), None, "Auth ($0.00)"
+                elif statuscc in ['lookup_card_error', 'authenticate_failed']:
+                    return False, "Card Declined by Issuer", json.dumps(bin_info), None, "Auth ($0.00)"
                 else:
-                    return False, f"3DS Status: {statuscc}", json.dumps(bin_info), None, "Auth ($0.00)"
+                    return False, f"Declined ({statuscc.replace('_', ' ').title()})", json.dumps(bin_info), None, "Auth ($0.00)"
                      
             except KeyError:
                 err_msg = res_json.get('error', {}).get('message', '3DS Lookup Failed')
                 if 'error' not in res_json:
-                    err_msg = str(res_json)
-                return False, f"Failed: {err_msg}", str(res_json), None, "Auth ($0.00)"
+                    err_msg = "3DS Lookup Failed"
+                return False, err_msg, str(res_json), None, "Auth ($0.00)"
                 
     except Exception as e:
         return False, f"Error: {str(e)}", "", None, "Auth ($0.00)"

@@ -188,13 +188,15 @@ async def check_card_inu(cc: str, mm: str, yy: str, cvc: str, proxy_url: str | N
             try:
                 statuscc = res_json["paymentMethod"]["threeDSecureInfo"]["status"]
                 if statuscc in ['authenticate_successful', 'authenticate_attempt_successful', 'authenticate_successful_issuer_not_participating']:
-                    return True, "Approved! ✅", f"3DS Passed ({statuscc})", json.dumps(res_json)
+                    return True, "Approved! ✅", "3DS Passed (Frictionless / Non-VBV)", json.dumps(res_json)
                 elif statuscc in ['lookup_not_enrolled', 'lookup_bypassed']:
-                    return True, "Approved! ✅", f"Non-VBV ({statuscc})", json.dumps(res_json)
+                    return True, "Approved! ✅", "Non-VBV (Direct Chargeable)", json.dumps(res_json)
                 elif statuscc in ['challenge_required', 'authenticate_rejected']:
-                    return False, "Declined! ❌", f"3D Challenge Required ({statuscc})", json.dumps(res_json)
+                    return False, "Declined! ❌", "3DS Challenge Required (OTP Enforced)", json.dumps(res_json)
+                elif statuscc in ['lookup_card_error', 'authenticate_failed']:
+                    return False, "Declined! ❌", "Card Declined by Issuer", json.dumps(res_json)
                 else:
-                    return False, "Declined! ❌", f"Status: {statuscc}", json.dumps(res_json)
+                    return False, "Declined! ❌", f"Declined ({statuscc.replace('_', ' ').title()})", json.dumps(res_json)
             except KeyError:
                 err_msg = res_json.get('error', {}).get('message', '3DS Lookup Failed')
                 return False, "Declined! ❌", err_msg, json.dumps(res_json)
