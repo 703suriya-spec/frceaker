@@ -3645,7 +3645,7 @@ async def _run_generic_mass_check(event, gateway_name, check_func):
 <b>Checked</b> -> {checked_count}/{total}
 <b>Approved</b> -> {approved}
 <b>CHARGED</b> -> {charged}
-<b>Dead</b> -> {declined}
+<b>Declined</b> -> {declined}
 <b>Errors</b> -> {errors}
 <b>Time</b> -> {time_str}
 <b>Proxies</b> -> {active_proxies_count} / {active_proxies_count} active
@@ -3723,7 +3723,7 @@ async def _run_generic_mass_check(event, gateway_name, check_func):
 <b>Total Checked</b> -> {checked_count}/{total}
 <b>Approved</b> -> {approved}
 <b>CHARGED</b> -> {charged}
-<b>Dead</b> -> {declined}
+<b>Declined</b> -> {declined}
 <b>Errors</b> -> {errors}
 <b>Time</b> -> {time_str}
 ━━━━━━━━━━━━━━━━━━━━
