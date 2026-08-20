@@ -3635,22 +3635,23 @@ async def _run_generic_mass_check(event, gateway_name, check_func):
                 pbar = make_progress_bar(pct)
                 current_st = sess_info.get("status", "CHECKING")
 
-                progress_ui = f"""━━━━━━━━━━━━━━━━━━━━
-<b>Gateway</b> -> {gateway_name}
-<b>Status</b> -> {current_st}
-<b>Mode</b> -> Approved + Charged
-
-<b>PROGRESS</b>
-{pbar} {pct}%
-<b>Checked</b> -> {checked_count}/{total}
-<b>Approved</b> -> {approved}
-<b>CHARGED</b> -> {charged}
-<b>Declined</b> -> {declined}
-<b>Errors</b> -> {errors}
-<b>Time</b> -> {time_str}
-<b>Proxies</b> -> {active_proxies_count} / {active_proxies_count} active
+                progress_ui = f"""<b>陣 𝙈𝙖𝙨𝙨 𝘾𝙝𝙚𝙘𝙠𝙚𝙧 𝙃𝙐𝘿</b>
 ━━━━━━━━━━━━━━━━━━━━
-<b>Session ID</b> -> {session_id}"""
+<b>門 𝙂𝙖𝙩𝙚𝙬𝙖𝙮</b> -» {gateway_name}
+<b>態 𝙎𝙩𝙖𝙩𝙪𝙨</b> -» <code>{current_st}</code> ⚡
+<b>式 𝙈𝙤𝙙𝙚</b> -» Approved + Charged
+
+<b>進 𝙋𝙧𝙤𝙜𝙧𝙚𝙨𝙨</b>
+{pbar} <b>{pct}%</b>
+<b>総 𝘾𝙝𝙚𝙘𝙠𝙚𝙙</b> -» <code>{checked_count} / {total}</code>
+<b>承 𝘼𝙥𝙥𝙧𝙤𝙫𝙚𝙙</b> -» <code>{approved}</code> ✅
+<b>金 𝘾𝙝𝙖𝙧𝙜𝙚𝙙</b> -» <code>{charged}</code> 🟢
+<b>否 𝘿𝙚𝙘𝙡𝙞𝙣𝙚𝙙</b> -» <code>{declined}</code> ❌
+<b>障 𝙀𝙧𝙧𝙤𝙧𝙨</b> -» <code>{errors}</code> ⚠️
+<b>時 𝙏𝙞𝙢𝙚</b> -» <code>{time_str}</code>
+<b>網 𝙋𝙧𝙤𝙭𝙞𝙚𝙨</b> -» <code>{active_proxies_count} / {active_proxies_count} Active</code>
+━━━━━━━━━━━━━━━━━━━━
+<b>符 𝙎𝙚𝙨𝙨𝙞𝙤𝙣</b> -» <code>{session_id}</code>"""
                 await status_msg.edit(progress_ui, buttons=control_buttons, parse_mode="html")
             except Exception:
                 pass
@@ -3714,20 +3715,21 @@ async def _run_generic_mass_check(event, gateway_name, check_func):
     if final_st == "CHECKING":
         final_st = "COMPLETE"
 
-    final_ui = f"""━━━━━━━━━━━━━━━━━━━━
-<b>Gateway</b> -> {gateway_name}
-<b>Status</b> -> {final_st}
-<b>Mode</b> -> Approved + Charged
-
-<b>SUMMARY</b>
-<b>Total Checked</b> -> {checked_count}/{total}
-<b>Approved</b> -> {approved}
-<b>CHARGED</b> -> {charged}
-<b>Declined</b> -> {declined}
-<b>Errors</b> -> {errors}
-<b>Time</b> -> {time_str}
+    final_ui = f"""<b>陣 𝙈𝙖𝙨𝙨 𝘾𝙝𝙚𝙘𝙠 𝙎𝙪𝙢𝙢𝙖𝙧𝙮</b>
 ━━━━━━━━━━━━━━━━━━━━
-<b>Session ID</b> -> {session_id}"""
+<b>門 𝙂𝙖𝙩𝙚𝙬𝙖𝙮</b> -» {gateway_name}
+<b>態 𝙎𝙩𝙖𝙩𝙪𝙨</b> -» <code>{final_st}</code> 💠
+<b>式 𝙈𝙤𝙙𝙚</b> -» Approved + Charged
+
+<b>計 𝙎𝙪𝙢𝙢𝙖𝙧𝙮 𝙈𝙖𝙩𝙧𝙞𝙭</b>
+<b>総 𝘾𝙝𝙚𝙘𝙠𝙚𝙙</b> -» <code>{checked_count} / {total}</code>
+<b>承 𝘼𝙥𝙥𝙧𝙤𝙫𝙚𝙙</b> -» <code>{approved}</code> ✅
+<b>金 𝘾𝙝𝙖𝙧𝙜𝙚𝙙</b> -» <code>{charged}</code> 🟢
+<b>否 𝘿𝙚𝙘𝙡𝙞𝙣𝙚𝙙</b> -» <code>{declined}</code> ❌
+<b>障 𝙀𝙧𝙧𝙤𝙧𝙨</b> -» <code>{errors}</code> ⚠️
+<b>時 𝙏𝙞𝙢𝙚</b> -» <code>{time_str}</code>
+━━━━━━━━━━━━━━━━━━━━
+<b>符 𝙎𝙚𝙨𝙨𝙞𝙤𝙣</b> -» <code>{session_id}</code>"""
 
     try:
         await status_msg.edit(final_ui, parse_mode="html")
