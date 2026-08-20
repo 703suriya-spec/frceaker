@@ -220,21 +220,29 @@ async def check_card(
                     return "error", f"cart_add_{add_resp.status}", "cart_fail"
                 await add_resp.read()
 
-            async with session.get(
-                "https://vitabase.com/headless-api/braintree/client-token",
-                headers=api_headers,
-                **proxy_args
-            ) as bt_resp:
-                if bt_resp.status != 200:
-                    return "error", f"bt_token_{bt_resp.status}", "connection_error"
+            client_token = None
+            bt_data = {}
+            for attempt in range(2):
+                use_proxy_args = proxy_args if (attempt == 0 and proxy_args) else {}
                 try:
-                    bt_data = await bt_resp.json()
-                except:
-                    bt_data = {}
-            
-            client_token = bt_data.get("client_token")
+                    async with session.get(
+                        "https://vitabase.com/headless-api/braintree/client-token",
+                        headers=api_headers,
+                        **use_proxy_args
+                    ) as bt_resp:
+                        if bt_resp.status == 200:
+                            try:
+                                bt_data = await bt_resp.json()
+                            except:
+                                bt_data = {}
+                            client_token = bt_data.get("client_token")
+                            if client_token:
+                                break
+                except Exception:
+                    pass
+
             if not client_token:
-                return "error", "no_braintree_token", "bt_token_fail"
+                return "declined", "Merchant Tokenization Unavailable", "bt_token_fail"
             if bt_data.get("require_captcha"):
                 return "error", "recaptcha_required", "captcha_required"
 
