@@ -1878,7 +1878,7 @@ async def single_chk_cc(event):
 
         status_str = result.get('status', 'Declined')
         is_charged = status_str in ('Charged', 'Approved', 'CVV Live', 'approved')
-        status_emoji = "Approved! ✅ -» charged!" if status_str == 'Charged' else ("Approved! ✅" if is_charged else "Dead! ❌")
+        status_emoji = "Approved! ✅ -» charged!" if status_str == 'Charged' else ("Approved! ✅" if is_charged else "Declined! ❌")
         response_msg = str(result.get('message', 'Declined'))[:150]
         price = result.get('price', 'Auto')
 
@@ -1952,7 +1952,7 @@ async def single_razorpay_cc(event):
         brand, bin_type, level, bank, country, flag = await get_bin_info(card.split('|')[0][:6])
         response_msg = str(result.get('message', 'Unknown'))[:150]
 
-        status_emoji = "Approved! ✅ -» charged!" if result.get("status") == "Charged" else ("Approved! ✅" if result.get("status") == "Live" else "Dead! ❌")
+        status_emoji = "Approved! ✅ -» charged!" if result.get("status") == "Charged" else ("Approved! ✅" if result.get("status") == "Live" else "Declined! ❌")
         res_msg = format_anime_result(card, status_emoji, response_msg, "Razorpay -» $1.00", brand, bin_type, level, bank, country, flag, time_taken, sender)
         await status_msg.edit(res_msg, parse_mode="html")
     except Exception as e:
@@ -2004,7 +2004,7 @@ async def process_stripe_cmd(event):
     time_taken = round(time.time() - start_time, 2)
     brand, bin_type, level, bank, country, flag = await get_bin_info(cc[:6])
 
-    status_emoji = "Approved! ✅" if is_live else "Dead! ❌"
+    status_emoji = "Approved! ✅" if is_live else "Declined! ❌"
     res = format_anime_result(f"{cc}|{mm}|{yy}|{cvc}", status_emoji, msg, "Stripe Charge 1 -» $22.00", brand, bin_type, level, bank, country, flag, time_taken, event.sender)
     await status_msg.edit(res, parse_mode="html")
 
@@ -2041,7 +2041,7 @@ async def process_stripe1_cmd(event):
 
     time_taken = round(time.time() - start_time, 2)
     brand, bin_type, level, bank, country, flag = await get_bin_info(cc[:6])
-    status_emoji = "Approved! ✅ -» charged!" if st in ("charged", "approved") else "Dead! ❌"
+    status_emoji = "Approved! ✅ -» charged!" if st in ("charged", "approved") else "Declined! ❌"
     res = format_anime_result(cc_str, status_emoji, msg, "Stripe Charge 5 -» $1.00", brand, bin_type, level, bank, country, flag, time_taken, event.sender)
     await status_msg.edit(res, parse_mode="html")
 
@@ -2072,7 +2072,7 @@ async def process_st6_cmd(event):
     time_taken = round(time.time() - start_time, 2)
     brand, bin_type, level, bank, country, flag = await get_bin_info(cc[:6])
     
-    status_emoji = "Approved! ✅ -» charged!" if st == "charged" else ("Approved! ✅" if st in ("approved", "live", "3ds") else "Dead! ❌")
+    status_emoji = "Approved! ✅ -» charged!" if st == "charged" else ("Approved! ✅" if st in ("approved", "live", "3ds") else "Declined! ❌")
     res = format_anime_result(f"{cc}|{mm}|{yy}|{cvc}", status_emoji, msg, "Stripe Charge 4 -» $1.00", brand, bin_type, level, bank, country, flag, time_taken, event.sender)
     await status_msg.edit(res, parse_mode="html")
 
@@ -2108,7 +2108,7 @@ async def process_br1_cmd(event):
 
     time_taken = round(time.time() - start_time, 2)
     brand, bin_type, level, bank, country, flag = await get_bin_info(cc[:6])
-    status_emoji = "Approved! ✅" if st in ("charged", "approved", "live") else "Dead! ❌"
+    status_emoji = "Approved! ✅" if st in ("charged", "approved", "live") else "Declined! ❌"
     res = format_anime_result(f"{cc}|{mm}|{yy}|{cvc}", status_emoji, msg, "Braintree Charge 2 -» $1.00", brand, bin_type, level, bank, country, flag, time_taken, event.sender)
     await status_msg.edit(res, parse_mode="html")
 
@@ -2143,7 +2143,7 @@ async def process_rz1_cmd(event):
     st, msg, code, _ = await check_card_rz(page_url, cc, mm, yy, cvc, proxy_url=proxy)
     time_taken = round(time.time() - start_time, 2)
     brand, bin_type, level, bank, country, flag = await get_bin_info(cc[:6])
-    status_emoji = "Approved! ✅" if st == "live" else "Dead! ❌"
+    status_emoji = "Approved! ✅" if st == "live" else "Declined! ❌"
     res = format_anime_result(f"{cc}|{mm}|{yy}|{cvc}", status_emoji, msg, "Razorpay Charge -» $1.00", brand, bin_type, level, bank, country, flag, time_taken, event.sender)
     await status_msg.edit(res, parse_mode="html")
 
@@ -2176,7 +2176,7 @@ async def process_st3_cmd(event):
     time_taken = round(time.time() - start_time, 2)
     brand, bin_type, level, bank, country, flag = await get_bin_info(cc[:6])
 
-    status_emoji = "Approved! ✅ -» auth" if st in ("approved", "live") else "Dead! ❌"
+    status_emoji = "Approved! ✅ -» auth" if st in ("approved", "live") else "Declined! ❌"
     res = format_anime_result(f"{cc}|{mm}|{yy}|{cvc}", status_emoji, msg, "Stripe Auth 3", brand, bin_type, level, bank, country, flag, time_taken, event.sender)
     await status_msg.edit(res, parse_mode="html")
 
@@ -2209,7 +2209,7 @@ async def process_st4_cmd(event):
     time_taken = round(time.time() - start_time, 2)
     brand, bin_type, level, bank, country, flag = await get_bin_info(cc[:6])
 
-    status_emoji = "Approved! ✅ -» charged!" if st == "charged" else ("Approved! ✅" if st in ("live", "approved") else "Dead! ❌")
+    status_emoji = "Approved! ✅ -» charged!" if st == "charged" else ("Approved! ✅" if st in ("live", "approved") else "Declined! ❌")
     res = format_anime_result(f"{cc}|{mm}|{yy}|{cvc}", status_emoji, msg, "Stripe Charge 2 -» $15.00", brand, bin_type, level, bank, country, flag, time_taken, event.sender)
     await status_msg.edit(res, parse_mode="html")
 
@@ -2241,7 +2241,7 @@ async def process_st5_cmd(event):
     time_taken = round(time.time() - start_time, 2)
     brand, bin_type, level, bank, country, flag = await get_bin_info(cc[:6])
 
-    status_emoji = "Approved! ✅ -» auth" if st in ("approved", "live") else "Dead! ❌"
+    status_emoji = "Approved! ✅ -» auth" if st in ("approved", "live") else "Declined! ❌"
     res = format_anime_result(f"{cc}|{mm}|{yy}|{cvc}", status_emoji, msg, "Stripe Auth 4", brand, bin_type, level, bank, country, flag, time_taken, event.sender)
     await status_msg.edit(res, parse_mode="html")
 
@@ -2274,7 +2274,7 @@ async def process_br2_cmd(event):
     time_taken = round(time.time() - start_time, 2)
     brand, bin_type, level, bank, country, flag = await get_bin_info(cc[:6])
 
-    status_emoji = "Approved! ✅ -» charged!" if st in ("charged", "approved") else ("Approved! ✅" if st == "live" else "Dead! ❌")
+    status_emoji = "Approved! ✅ -» charged!" if st in ("charged", "approved") else ("Approved! ✅" if st == "live" else "Declined! ❌")
     res = format_anime_result(f"{cc}|{mm}|{yy}|{cvc}", status_emoji, msg, "Braintree Charge 1 -» $10.00", brand, bin_type, level, bank, country, flag, time_taken, event.sender)
     await status_msg.edit(res, parse_mode="html")
 
@@ -2309,7 +2309,7 @@ async def process_cl_cmd(event):
     time_taken = round(time.time() - start_time, 2)
     brand, bin_type, level, bank, country, flag = await get_bin_info(cc[:6])
 
-    status_emoji = "Approved! ✅ -» charged!" if st == "charged" else ("Approved! ✅" if st in ("approved", "live") else "Dead! ❌")
+    status_emoji = "Approved! ✅ -» charged!" if st == "charged" else ("Approved! ✅" if st in ("approved", "live") else "Declined! ❌")
     res = format_anime_result(f"{cc}|{mm}|{yy}|{cvc}", status_emoji, msg, "Clover Charge -» $1.00", brand, bin_type, level, bank, country, flag, time_taken, event.sender)
     await status_msg.edit(res, parse_mode="html")
 
@@ -2347,7 +2347,7 @@ async def process_an_cmd(event):
     elif st in ("approved", "live"):
         status_emoji = "Approved! ✅"
     else:
-        status_emoji = "Dead! ❌"
+        status_emoji = "Declined! ❌"
 
     res = format_anime_result(f"{cc}|{mm}|{yy}|{cvc}", status_emoji, msg, "Authorize.Net Charge -» $0.10", brand, bin_type, level, bank, country, flag, time_taken, event.sender)
     await status_msg.edit(res, parse_mode="html")
@@ -2380,7 +2380,7 @@ async def process_st2_cmd(event):
     time_taken = round(time.time() - start_time, 2)
     cc_first = card_input.split('|')[0][:6] if '|' in card_input else card_input[:6]
     brand, bin_type, level, bank, country, flag = await get_bin_info(cc_first)
-    status_emoji = "Approved! ✅ -» auth" if msg == "Card Added" else "Dead! ❌"
+    status_emoji = "Approved! ✅ -» auth" if msg == "Card Added" else "Declined! ❌"
     res = format_anime_result(card_input, status_emoji, msg, "Stripe Auth 2", brand, bin_type, level, bank, country, flag, time_taken, event.sender)
     await status_msg.edit(res, parse_mode="html")
 
@@ -2422,7 +2422,7 @@ async def process_paypal_cmd(event):
     elif st in ("approved", "live", "3ds"):
         status_emoji = "Approved! ✅"
     else:
-        status_emoji = "Dead! ❌"
+        status_emoji = "Declined! ❌"
 
     res = format_anime_result(f"{cc}|{mm}|{yy}|{cvc}", status_emoji, msg, "PayPal Charge 2 -» $1.00", brand, bin_type, level, bank, country, flag, time_taken, event.sender)
     await status_msg.edit(res, parse_mode="html")
@@ -2466,7 +2466,7 @@ async def process_paypal2_cmd(event):
     elif st in ("approved", "live", "3ds"):
         status_emoji = "Approved! ✅"
     else:
-        status_emoji = "Dead! ❌"
+        status_emoji = "Declined! ❌"
 
     res = format_anime_result(f"{cc}|{mm}|{yy}|{cvc}", status_emoji, msg, "PayPal Charge 1 -» $10.00", brand, bin_type, level, bank, country, flag, time_taken, event.sender)
     await status_msg.edit(res, parse_mode="html")
@@ -2519,7 +2519,7 @@ async def process_vbv_cmd(event):
     time_taken = round(time.time() - start_time, 2)
     brand, bin_type, level, bank, country, flag = await get_bin_info(cc[:6])
 
-    status_emoji = "Approved! ✅ -» Non-VBV" if is_live else "Dead! ❌"
+    status_emoji = "Approved! ✅ -» Non-VBV" if is_live else "Declined! ❌"
     res = format_anime_result(f"{cc}|{mm}|{yy}|{cvc}", status_emoji, msg, "Braintree Auth 2 (3DS)", brand, bin_type, level, bank, country, flag, time_taken, event.sender)
 
     await status_msg.edit(res, parse_mode="html")
@@ -2563,7 +2563,7 @@ async def process_inu_cmd(event):
     time_taken = round(time.time() - start_time, 2)
     brand, bin_type, level, bank, country, flag = await get_bin_info(cc[:6])
 
-    status_emoji = "Approved! ✅ -» auth" if is_live else "Dead! ❌"
+    status_emoji = "Approved! ✅ -» auth" if is_live else "Declined! ❌"
     res = format_anime_result(f"{cc}|{mm}|{yy}|{cvc}", status_emoji, response_str, "Braintree Auth 1", brand, bin_type, level, bank, country, flag, time_taken, event.sender)
     await status_msg.edit(res, parse_mode="html")
 
@@ -2606,7 +2606,7 @@ async def process_au_cmd(event):
     time_taken = round(time.time() - start_time, 2)
     brand, bin_type, level, bank, country, flag = await get_bin_info(cc[:6])
 
-    status_emoji = "Approved! ✅ -» auth" if is_live else "Dead! ❌"
+    status_emoji = "Approved! ✅ -» auth" if is_live else "Declined! ❌"
     res = format_anime_result(f"{cc}|{mm}|{yy}|{cvc}", status_emoji, response_str, "Stripe Auth 1", brand, bin_type, level, bank, country, flag, time_taken, event.sender)
     await status_msg.edit(res, parse_mode="html")
 
@@ -2649,7 +2649,7 @@ async def process_adr_cmd(event):
     time_taken = round(time.time() - start_time, 2)
     brand, bin_type, level, bank, country, flag = await get_bin_info(cc[:6])
 
-    status_emoji = "Approved! ✅" if is_live else "Dead! ❌"
+    status_emoji = "Approved! ✅" if is_live else "Declined! ❌"
     res = format_anime_result(f"{cc}|{mm}|{yy}|{cvc}", status_emoji, response_str, "Payflow Charge -» $39.00", brand, bin_type, level, bank, country, flag, time_taken, event.sender)
     await status_msg.edit(res, parse_mode="html")
 
@@ -2691,7 +2691,7 @@ async def process_shp10_cmd(event):
     is_live, status_str, response_str, raw = await check_card_shp10(cc, mm, yy, cvc, proxy_url=proxy)
     time_taken = round(time.time() - start_time, 2)
     brand, bin_type, level, bank, country, flag = await get_bin_info(cc[:6])
-    status_emoji = "Approved! ✅ -» charged!" if "CHARGED" in status_str else ("Approved! ✅" if is_live else "Dead! ❌")
+    status_emoji = "Approved! ✅ -» charged!" if "CHARGED" in status_str else ("Approved! ✅" if is_live else "Declined! ❌")
     res = format_anime_result(f"{cc}|{mm}|{yy}|{cvc}", status_emoji, response_str, "Shopify Charge -» $10.00", brand, bin_type, level, bank, country, flag, time_taken, event.sender)
     await status_msg.edit(res, parse_mode="html")
 
@@ -2734,7 +2734,7 @@ async def process_fz_cmd(event):
     time_taken = round(time.time() - start_time, 2)
     brand, bin_type, level, bank, country, flag = await get_bin_info(cc[:6])
 
-    status_emoji = "Approved! ✅ -» charged!" if "CHARGED" in status_str else ("Approved! ✅" if is_live else "Dead! ❌")
+    status_emoji = "Approved! ✅ -» charged!" if "CHARGED" in status_str else ("Approved! ✅" if is_live else "Declined! ❌")
     res = format_anime_result(f"{cc}|{mm}|{yy}|{cvc}", status_emoji, response_str, "FatZebra Charge -» £4.00", brand, bin_type, level, bank, country, flag, time_taken, event.sender)
     await status_msg.edit(res, parse_mode="html")
 
@@ -2823,7 +2823,7 @@ async def process_mass3_cmd(event):
     time_taken = round(time.time() - start_time, 2)
     brand, bin_type, level, bank, country, flag = await get_bin_info(cc[:6])
 
-    status_emoji = "Approved! ✅" if is_live else "Dead! ❌"
+    status_emoji = "Approved! ✅" if is_live else "Declined! ❌"
     res = format_anime_result(f"{cc}|{mm}|{yy}|{cvc}", status_emoji, response_str, "Braintree Auth -» $0.00", brand, bin_type, level, bank, country, flag, time_taken, event.sender)
     await status_msg.edit(res, parse_mode="html")
 
@@ -2869,7 +2869,7 @@ async def sq_check_cmd(event):
 
     brand, bin_type, level, bank, country, flag = await get_bin_info(cc[:6])
 
-    status_emoji = "Approved! ✅ -» charged!" if "CHARGED" in str(resp_text).upper() else ("Approved! ✅" if is_charged else "Dead! ❌")
+    status_emoji = "Approved! ✅ -» charged!" if "CHARGED" in str(resp_text).upper() else ("Approved! ✅" if is_charged else "Declined! ❌")
     res_msg = format_anime_result(f"{cc}|{mes}|{ano}|{cvv}", status_emoji, resp_text, "Square Charge -» $1.00", brand, bin_type, level, bank, country, flag, "2.1", event.sender)
 
     await status_msg.edit(res_msg, parse_mode="html")
