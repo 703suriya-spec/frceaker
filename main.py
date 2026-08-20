@@ -2740,92 +2740,45 @@ async def process_fz_cmd(event):
 
 
 # ==================== MASS3 (BULLFROG BRAINTREE AUTH) ENGINE ====================
-@bot.on(events.NewMessage(pattern=r'^/mass3(?:\s+(.+))?$'))
+@bot.on(events.NewMessage(pattern=r'(?i)^[./]mass3(?:\s+([\s\S]+))?$'))
 async def process_mass3_cmd(event):
-    user_id = event.sender_id
-    if not is_admin(event.sender_id):
-        await event.reply("Access denied.")
-        return
-
-    # Check if replied to a file
-    if event.is_reply:
-        reply_msg = await event.get_reply_message()
-        if reply_msg and reply_msg.file:
-            status_msg = await event.reply("⏳ <b>Reading card file for Mass3...</b>", parse_mode="html")
-            buf = BytesIO()
-            await reply_msg.download_media(file=buf)
-            text = buf.getvalue().decode('utf-8', errors='ignore')
-            cards = extract_cc(text)
-            if not cards:
-                await status_msg.edit("❌ No valid cards found in file.")
-                return
-
-            cards = cards[:25]
-            await status_msg.edit(f"<b>Mass Braintree Auth Check ({len(cards)} cards)</b>\n<i>Processing batch...</i>", parse_mode="html")
-            proxies = load_proxies(user_id)
-            results = []
-            for card in cards:
-                parts = card.split('|')
-                if len(parts) >= 4:
-                    proxy = random.choice(proxies) if proxies else None
-                    is_live, st, msg, _ = await check_card_mass3(parts[0], parts[1], parts[2], parts[3], proxy_url=proxy)
-                    icon = "✅" if is_live else "❌"
-                    results.append(f"{icon} <code>{card}</code> -> {st} ({msg})")
-            
-            res_batch = f"<b>Mass Braintree Auth Results ({len(cards)})</b>\n" + "\n".join(results)
-            await status_msg.edit(res_batch, parse_mode="html")
+    raw_args = event.pattern_match.group(1) or ""
+    cards = extract_cc(raw_args) if raw_args.strip() else []
+    
+    # If single card without reply file, execute single card view
+    if not event.is_reply and len(cards) == 1:
+        user_id = event.sender_id
+        if not is_admin(user_id):
+            await event.reply("Access denied.")
             return
 
-    card_input = event.pattern_match.group(1)
-    if not card_input:
-        await event.reply("⚠️ Format: `/mass3 cc|mm|yy|cvv` or reply `/mass3` to a .txt file")
-        return
-
-    cards = extract_cc(card_input)
-    if not cards:
-        await event.reply("⚠️ Format: `/mass3 cc|mm|yy|cvv`")
-        return
-
-    if len(cards) > 1:
-        # Multi-card inline
-        cards = cards[:20]
-        status_msg = await event.reply(f"<b>Mass Braintree Auth Check ({len(cards)})</b>\n<i>Processing...</i>", parse_mode="html")
+        card = cards[0]
+        parts = card.split('|')
+        cc, mm, yy, cvc = [p.strip() for p in parts[:4]]
+        status_msg = await event.reply("🔄 <b>Checking (Braintree Auth)...</b>", parse_mode="html")
         proxies = load_proxies(user_id)
-        results = []
-        for card in cards:
-            parts = card.split('|')
-            if len(parts) >= 4:
-                proxy = random.choice(proxies) if proxies else None
-                is_live, st, msg, _ = await check_card_mass3(parts[0], parts[1], parts[2], parts[3], proxy_url=proxy)
-                icon = "✅" if is_live else "❌"
-                results.append(f"{icon} <code>{card}</code> -> {st} ({msg})")
-        res_batch = f"<b>Mass Braintree Auth Results ({len(cards)})</b>\n" + "\n".join(results)
-        await status_msg.edit(res_batch, parse_mode="html")
+        proxy = random.choice(proxies) if proxies else None
+        start_time = time.time()
+
+        is_live, status_str, response_str, raw = await check_card_mass3(cc, mm, yy, cvc, proxy_url=proxy)
+        time_taken = round(time.time() - start_time, 2)
+        brand, bin_type, level, bank, country, flag = await get_bin_info(cc[:6])
+
+        status_emoji = "Approved! ✅ -» Auth" if is_live else ("Live! 🟡" if ("3DS" in response_str or "Challenge" in response_str) else "Declined! ❌")
+        res = format_anime_result(f"{cc}|{mm}|{yy}|{cvc}", status_emoji, response_str, "Braintree Auth -» $0.00", brand, bin_type, level, bank, country, flag, time_taken, event.sender)
+        await status_msg.edit(res, parse_mode="html")
         return
 
-    card = cards[0]
-    parts = card.split('|')
-    try:
-        cc = parts[0].strip()
-        mm = parts[1].strip()
-        yy = parts[2].strip()
-        cvc = parts[3].strip()
-    except IndexError:
-        await event.reply("⚠️ Format: `/mass3 cc|mm|yy|cvv`")
-        return
+    # If multiple cards or reply file, pipe directly into the 10-worker mass runner!
+    async def run_mass3_worker(card_item, proxy_item):
+        parts = card_item.split("|")
+        if len(parts) >= 4:
+            is_live, st, msg, _ = await check_card_mass3(parts[0], parts[1], parts[2], parts[3], proxy_url=proxy_item)
+            status_verdict = "approved" if is_live else "declined"
+            return status_verdict, msg, "Braintree"
+        return "declined", "Invalid Card Format", "Unknown"
 
-    status_msg = await event.reply("🔄 <b>Checking (Braintree Auth)...</b>", parse_mode="html")
-    proxies = load_proxies(user_id)
-    proxy = random.choice(proxies) if proxies else None
-    start_time = time.time()
-
-    is_live, status_str, response_str, raw = await check_card_mass3(cc, mm, yy, cvc, proxy_url=proxy)
-    time_taken = round(time.time() - start_time, 2)
-    brand, bin_type, level, bank, country, flag = await get_bin_info(cc[:6])
-
-    status_emoji = "Charged! 🟢 -» $22.00" if is_live else "Declined! ❌"
-    res = format_anime_result(f"{cc}|{mm}|{yy}|{cvc}", status_emoji, response_str, "Braintree Auth -» $0.00", brand, bin_type, level, bank, country, flag, time_taken, event.sender)
-    await status_msg.edit(res, parse_mode="html")
+    await _run_generic_mass_check(event, "Braintree Mass Auth ($0.00)", run_mass3_worker)
 
 
 @bot.on(events.NewMessage(pattern=r'^/sq(?:\s+(.+))?$'))
