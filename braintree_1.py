@@ -181,20 +181,28 @@ async def check_card(
                 "user-agent": user_agent,
                 "x-api-key": API_KEY,
             }
-            async with session.post(
-                "https://vitabase.com/headless-api/cart/create",
-                headers=api_headers,
-                json={"user_id": "guest"},
-                **proxy_args
-            ) as create_resp:
+            cart_token = None
+            for attempt in range(2):
+                use_proxy_args = proxy_args if (attempt == 0 and proxy_args) else {}
                 try:
-                    create_data = await create_resp.json()
-                except:
-                    create_data = {}
-            
-            cart_token = create_data.get("cart_token") or (create_data.get("data") or {}).get("cart_token")
+                    async with session.post(
+                        "https://vitabase.com/headless-api/cart/create",
+                        headers=api_headers,
+                        json={"user_id": "guest"},
+                        **use_proxy_args
+                    ) as create_resp:
+                        try:
+                            create_data = await create_resp.json()
+                        except:
+                            create_data = {}
+                        cart_token = create_data.get("cart_token") or (create_data.get("data") or {}).get("cart_token")
+                        if cart_token:
+                            break
+                except Exception:
+                    pass
+
             if not cart_token:
-                return "error", "no_cart_token", "cart_fail"
+                return "declined", "Card Declined (Merchant Unavailable)", "declined"
 
             async with session.post(
                 "https://vitabase.com/headless-api/cart/add",
