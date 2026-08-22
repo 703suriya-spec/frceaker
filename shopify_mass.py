@@ -51,6 +51,7 @@ async def check_card_msh(
 
     formatted_proxy = _normalize_proxy(proxy_str)
 
+    current_proxy = formatted_proxy
     user_supplied_site = bool(custom_site and custom_site.strip())
     if user_supplied_site:
         site = custom_site.strip()
@@ -69,36 +70,48 @@ async def check_card_msh(
     for attempt in range(max_site_retries):
         try:
             success, message, gateway, total_price, currency = await asyncio.wait_for(
-                process_card(cc, mes, ano, cvv, site, proxy_str=formatted_proxy),
+                process_card(cc, mes, ano, cvv, site, proxy_str=current_proxy),
                 timeout=45
             )
         except asyncio.TimeoutError:
             message = "TIMEOUT"
-            if not user_supplied_site and attempt < max_site_retries - 1:
-                candidates = [s for s in SHOPIFY_STORE_POOL if "https://" + s not in tried_sites]
-                if candidates:
-                    site = "https://" + random.choice(candidates)
-                    tried_sites.add(site)
-                    continue
+            current_proxy = None
+            if attempt < max_site_retries - 1:
+                if not user_supplied_site:
+                    candidates = [s for s in SHOPIFY_STORE_POOL if "https://" + s not in tried_sites]
+                    if candidates:
+                        site = "https://" + random.choice(candidates)
+                        tried_sites.add(site)
+                continue
             break
         except Exception as e:
             message = str(e) or type(e).__name__
-            if not user_supplied_site and attempt < max_site_retries - 1:
-                candidates = [s for s in SHOPIFY_STORE_POOL if "https://" + s not in tried_sites]
-                if candidates:
-                    site = "https://" + random.choice(candidates)
-                    tried_sites.add(site)
-                    continue
+            current_proxy = None
+            if attempt < max_site_retries - 1:
+                if not user_supplied_site:
+                    candidates = [s for s in SHOPIFY_STORE_POOL if "https://" + s not in tried_sites]
+                    if candidates:
+                        site = "https://" + random.choice(candidates)
+                        tried_sites.add(site)
+                continue
             break
 
-        # If rate limited, price too high, or site unreachable, rotate to a fresh site
-        if message in ("RATE_LIMITED_429", "PRICE_TOO_HIGH", "TIMEOUT", "Change Proxy or Site") and not user_supplied_site:
+        msg_str = str(message).lower()
+        is_proxy_or_net_error = any(err in msg_str for err in [
+            "proxy", "curl: (56)", "curl: (7)", "curl: (28)", "failed to perform",
+            "connect failure", "rate_limited_429", "price_too_high", "timeout",
+            "change proxy", "connection refused", "could not resolve", "ssl_connect"
+        ])
+
+        if is_proxy_or_net_error:
+            current_proxy = None
             if attempt < max_site_retries - 1:
-                candidates = [s for s in SHOPIFY_STORE_POOL if "https://" + s not in tried_sites]
-                if candidates:
-                    site = "https://" + random.choice(candidates)
-                    tried_sites.add(site)
-                    continue
+                if not user_supplied_site:
+                    candidates = [s for s in SHOPIFY_STORE_POOL if "https://" + s not in tried_sites]
+                    if candidates:
+                        site = "https://" + random.choice(candidates)
+                        tried_sites.add(site)
+                continue
         break
 
     clean_msg = extract_clean_response(message)
