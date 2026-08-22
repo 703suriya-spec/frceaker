@@ -2349,15 +2349,13 @@ async def process_card(cc, mes, ano, cvv, site_url, variant_id=None, proxy_str=N
                             if error_type == 'PaymentFailed':
                                 code = error.get('code', '')
                                 msg = error.get('messageUntranslated', '')
-                                # If code is generic, prefer the untranslated message for the real decline reason
                                 if code in ('GENERIC_ERROR', 'PAYMENT_FAILED', '') and msg:
-                                    return True, msg, gateway, total_price, currency
-                                return True, code if code else 'PAYMENT_FAILED', gateway, total_price, currency
-                            # Handle other error types
-                            code = error.get('code') or error_type or 'UNKNOWN_ERROR'
-                            return True, code, gateway, total_price, currency
+                                    return False, msg, gateway, total_price, currency
+                                return False, code if code else 'CARD_DECLINED', gateway, total_price, currency
+                            code = error.get('code') or error_type or 'CARD_DECLINED'
+                            return False, code, gateway, total_price, currency
                         elif typename == 'ActionRequiredReceipt':
-                            return True, "OTP_REQUIRED", gateway, total_price, currency
+                            return False, "OTP_REQUIRED", gateway, total_price, currency
                         
                         if receipt_data.get('__typename') in ['ProcessingReceipt', 'WaitingReceipt']:
                             await asyncio.sleep(4)
@@ -2372,21 +2370,20 @@ async def process_card(cc, mes, ano, cvv, site_url, variant_id=None, proxy_str=N
                     break
             
             if 'CAPTCHA_REQUIRED' in final_text:
-                return True, "CARD_DECLINED", gateway, total_price, currency
+                return False, "CARD_DECLINED", gateway, total_price, currency
             
             if 'WaitingReceipt' in final_text:
                 return False, "Change Proxy or Site", gateway, total_price, currency
             
             try:
                 res_json = json.loads(final_text)
-                result = res_json.get('data', {}).get('receipt', {}).get('processingError', {}).get('code')
-                
-                if "shopify_payments" in str(res_json):
-                    return True, "ORDER_PLACED", gateway, total_price, currency
-                elif result:
-                    return True, result, gateway, total_price, currency
-                else:
-                    return True, "MISMATCHED_BILL", gateway, total_price, currency
+                err_data = res_json.get('data', {}).get('receipt', {}).get('processingError', {})
+                code = err_data.get('code')
+                msg = err_data.get('messageUntranslated')
+                if code:
+                    return False, code, gateway, total_price, currency
+                if msg:
+                    return False, msg, gateway, total_price, currency
             except:
                 pass
             
@@ -2394,13 +2391,13 @@ async def process_card(cc, mes, ano, cvv, site_url, variant_id=None, proxy_str=N
             
             final_lower = final_text.lower()
             if 'actionreq' in final_lower or 'action_required' in final_lower:
-                return True, f"OTP_REQUIRED", gateway, total_price, currency
+                return False, "OTP_REQUIRED", gateway, total_price, currency
             elif 'processedreceipt' in final_lower:
-                return True, f"ORDER_PLACED", gateway, total_price, currency
-            elif 'failedreceipt' in final_lower or 'declined' in final_lower:
-                return True, code if code else "CARD_DECLINED", gateway, total_price, currency
+                return True, "ORDER_PLACED", gateway, total_price, currency
+            elif 'failedreceipt' in final_lower or 'declined' in final_lower or 'paymentfailed' in final_lower:
+                return False, code if code else "CARD_DECLINED", gateway, total_price, currency
             else:
-                return False, f"Unknown Result", gateway, total_price, currency
+                return False, "CARD_DECLINED", gateway, total_price, currency
 
     except aiohttp.ClientError as e:
         # aiohttp-level timeouts come through as ServerTimeoutError (subclass of ClientError)

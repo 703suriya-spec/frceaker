@@ -107,7 +107,7 @@ async def check_card_msh(
     gateway_str = gateway if gateway and gateway not in ("", "UNKNOWN") else "Shopify Payments"
 
     # Status classification
-    if success is True or "ORDER_PLACED" in msg_upper or "PROCESSEDRECEIPT" in msg_upper:
+    if "ORDER_PLACED" in msg_upper or "PROCESSEDRECEIPT" in msg_upper or "ORDER PLACED" in clean_upper:
         price_display = f"${total_price}" if total_price and str(total_price) not in ("0", "0.0", "0.00") else "Charged"
         return "charged", f"Charged ({price_display} {currency.upper()})", gateway_str
 
@@ -123,7 +123,10 @@ async def check_card_msh(
     if "MISMATCHED_BILL" in msg_upper or "BILLING_ADDRESS" in msg_upper:
         return "approved", "AVS Mismatch (Card Live)", gateway_str
 
-    if "TIMEOUT" in msg_upper or "ERROR" in msg_upper and not any(k in msg_upper for k in ("DECLINED", "FAILED", "REJECTED")):
+    if "TIMEOUT" in msg_upper or "GATEWAY TIMEOUT" in msg_upper or "CHANGE PROXY" in msg_upper:
         return "error", clean_msg if clean_msg else "Gateway Timeout", gateway_str
+
+    if "GENERIC_ERROR" in msg_upper or "PAYMENT_FAILED" in msg_upper or "DECLINED" in msg_upper or "FAILED" in msg_upper or "REJECTED" in msg_upper:
+        return "declined", clean_msg if clean_msg else "Card Declined", gateway_str
 
     return "declined", clean_msg if clean_msg else "Card Declined", gateway_str
