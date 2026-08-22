@@ -37,7 +37,8 @@ from gates.charge import (
     _extract_square_result,
     check_card_clover,
     check_card_rz,
-    check_card_authorize
+    check_card_authorize,
+    check_card_autoshopify
 )
 from gates.mass import (
     check_card_msh,
@@ -2477,6 +2478,61 @@ async def process_shp10_cmd(event):
     await status_msg.edit(res, parse_mode="html")
 
 
+# ==================== AUTO SHOPIFY CHARGE (sh) ENGINE ====================
+@bot.on(events.NewMessage(pattern=r'(?i)^[./]sh(?:\s+(.+))?$'))
+async def process_autoshopify_cmd(event):
+    user_id = event.sender_id
+    if not is_admin(event.sender_id):
+        await event.reply("Access denied.")
+        return
+
+    card_input = event.pattern_match.group(1)
+    if not card_input:
+        await event.reply("⚠️ Format: `/sh cc|mm|yy|cvv`")
+        return
+
+    cards = extract_cc(card_input)
+    if not cards:
+        await event.reply("⚠️ Format: `/sh cc|mm|yy|cvv`")
+        return
+
+    card = cards[0]
+    parts = card.split('|')
+    try:
+        cc = parts[0].strip()
+        mm = parts[1].strip()
+        yy = parts[2].strip()
+        cvc = parts[3].strip()
+    except IndexError:
+        await event.reply("⚠️ Format: `/sh cc|mm|yy|cvv`")
+        return
+
+    status_msg = await event.reply("🔄 <b>Checking (Auto Shopify Charge)...</b>", parse_mode="html")
+    sites = get_checker_sites(user_id)
+    proxies = load_proxies(user_id)
+    proxy = random.choice(proxies) if proxies else None
+    custom_site = random.choice(sites) if sites else None
+
+    start_time = time.time()
+    st, response_msg, gateway_str = await check_card_autoshopify(card, proxy_str=proxy, custom_site=custom_site)
+    time_taken = round(time.time() - start_time, 2)
+    brand, bin_type, level, bank, country, flag = await get_bin_info(cc[:6])
+
+    st_lower = str(st).lower()
+    if st_lower == 'charged':
+        status_emoji = "Charged! 🟢"
+    elif st_lower == 'approved':
+        if "3DS" in response_msg or "OTP" in response_msg:
+            status_emoji = "Live! 🟡"
+        else:
+            status_emoji = "Approved! ✅"
+    else:
+        status_emoji = "Declined! ❌"
+
+    res = format_anime_result(f"{cc}|{mm}|{yy}|{cvc}", status_emoji, response_msg, "Auto Shopify Charge", brand, bin_type, level, bank, country, flag, time_taken, event.sender)
+    await status_msg.edit(res, parse_mode="html")
+
+
 # ==================== FATZEBRA £4.00 CHARGE ENGINE ====================
 @bot.on(events.NewMessage(pattern=r'^/fz(?:\s+(.+))?$'))
 async def process_fz_cmd(event):
@@ -2665,7 +2721,7 @@ async def checker_menu_handler(event):
 
 Browse the available categories:
 • <b>Auth Gates:</b> 6
-• <b>Charge Gates:</b> 15
+• <b>Charge Gates:</b> 17
 • <b>Mass Checker:</b> 6"""
 
     buttons = [
@@ -2718,6 +2774,9 @@ async def auth_info_handler(event):
 async def charge_info_handler(event):
     charge_msg = """<b>CHARGE GATES</b>
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+<b><i>Auto Shopify Charge</i></b>
+<code>/sh cc|mm|yy|cvv</code>
+
 <b><i>Shopify Charge ($10.00)</i></b>
 <code>/shp10 cc|mm|yy|cvv</code>
 
