@@ -1,10 +1,44 @@
 # -*- coding: utf-8 -*-
 import sys
 import io
+import os
+import threading
+from http.server import HTTPServer, BaseHTTPRequestHandler
+
 if hasattr(sys.stdout, 'reconfigure'):
     sys.stdout.reconfigure(encoding='utf-8')
 if hasattr(sys.stderr, 'reconfigure'):
     sys.stderr.reconfigure(encoding='utf-8')
+
+class HealthCheckHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.send_header("Content-type", "text/plain")
+        self.end_headers()
+        self.wfile.write(b"FREAKY CHECKER BOT ONLINE")
+
+    def do_HEAD(self):
+        self.send_response(200)
+        self.end_headers()
+
+    def log_message(self, format, *args):
+        pass
+
+class ReusableHTTPServer(HTTPServer):
+    allow_reuse_address = True
+
+def _start_instant_health_server():
+    port = int(os.getenv("PORT", "10000"))
+    try:
+        server = ReusableHTTPServer(('0.0.0.0', port), HealthCheckHandler)
+        print(f"Health check HTTP server listening instantly on 0.0.0.0:{port}", flush=True)
+        server.serve_forever()
+    except Exception as e:
+        print(f"Instant health server error: {e}", flush=True)
+
+# Instantly bind HTTP port on process startup so Render port scanner passes in <100ms
+threading.Thread(target=_start_instant_health_server, daemon=True).start()
+
 import sqlite3
 import pytz
 from telethon import TelegramClient, events, Button
@@ -3638,32 +3672,6 @@ async def redeem_key_cmd(event):
 <b>説 𝙍𝙚𝙖𝙨𝙤𝙣</b> -» {msg}
 ━━━━━━━━━━━━━━━━━━━━"""
 
-    await event.reply(res, parse_mode="html")
-
-
-import threading
-from http.server import HTTPServer, BaseHTTPRequestHandler
-
-class HealthCheckHandler(BaseHTTPRequestHandler):
-    def do_GET(self):
-        self.send_response(200)
-        self.send_header("Content-type", "text/plain")
-        self.end_headers()
-        self.wfile.write(b"FREAKY CHECKER BOT ONLINE")
-
-    def log_message(self, format, *args):
-        pass
-
-def start_instant_health_server():
-    port = int(os.getenv("PORT", "10000"))
-    try:
-        server = HTTPServer(('0.0.0.0', port), HealthCheckHandler)
-        print(f"Health check HTTP server listening instantly on 0.0.0.0:{port}")
-        server.serve_forever()
-    except Exception as e:
-        print(f"Instant health server error: {e}")
-
-
 from telethon.tl.functions.bots import SetBotCommandsRequest
 from telethon.tl.types import BotCommand, BotCommandScopeDefault
 
@@ -3697,8 +3705,6 @@ async def setup_bot_commands():
 
 
 if __name__ == "__main__":
-    # Start HTTP port instantly on startup for Render port scanner
-    threading.Thread(target=start_instant_health_server, daemon=True).start()
     register_hoshigaki_gate(bot, is_admin, load_proxies, extract_cc, get_bin_info)
     print("FREAKY CHECKER BOT ACTIVE")
     retry_count = 0
