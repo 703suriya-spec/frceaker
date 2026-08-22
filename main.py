@@ -32,6 +32,7 @@ from authorize_engine import check_card_authorize
 from paypal_lounsbury_engine import check_card_paypal_lounsbury
 from bloomerang_engine import check_card_bloomerang
 from nemaneide_engine import check_card_nemaneide
+from shopify_mass import check_card_msh
 
 
 
@@ -3020,7 +3021,10 @@ Reply to .txt or inline: <code>/mass3</code>
 Inline: <code>/mbt1 cc|mm|yy|cvv cc...</code>
 
 <b><i>PayPal Mass Charge ($10.00)</i></b>
-Inline: <code>/mpp2 cc|mm|yy|cvv cc...</code>"""
+Inline: <code>/mpp2 cc|mm|yy|cvv cc...</code>
+
+<b><i>Shopify Storefront Mass Charge</i></b>
+Reply to .txt or inline: <code>/msh cc|mm|yy|cvv cc...</code>"""
 
     buttons = [
         [Button.inline("Back", b"checker")]
@@ -3733,6 +3737,11 @@ async def process_mpp2_cmd(event):
             return st, msg, brand
         return "declined", "Invalid Card Format", "Unknown"
     await _run_generic_mass_check(event, "PayPal Mass Charge ($10.00)", run_mpp2)
+
+
+@bot.on(events.NewMessage(pattern=r'(?i)^[./]msh(?:\s+([\s\S]+))?$'))
+async def process_msh_cmd(event):
+    await _run_generic_mass_check(event, "Shopify Storefront Mass Charge", check_card_msh)
 
 
 
