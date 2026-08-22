@@ -9,30 +9,44 @@ import sqlite3
 import pytz
 from telethon import TelegramClient, events, Button
 import asyncio
-from square_engine import process_square, _parse_square_url, _extract_square_result
-from stripe_engine import process_stripe
-from brccn import check_card_brccn
-from inu import check_card_inu
-from au import check_card_au
-from mass3 import check_card_mass3, check_card_mass3_sync
-from adr import check_card_adr
-from shp10 import check_card_shp10
-from fz import check_card_fz
-from gate_hoshigaki import register_hoshigaki_gate
-from paypal_engine import process_paypal_charge
-from stripe_1 import check_card_stripe_1
-from braintree_1 import check_card as check_card_braintree_1
-from rz import charge_payment_page_card_async as check_card_rz
-from st import VW as check_card_st
-from dila_engine import check_card_dila
-from nantucket_engine import check_card_nantucket
-from mixtape_engine import check_card_mixtape
-from clover_engine import check_card_clover
-from authorize_engine import check_card_authorize
-from paypal_lounsbury_engine import check_card_paypal_lounsbury
-from bloomerang_engine import check_card_bloomerang
-from nemaneide_engine import check_card_nemaneide
-from shopify_mass import check_card_msh
+# ==================== MODULAR GATES PACKAGE IMPORTS ====================
+from gates.auth import (
+    check_card_au,
+    check_card_st2,
+    check_card_st,
+    check_card_dila,
+    check_card_nemaneide,
+    check_card_inu,
+    check_card_brccn
+)
+from gates.charge import (
+    check_card_shp10,
+    process_stripe,
+    check_card_nantucket,
+    register_hoshigaki_gate,
+    check_card_bloomerang,
+    check_card_stripe_1,
+    check_card_mixtape,
+    check_card_braintree_1,
+    check_card_adr,
+    check_card_paypal_lounsbury,
+    check_card_paypal_aww,
+    check_card_fz,
+    process_square,
+    _parse_square_url,
+    _extract_square_result,
+    check_card_clover,
+    check_card_rz,
+    check_card_authorize
+)
+from gates.mass import (
+    check_card_msh,
+    run_mst1,
+    run_mst6,
+    check_card_mass3,
+    run_mbt1,
+    run_mpp2
+)
 
 
 
@@ -3218,42 +3232,21 @@ async def _run_generic_mass_check(event, gateway_name, check_func):
 
 @bot.on(events.NewMessage(pattern=r'^/mst1(?:\s+([\s\S]+))?$'))
 async def process_mst1_cmd(event):
-    async def run_mst1(card, proxy):
-        st, msg, code = await check_card_stripe_1(card, proxy_url=proxy)
-        return st, msg, "Stripe"
     await _run_generic_mass_check(event, "Stripe Mass Charge 1 ($1.00)", run_mst1)
 
 
 @bot.on(events.NewMessage(pattern=r'^/mst6(?:\s+([\s\S]+))?$'))
 async def process_mst6_cmd(event):
-    async def run_mst6(card, proxy):
-        parts = card.split("|")
-        if len(parts) >= 4:
-            st, msg, brand = await check_card_bloomerang(parts[0], parts[1], parts[2], parts[3], proxy_url=proxy)
-            return st, msg, brand
-        return "declined", "Invalid Card Format", "Unknown"
     await _run_generic_mass_check(event, "Stripe Mass Charge 2 ($1.00)", run_mst6)
 
 
 @bot.on(events.NewMessage(pattern=r'^/mbt1(?:\s+([\s\S]+))?$'))
 async def process_mbt1_cmd(event):
-    async def run_mbt1(card, proxy):
-        parts = card.split("|")
-        if len(parts) >= 4:
-            st, msg, code = await check_card_braintree_1(parts[0], parts[1], parts[2], parts[3], proxy=proxy)
-            return st, msg, "Braintree"
-        return "declined", "Invalid Card Format", "Unknown"
     await _run_generic_mass_check(event, "Braintree Mass Charge ($1.00)", run_mbt1)
 
 
 @bot.on(events.NewMessage(pattern=r'^/mpp2(?:\s+([\s\S]+))?$'))
 async def process_mpp2_cmd(event):
-    async def run_mpp2(card, proxy):
-        parts = card.split("|")
-        if len(parts) >= 4:
-            st, msg, brand = await check_card_paypal_lounsbury(parts[0], parts[1], parts[2], parts[3], proxy_url=proxy)
-            return st, msg, brand
-        return "declined", "Invalid Card Format", "Unknown"
     await _run_generic_mass_check(event, "PayPal Mass Charge ($10.00)", run_mpp2)
 
 
