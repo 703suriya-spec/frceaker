@@ -32,7 +32,7 @@ async def check_card_msh(
     card_str: str,
     proxy_str: str | None = None,
     custom_site: str | None = None,
-    max_site_retries: int = 3
+    max_site_retries: int = 6
 ) -> tuple[str, str, str]:
     """
     Checks a single card against Shopify Storefront GraphQL.
@@ -50,7 +50,6 @@ async def check_card_msh(
     mes = mes.zfill(2)
 
     formatted_proxy = _normalize_proxy(proxy_str)
-
     current_proxy = formatted_proxy
     user_supplied_site = bool(custom_site and custom_site.strip())
     if user_supplied_site:
@@ -71,47 +70,50 @@ async def check_card_msh(
         try:
             success, message, gateway, total_price, currency = await asyncio.wait_for(
                 process_card(cc, mes, ano, cvv, site, proxy_str=current_proxy),
-                timeout=45
+                timeout=30
             )
         except asyncio.TimeoutError:
             message = "TIMEOUT"
             current_proxy = None
-            if attempt < max_site_retries - 1:
-                if not user_supplied_site:
-                    candidates = [s for s in SHOPIFY_STORE_POOL if "https://" + s not in tried_sites]
-                    if candidates:
-                        site = "https://" + random.choice(candidates)
-                        tried_sites.add(site)
+            if attempt < max_site_retries - 1 and not user_supplied_site:
+                candidates = [s for s in SHOPIFY_STORE_POOL if "https://" + s not in tried_sites]
+                if candidates:
+                    site = "https://" + random.choice(candidates)
+                    tried_sites.add(site)
                 continue
             break
         except Exception as e:
             message = str(e) or type(e).__name__
             current_proxy = None
-            if attempt < max_site_retries - 1:
-                if not user_supplied_site:
-                    candidates = [s for s in SHOPIFY_STORE_POOL if "https://" + s not in tried_sites]
-                    if candidates:
-                        site = "https://" + random.choice(candidates)
-                        tried_sites.add(site)
+            if attempt < max_site_retries - 1 and not user_supplied_site:
+                candidates = [s for s in SHOPIFY_STORE_POOL if "https://" + s not in tried_sites]
+                if candidates:
+                    site = "https://" + random.choice(candidates)
+                    tried_sites.add(site)
                 continue
             break
 
-        msg_str = str(message).lower()
-        is_proxy_or_net_error = any(err in msg_str for err in [
-            "proxy", "curl: (56)", "curl: (7)", "curl: (28)", "failed to perform",
-            "connect failure", "rate_limited_429", "price_too_high", "timeout",
-            "change proxy", "connection refused", "could not resolve", "ssl_connect"
+        msg_upper = str(message).upper()
+
+        # Check if response is a definitive payment processor outcome
+        is_definite_card_verdict = any(k in msg_upper for k in [
+            "ORDER_PLACED", "PROCESSEDRECEIPT", "ACTIONREQUIRED", "OTP_REQUIRED", "3DS",
+            "INSUFFICIENT", "CVC", "CVV", "SECURITY_CODE", "DECLINED", "DO_NOT_HONOR",
+            "EXPIRED", "FRAUD", "TRANSACTION_REJECTED", "PROCESSING_ERROR", "PAYMENT_FAILED",
+            "CARD_ERROR", "INVALID_CARD", "CALL_ISSUER", "CARD_NOT_SUPPORTED", "LIMIT_EXCEEDED"
         ])
 
-        if is_proxy_or_net_error:
-            current_proxy = None
-            if attempt < max_site_retries - 1:
-                if not user_supplied_site:
-                    candidates = [s for s in SHOPIFY_STORE_POOL if "https://" + s not in tried_sites]
-                    if candidates:
-                        site = "https://" + random.choice(candidates)
-                        tried_sites.add(site)
-                continue
+        if is_definite_card_verdict:
+            break
+
+        # If it's a site error, proxy error, 404, or cart issue, drop proxy & rotate store
+        current_proxy = None
+        if attempt < max_site_retries - 1 and not user_supplied_site:
+            candidates = [s for s in SHOPIFY_STORE_POOL if "https://" + s not in tried_sites]
+            if candidates:
+                site = "https://" + random.choice(candidates)
+                tried_sites.add(site)
+            continue
         break
 
     clean_msg = extract_clean_response(message)
