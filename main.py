@@ -886,41 +886,65 @@ def get_checker_sites(user_id):
 
 # ==================== /addsites - USER PERSONAL SHOPIFY SITE (SINGLE / BATCH / .TXT FILE REPLY) ====================
 async def check_single_shopify_site(site: str):
-    """Verifies if a URL is an active Shopify gateway store and extracts item price"""
+    """Verifies if a URL is an active Shopify gateway store and extracts item price with Chrome TLS and in-stock checks"""
     site = site.strip().rstrip('/')
-    if not site.startswith("http://") and not site.startswith("https://"):
+    if not site.startswith(("http://", "https://")):
         site = f"https://{site}"
 
-    headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'application/json, text/plain, */*'
-    }
+    endpoints = [
+        f"{site}/products.json?limit=10",
+        f"{site}/collections/all/products.json?limit=10"
+    ]
 
     try:
-        timeout = aiohttp.ClientTimeout(total=8)
-        connector = aiohttp.TCPConnector(ssl=False)
-        async with aiohttp.ClientSession(connector=connector, timeout=timeout) as session:
-            async with session.get(f"{site}/products.json?limit=3", headers=headers) as resp:
-                if resp.status == 200:
+        from curl_cffi.requests import AsyncSession
+        async with AsyncSession(impersonate="chrome120") as session:
+            for url in endpoints:
+                resp = None
+                for _ in range(2):
                     try:
-                        data = await resp.json(content_type=None)
-                        products = data.get('products', [])
-                        if isinstance(products, list) and len(products) > 0:
-                            # Extract price from first product variant
-                            price_str = "$1.00"
-                            for p in products:
-                                variants = p.get('variants', [])
-                                if variants and 'price' in variants[0]:
-                                    raw_p = str(variants[0]['price']).strip()
-                                    if raw_p:
-                                        price_str = f"${raw_p}"
-                                        break
-                            return {"site": site, "status": "alive", "price": price_str}
+                        resp = await session.get(url, timeout=8)
+                        if resp.status_code == 429:
+                            await asyncio.sleep(0.5)
+                            continue
+                        break
                     except Exception:
-                        pass
-                elif resp.status in [403, 429]:
-                    # Cloudflare protected Shopify storefront
-                    return {"site": site, "status": "alive", "price": "Auto USD"}
+                        break
+
+                if not resp or resp.status_code != 200:
+                    continue
+
+                # 1. Password wall & Login barrier check
+                final_url = str(resp.url).lower()
+                if "password" in final_url or "challenge" in final_url or "login" in final_url:
+                    return {"site": site, "status": "dead", "price": "-"}
+
+                try:
+                    data = resp.json()
+                except Exception:
+                    continue
+
+                products = data.get("products", [])
+                if not isinstance(products, list) or not products:
+                    continue
+
+                # 2. In-stock availability & lowest price extraction
+                best_price = None
+                for p in products:
+                    for v in p.get("variants", []):
+                        if not v.get("available", True):
+                            continue
+                        try:
+                            raw_p = str(v.get("price", "")).strip()
+                            price = float(raw_p)
+                            if price > 0:
+                                if best_price is None or price < best_price:
+                                    best_price = price
+                        except Exception:
+                            continue
+
+                if best_price is not None:
+                    return {"site": site, "status": "alive", "price": f"${best_price:.2f}"}
 
         return {"site": site, "status": "dead", "price": "-"}
     except Exception:
