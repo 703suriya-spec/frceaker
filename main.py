@@ -2571,14 +2571,12 @@ async def process_autoshopify_cmd(event):
         return
 
     status_msg = await event.reply("🔄 <b>Checking (Auto Shopify Charge)...</b>", parse_mode="html")
-    sites = get_checker_sites(user_id)
     proxies = load_proxies(user_id)
     proxy = random.choice(proxies) if proxies else None
-    custom_site = random.choice(sites) if sites else None
 
     start_time = time.time()
     try:
-        st, response_msg, gateway_str = await check_card_autoshopify(card, proxy_str=proxy, custom_site=custom_site)
+        st, response_msg, gateway_str = await check_card_autoshopify(card, proxy_str=proxy)
         time_taken = round(time.time() - start_time, 2)
         update_daily_usage(user_id, 1)
 
