@@ -2950,41 +2950,44 @@ Inline: <code>/mpp2 cc|mm|yy|cvv cc...</code>"""
         await event.reply(mass_msg, parse_mode="html")
 
 # ==================== TOOLS MENU ====================
+@bot.on(events.NewMessage(pattern=r'^/tools$'))
 @bot.on(events.CallbackQuery(data=b"tools"))
 async def tools_menu_handler(event):
-    tools_msg = """<b>\U0001f527 Tools Menu</b>
+    tools_msg = """<b>具 𝙏𝙊𝙊𝙇𝙎 &amp; 𝙐𝙏𝙄𝙇𝙄𝙏𝙄𝙀𝙎</b>
+━━━━━━━━━━━━━━━━━━━━
+<b>💳 𝘽𝙄𝙉 𝙇𝙤𝙤𝙠𝙪𝙥</b>
+<code>/bin 409758</code> — <i>Card &amp; Issuer Details</i>
 
-<b>Available Tools:</b>
+<b>🌐 𝙂𝙚𝙣𝙚𝙧𝙖𝙩𝙤𝙧𝙨</b>
+<code>/gen US</code> — <i>Address &amp; Identity Generator</i>
+<code>/iban DE</code> — <i>IBAN &amp; Bank Details Generator</i>
 
-\U0001f4b3 <b>BIN Lookup</b>
-<code>/bin 409758</code>
+<b>📡 𝙋𝙧𝙤𝙭𝙮 𝙈𝙖𝙣𝙖𝙜𝙚𝙢𝙚𝙣𝙩</b>
+<code>/proxy</code> — <i>View Active Proxies</i>
+<code>/addproxy ip:port</code> — <i>Add Personal Proxy</i>
 
-\U0001f310 <b>Address Generator</b>
-<code>/gen US</code>
+<b>🏬 𝙎𝙝𝙤𝙥𝙞𝙛𝙮 𝙎𝙞𝙩𝙚 𝙏𝙤𝙤𝙡𝙨</b>
+<code>/addsite url</code> — <i>Add Custom Shopify Store</i>
+<code>/mysites</code> — <i>View Added Stores</i>
+<code>/site url</code> — <i>Quick Store Smoke Test</i>
+<code>/clearsites</code> — <i>Purge Custom Stores</i>
 
-\U0001f3e6 <b>IBAN Generator</b>
-<code>/iban DE</code>
+<b>🛠 𝘾𝘾 𝙐𝙩𝙞𝙡𝙞𝙩𝙞𝙚𝙨</b>
+<code>/clean</code> — <i>Deduplicate &amp; Format CCs</i>
+<code>/filter brand</code> — <i>Filter by Visa, MC, Amex</i>
 
-\U0001f4e1 <b>Proxy Tools</b>
-<code>/proxy</code> - View proxies
-<code>/addproxy ip:port</code> - Add proxy
-
-🌐 <b>Shopify Site Management:</b>
-<code>/addsite url</code> | <code>/site</code> | <code>/mysites</code> | <code>/clearsites</code>
-
-<b>CC Utilities:</b>
-<code>/clean</code> - Extract & deduplicate CCs
-<code>/filter brand</code> - Filter CCs by brand (visa, mc, amex)
-
-<b>Admin & Telemetry:</b>
-<code>/genkey days max</code> | <code>/redeem key</code>
-<code>/broadcast msg</code> | <code>/stats</code>"""
+<b>🔑 𝙇𝙞𝙘𝙚𝙣𝙨𝙚</b>
+<code>/redeem key</code> — <i>Redeem Premium Access</i>
+━━━━━━━━━━━━━━━━━━━━"""
 
     buttons = [
         [Button.inline("🔙 𝘽𝙖𝙘𝙠", b"back_to_start")]
     ]
 
-    await event.edit(tools_msg, buttons=buttons, parse_mode="html")
+    if isinstance(event, events.CallbackQuery.Event):
+        await event.edit(tools_msg, buttons=buttons, parse_mode="html")
+    else:
+        await event.reply(tools_msg, buttons=buttons, parse_mode="html")
 
 
 # ==================== BACK TO START ====================
