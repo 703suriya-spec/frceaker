@@ -3022,7 +3022,7 @@ async def tools_menu_handler(event):
 <code>/bin 409758</code> — <i>Card &amp; Issuer Details</i>
 
 <b>🌐 𝙂𝙚𝙣𝙚𝙧𝙖𝙩𝙤𝙧𝙨</b>
-<code>/gen 403306</code> — <i>Luhn Mod-10 CC Generator</i>
+<code>/gen 403306</code> — <i>Card Generator</i>
 <code>/fake IN</code> — <i>Address &amp; Identity Generator</i>
 <code>/iban DE</code> — <i>IBAN &amp; Bank Details Generator</i>
 
@@ -3129,8 +3129,7 @@ async def bin_generator_cmd(event):
 <code>/gen 403306</code>
 <code>/gen 403306 15</code> (Custom amount)
 <code>/gen 403306|12|28|rnd</code> (Custom format)
-━━━━━━━━━━━━━━━━━━━━
-💡 <i>Generates Mod-10 Luhn valid test cards</i>""", parse_mode="html")
+━━━━━━━━━━━━━━━━━━━━""", parse_mode="html")
         return
 
     try:
@@ -3154,8 +3153,7 @@ async def bin_generator_cmd(event):
 <b>国 𝘾𝙤𝙪𝙣𝙩𝙧𝙮</b> -» {country} {flag}
 ━━━━━━━━━━━━━━━━━━━━
 {cards_block}
-━━━━━━━━━━━━━━━━━━━━
-<b>計 𝙏𝙤𝙩𝙖𝙡</b> -» <code>{len(cards)}</code> Cards (Luhn Mod-10 ✅)"""
+━━━━━━━━━━━━━━━━━━━━"""
             await event.reply(res, parse_mode="html")
         else:
             caption = f"""<b>陣 𝘽𝙄𝙉 𝘾𝙖𝙧𝙙 𝙂𝙚𝙣𝙚𝙧𝙖𝙩𝙤𝙧</b>
@@ -3164,9 +3162,7 @@ async def bin_generator_cmd(event):
 <b>銘 𝘽𝙧𝙖𝙣𝙙</b> -» {bin_brand} - {bin_type} - {level}
 <b>行 𝘽𝙖𝙣𝙠</b> -» {bank}
 <b>国 𝘾𝙤𝙪𝙣𝙩𝙧𝙮</b> -» {country} {flag}
-━━━━━━━━━━━━━━━━━━━━
-<b>計 𝙏𝙤𝙩𝙖𝙡</b> -» <code>{len(cards)}</code> Cards (Luhn Mod-10 ✅)
-📁 <i>All {len(cards)} cards included in this .txt file</i>"""
+━━━━━━━━━━━━━━━━━━━━"""
 
             filename = f"cards_{bin_digits[:6]}_{len(cards)}.txt"
             try:
@@ -3851,7 +3847,7 @@ async def setup_bot_commands():
             BotCommand(command="msh", description="Shopify Storefront Mass Charge"),
             BotCommand(command="tools", description="Tools & utilities menu"),
             BotCommand(command="bin", description="BIN Lookup (/bin 409758)"),
-            BotCommand(command="gen", description="Luhn BIN CC Generator (/gen 403306)"),
+            BotCommand(command="gen", description="Card Generator (/gen 403306)"),
             BotCommand(command="fake", description="Fake Address / ID Generator (/fake IN)"),
             BotCommand(command="iban", description="IBAN Generator (/iban DE)"),
             BotCommand(command="proxy", description="View proxies"),
