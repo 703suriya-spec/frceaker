@@ -243,7 +243,7 @@ def generate_luhn_cards(bin_format: str, amount: int = 10) -> tuple[list[str], s
     cvv_len = 4 if is_amex else 3
 
     cards = []
-    for _ in range(min(max(amount, 1), 50)):
+    for _ in range(min(max(amount, 1), 5000)):
         needed = length - len(bin_digits) - 1
         if needed < 0:
             cur_bin = bin_digits[:length-1]
