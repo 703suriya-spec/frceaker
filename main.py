@@ -3118,8 +3118,8 @@ async def bin_lookup_cmd(event):
     await event.reply(res, parse_mode='html')
 
 
-# ==================== BIN CARD GENERATOR (/gen, /bingen, /ccgen) ====================
-@bot.on(events.NewMessage(pattern=r'(?i)^[./](?:gen|bingen|ccgen)(?:\s+(.+))?$'))
+# ==================== BIN CARD GENERATOR (/gen) ====================
+@bot.on(events.NewMessage(pattern=r'(?i)^[./]gen(?:\s+(.+))?$'))
 async def bin_generator_cmd(event):
     raw_arg = (event.pattern_match.group(1) or '').strip()
     if not raw_arg:
@@ -3162,8 +3162,8 @@ async def bin_generator_cmd(event):
         await event.reply(f"Error: {e}")
 
 
-# ==================== FAKE IDENTITY GENERATOR (/fake, /address) ====================
-@bot.on(events.NewMessage(pattern=r'(?i)^[./](?:fake|address|identity)(?:\s+(.+))?$'))
+# ==================== FAKE IDENTITY GENERATOR (/fake) ====================
+@bot.on(events.NewMessage(pattern=r'(?i)^[./]fake(?:\s+(.+))?$'))
 async def fake_identity_cmd(event):
     raw_arg = (event.pattern_match.group(1) or '').strip()
     country_q = raw_arg if raw_arg else 'US'
