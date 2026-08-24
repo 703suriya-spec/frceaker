@@ -886,15 +886,32 @@ def get_checker_sites(user_id):
 
 # ==================== /addsites - USER PERSONAL SHOPIFY SITE (SINGLE / BATCH / .TXT FILE REPLY) ====================
 async def check_single_shopify_site(site: str):
-    """Verifies if a URL is an active Shopify gateway store and extracts item price with Chrome TLS and in-stock checks"""
+    """Verifies if a URL is an active Shopify gateway store and extracts in-stock item price with 4-way fallback and Chrome TLS"""
+    import re
     site = site.strip().rstrip('/')
     if not site.startswith(("http://", "https://")):
         site = f"https://{site}"
 
     endpoints = [
-        f"{site}/products.json?limit=10",
-        f"{site}/collections/all/products.json?limit=10"
+        f"{site}/products.json?limit=25",
+        f"{site}/collections/all/products.json?limit=25",
+        f"{site}/collections/frontpage/products.json?limit=25",
+        f"{site}/search/suggest.json?q=&resources[type]=product"
     ]
+
+    def _parse_p(val):
+        if val is None: return None
+        s = str(val).strip().replace("$", "").replace("£", "").replace("€", "").replace("USD", "").replace("CAD", "").replace("EUR", "").strip()
+        if "," in s and "." not in s:
+            s = s.replace(",", ".")
+        m = re.search(r"\d+(?:\.\d+)?", s)
+        if m:
+            try:
+                p = float(m.group(0))
+                return p if p > 0 else None
+            except:
+                return None
+        return None
 
     try:
         from curl_cffi.requests import AsyncSession
@@ -903,7 +920,7 @@ async def check_single_shopify_site(site: str):
                 resp = None
                 for _ in range(2):
                     try:
-                        resp = await session.get(url, timeout=8)
+                        resp = await session.get(url, timeout=7, allow_redirects=True)
                         if resp.status_code == 429:
                             await asyncio.sleep(0.5)
                             continue
@@ -924,24 +941,37 @@ async def check_single_shopify_site(site: str):
                 except Exception:
                     continue
 
-                products = data.get("products", [])
+                products = []
+                if isinstance(data, dict):
+                    products = data.get("products", [])
+                    if not products and "resources" in data:
+                        products = data.get("resources", {}).get("results", {}).get("products", [])
+                elif isinstance(data, list):
+                    products = data
+
                 if not isinstance(products, list) or not products:
                     continue
 
                 # 2. In-stock availability & lowest price extraction
                 best_price = None
                 for p in products:
-                    for v in p.get("variants", []):
-                        if not v.get("available", True):
-                            continue
-                        try:
-                            raw_p = str(v.get("price", "")).strip()
-                            price = float(raw_p)
-                            if price > 0:
-                                if best_price is None or price < best_price:
-                                    best_price = price
-                        except Exception:
-                            continue
+                    if not isinstance(p, dict):
+                        continue
+                    variants = p.get("variants", [])
+                    if isinstance(variants, list) and variants:
+                        for v in variants:
+                            if isinstance(v, dict):
+                                if not v.get("available", True):
+                                    continue
+                                p_val = _parse_p(v.get("price"))
+                                if p_val is not None:
+                                    if best_price is None or p_val < best_price:
+                                        best_price = p_val
+                    if best_price is None and "price" in p:
+                        p_val = _parse_p(p.get("price"))
+                        if p_val is not None:
+                            if best_price is None or p_val < best_price:
+                                best_price = p_val
 
                 if best_price is not None:
                     return {"site": site, "status": "alive", "price": f"${best_price:.2f}"}
