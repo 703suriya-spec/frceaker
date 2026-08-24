@@ -3022,8 +3022,8 @@ async def tools_menu_handler(event):
 <code>/bin 409758</code> — <i>Card &amp; Issuer Details</i>
 
 <b>🌐 𝙂𝙚𝙣𝙚𝙧𝙖𝙩𝙤𝙧𝙨</b>
-<code>/bingen 403306</code> — <i>Luhn Mod-10 CC Generator</i>
-<code>/gen US</code> — <i>Address &amp; Identity Generator</i>
+<code>/gen 403306</code> — <i>Luhn Mod-10 CC Generator</i>
+<code>/fake IN</code> — <i>Address &amp; Identity Generator</i>
 <code>/iban DE</code> — <i>IBAN &amp; Bank Details Generator</i>
 
 <b>📡 𝙋𝙧𝙤𝙭𝙮 𝙈𝙖𝙣𝙖𝙜𝙚𝙢𝙚𝙣𝙩</b>
@@ -3118,17 +3118,17 @@ async def bin_lookup_cmd(event):
     await event.reply(res, parse_mode='html')
 
 
-# ==================== BIN CARD GENERATOR & SMART /gen DISPATCHER ====================
-@bot.on(events.NewMessage(pattern=r'(?i)^[./](?:bingen|ccgen)(?:\s+(.+))?$'))
+# ==================== BIN CARD GENERATOR (/gen, /bingen, /ccgen) ====================
+@bot.on(events.NewMessage(pattern=r'(?i)^[./](?:gen|bingen|ccgen)(?:\s+(.+))?$'))
 async def bin_generator_cmd(event):
     raw_arg = (event.pattern_match.group(1) or '').strip()
     if not raw_arg:
         await event.reply("""<b>陣 𝘽𝙄𝙉 𝘾𝙖𝙧𝙙 𝙂𝙚𝙣𝙚𝙧𝙖𝙩𝙤𝙧</b>
 ━━━━━━━━━━━━━━━━━━━━
 <b>Usage:</b>
-<code>/bingen 403306</code>
-<code>/bingen 403306 15</code> (Custom amount)
-<code>/bingen 403306|12|28|rnd</code> (Custom format)
+<code>/gen 403306</code>
+<code>/gen 403306 15</code> (Custom amount)
+<code>/gen 403306|12|28|rnd</code> (Custom format)
 ━━━━━━━━━━━━━━━━━━━━
 💡 <i>Generates Mod-10 Luhn valid test cards</i>""", parse_mode="html")
         return
@@ -3162,16 +3162,10 @@ async def bin_generator_cmd(event):
         await event.reply(f"Error: {e}")
 
 
-# ==================== ADDRESS / IDENTITY GENERATOR (/fake or /gen <country>) ====================
-@bot.on(events.NewMessage(pattern=r'(?i)^[./](?:gen|fake)(?:\s+(.+))?$'))
-async def gen_smart_dispatcher_cmd(event):
+# ==================== FAKE IDENTITY GENERATOR (/fake, /address) ====================
+@bot.on(events.NewMessage(pattern=r'(?i)^[./](?:fake|address|identity)(?:\s+(.+))?$'))
+async def fake_identity_cmd(event):
     raw_arg = (event.pattern_match.group(1) or '').strip()
-
-    # If user passed BIN numbers (e.g. /gen 403306 or /gen 403306|12|28|rnd)
-    if raw_arg and (re.match(r'^\d{4,16}', raw_arg) or '|' in raw_arg):
-        await bin_generator_cmd(event)
-        return
-
     country_q = raw_arg if raw_arg else 'US'
     try:
         from generators import generate_fake_identity
@@ -3829,8 +3823,8 @@ async def setup_bot_commands():
             BotCommand(command="msh", description="Shopify Storefront Mass Charge"),
             BotCommand(command="tools", description="Tools & utilities menu"),
             BotCommand(command="bin", description="BIN Lookup (/bin 409758)"),
-            BotCommand(command="bingen", description="Luhn BIN CC Generator (/bingen 403306)"),
-            BotCommand(command="gen", description="Address / BIN Generator"),
+            BotCommand(command="gen", description="Luhn BIN CC Generator (/gen 403306)"),
+            BotCommand(command="fake", description="Fake Address / ID Generator (/fake IN)"),
             BotCommand(command="iban", description="IBAN Generator (/iban DE)"),
             BotCommand(command="proxy", description="View proxies"),
             BotCommand(command="addproxy", description="Add proxy (/addproxy ip:port)"),
