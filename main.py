@@ -3174,6 +3174,9 @@ async def fake_identity_cmd(event):
         rand_num = random.randint(10, 99)
         email = f'{first_clean}{rand_num}@gmail.com'
 
+        id_label = identity.get('id_name', 'ID')
+        id_val = identity.get('id_val', 'N/A')
+
         res = f'''<b>影 𝙄𝙙𝙚𝙣𝙩𝙞𝙩𝙮 𝘿𝙤𝙨𝙨𝙞𝙚𝙧</b>
 ━━━━━━━━━━━━━━━━━━━━
 <b>氏 𝙉𝙖𝙢𝙚</b> -» {identity.get('name', 'N/A')}
@@ -3182,6 +3185,7 @@ async def fake_identity_cmd(event):
 <b>所 𝘼𝙙𝙙𝙧𝙚𝙨𝙨</b> -» {identity.get('street', 'N/A')}
 <b>町 𝘾𝙞𝙩𝙮</b> -» {identity.get('city', 'N/A')}, {identity.get('state', 'N/A')}
 <b>〒 𝙕𝙄𝙋</b> -» <code>{identity.get('zip', 'N/A')}</code>
+<b>証 𝙄𝘿 ({id_label})</b> -» <code>{id_val}</code>
 <b>国 𝘾𝙤𝙪𝙣𝙩𝙧𝙮</b> -» {identity.get('country', country_q)} {identity.get('flag', '🌐')}
 ━━━━━━━━━━━━━━━━━━━━'''
 
