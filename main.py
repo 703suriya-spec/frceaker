@@ -1324,18 +1324,24 @@ async def remove_user_site_cmd(event):
 @bot.on(events.NewMessage(pattern=r'(?i)^[./]mysites?(?:@\w+)?$'))
 async def view_user_sites(event):
     user_id = event.sender_id
-    
+    try:
+        sender = await event.get_sender()
+        if sender and getattr(sender, 'username', None):
+            username = f"@{sender.username}"
+        elif sender and getattr(sender, 'first_name', None):
+            username = sender.first_name
+        else:
+            username = str(user_id)
+    except Exception:
+        username = str(user_id)
+
     user_shopify = get_user_sites_sync(user_id)
-    global_shopify = load_sites()
-    total_shopify = len(user_shopify) if user_shopify else len(global_shopify)
-    shopify_type = "Personal Sites Active" if user_shopify else "Default Bot Sites Active"
-    
-    summary_msg = f"""<b>⚡ LOADED SHOPIFY SITES</b>
+    total_shopify = len(user_shopify)
+
+    summary_msg = f"""<b><i>⚡ LOADED SHOPIFY SITES</i></b>
 ━━━━━━━━━━━━━━━━━━━━
-👤 <b>Account ID:</b> <code>{user_id}</code>
-🛒 <b>Status:</b> <code>{shopify_type}</code>
-📊 <b>Total Loaded Sites:</b> <code>{total_shopify}</code>
-🌐 <b>Bot Global Backup:</b> <code>{len(global_shopify)}</code>
+👤 <b><i>User:</i></b> {username}
+📊 <b><i>Total Sites Loaded:</i></b> <code>{total_shopify}</code>
 ━━━━━━━━━━━━━━━━━━━━"""
 
     await event.reply(summary_msg, parse_mode="html")
