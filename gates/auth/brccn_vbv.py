@@ -223,7 +223,7 @@ async def check_card_brccn(cc, mm, yy, cvc, proxy_url=None):
                 elif statuscc in ['lookup_not_enrolled', 'lookup_bypassed']:
                     return True, "Non-VBV (Direct Chargeable)", json.dumps(bin_info), None, "Auth ($0.00)"
                 elif statuscc in ['challenge_required', 'authenticate_rejected']:
-                    return False, "3DS Challenge Required (OTP Enforced)", json.dumps(bin_info), None, "Auth ($0.00)"
+                    return False, "3DS Challenge Required", json.dumps(bin_info), None, "Auth ($0.00)"
                 elif statuscc in ['lookup_card_error', 'authenticate_failed']:
                     return False, "Card Declined by Issuer", json.dumps(bin_info), None, "Auth ($0.00)"
                 else:

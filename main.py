@@ -1029,16 +1029,20 @@ async def add_shopify_site(event):
 
     alive_added = 0
     dead_count = 0
+    total_sites = len(sites_to_test)
+    checked_count = 0
+    last_edit_time = time.time()
 
-    # Process in parallel batches of 50
-    batch_size = 50
-    for i in range(0, len(sites_to_test), batch_size):
+    # Process in parallel batches of 20
+    batch_size = 20
+    for i in range(0, total_sites, batch_size):
         batch = sites_to_test[i:i + batch_size]
         tasks = [check_single_shopify_site(s) for s in batch]
         results = await asyncio.gather(*tasks)
 
         alive_batch = []
         for res in results:
+            checked_count += 1
             if res['status'] == 'alive':
                 alive_batch.append(res['site'])
             else:
@@ -1048,24 +1052,28 @@ async def add_shopify_site(event):
             added = await add_user_sites_batch(user_id, alive_batch)
             alive_added += added
 
-        # Update status message progressively to avoid FloodWaitError
-        if (i // batch_size) % 5 == 0 or i + batch_size >= len(sites_to_test):
+        now = time.time()
+        if (now - last_edit_time >= 1.2) or (checked_count >= total_sites):
             try:
                 cur_total = len(get_user_sites_sync(user_id))
-                await status_msg.edit(f"""<b>TESTING SHOPIFY SITES...</b>
+                pct = int((checked_count / total_sites) * 100) if total_sites > 0 else 0
+                pbar = "[" + "=" * (pct // 5) + " " * (20 - (pct // 5)) + "]"
+                await status_msg.edit(f"""⏳ <b>TESTING SHOPIFY SITES LIVE...</b>
 ━━━━━━━━━━━━━━━━━━━━
-📊 <b>Progress:</b> <code>{min(i + batch_size, len(sites_to_test))}/{len(sites_to_test)}</code>
+{pbar} <b>{pct}%</b>
+📊 <b>Progress:</b> <code>{checked_count} / {total_sites}</code>
 ✅ <b>Live Added:</b> <code>{alive_added}</code>
 ❌ <b>Dead/Failed:</b> <code>{dead_count}</code>
 📁 <b>Your Total Sites:</b> <code>{cur_total}</code>""", parse_mode="html")
-            except:
+                last_edit_time = now
+            except Exception:
                 pass
 
     final_total = len(get_user_sites_sync(user_id))
 
     await status_msg.edit(f"""✅ <b>SHOPIFY SITES ADD PROCESS COMPLETE!</b>
 ━━━━━━━━━━━━━━━━━━━━
-📊 <b>Total Tested:</b> <code>{len(sites_to_test)}</code>
+📊 <b>Total Tested:</b> <code>{total_sites}</code>
 ✅ <b>Working Added:</b> <code>{alive_added}</code>
 ❌ <b>Dead/Failed:</b> <code>{dead_count}</code>
 📁 <b>Your Total Sites:</b> <code>{final_total}</code>
@@ -1730,21 +1738,40 @@ Or send multiline / reply to a message or file:
 
         status_msg = await event.reply(f"⏳ <b>Testing {len(proxies_to_add)} Proxies in Parallel...</b>", parse_mode="html")
 
-        batch_size = 150
+        batch_size = 20
         alive_new = []
         dead_count = 0
+        total_proxies = len(proxies_to_add)
+        checked_count = 0
+        last_edit_time = time.time()
 
-        for i in range(0, len(proxies_to_add), batch_size):
+        for i in range(0, total_proxies, batch_size):
             batch = proxies_to_add[i:i + batch_size]
             tasks = [test_proxy(p) for p in batch]
             results = await asyncio.gather(*tasks)
 
             for res in results:
+                checked_count += 1
                 if isinstance(res, dict) and res.get('status') == 'alive':
                     if res['proxy'] not in alive_new:
                         alive_new.append(res['proxy'])
                 else:
                     dead_count += 1
+
+            now = time.time()
+            if (now - last_edit_time >= 1.0) or (checked_count >= total_proxies):
+                try:
+                    pct = int((checked_count / total_proxies) * 100) if total_proxies > 0 else 0
+                    pbar = "[" + "=" * (pct // 5) + " " * (20 - (pct // 5)) + "]"
+                    await status_msg.edit(f"""⏳ <b>TESTING PROXIES LIVE...</b>
+━━━━━━━━━━━━━━━━━━━━
+{pbar} <b>{pct}%</b>
+⚡ <b>Progress:</b> <code>{checked_count} / {total_proxies}</code>
+✅ <b>Live:</b> <code>{len(alive_new)}</code>
+💀 <b>Dead:</b> <code>{dead_count}</code>""", parse_mode="html")
+                    last_edit_time = now
+                except Exception:
+                    pass
 
         # Only add the LIVE verified proxies into the user database pool
         new_inserted, duplicates_count = add_db_user_proxies(user_id, alive_new)
@@ -3244,7 +3271,7 @@ async def _run_generic_mass_check(event, gateway_name, check_func):
 
     session_id = ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
     start_time_ts = time.time()
-    active_proxies_count = len(proxies) if proxies else 0
+    proxy_status_str = "Live 🟢" if proxies else "Direct ⚪"
 
     paused_evt = asyncio.Event()
     paused_evt.set()
@@ -3281,9 +3308,8 @@ async def _run_generic_mass_check(event, gateway_name, check_func):
 <b>否 𝘿𝙚𝙘𝙡𝙞𝙣𝙚𝙙</b> -» <code>0</code> ❌
 <b>障 𝙀𝙧𝙧𝙤𝙧𝙨</b> -» <code>0</code> ⚠️
 <b>時 𝙏𝙞𝙢𝙚</b> -» <code>0s</code>
-<b>網 𝙋𝙧𝙤𝙭𝙞𝙚𝙨</b> -» <code>{active_proxies_count} / {active_proxies_count} Active</code>
-━━━━━━━━━━━━━━━━━━━━
-<b>符 𝙎𝙚𝙨𝙨𝙞𝙤𝙣</b> -» <code>{session_id}</code>""", buttons=control_buttons, parse_mode="html")
+<b>網 𝙋𝙧𝙤𝙭𝙞𝙚𝙨</b> -» <code>{proxy_status_str}</code>
+━━━━━━━━━━━━━━━━━━━━""", buttons=control_buttons, parse_mode="html")
 
     is_running = True
 
@@ -3317,9 +3343,8 @@ async def _run_generic_mass_check(event, gateway_name, check_func):
 <b>否 𝘿𝙚𝙘𝙡𝙞𝙣𝙚𝙙</b> -» <code>{declined}</code> ❌
 <b>障 𝙀𝙧𝙧𝙤𝙧𝙨</b> -» <code>{errors}</code> ⚠️
 <b>時 𝙏𝙞𝙢𝙚</b> -» <code>{time_str}</code>
-<b>網 𝙋𝙧𝙤𝙭𝙞𝙚𝙨</b> -» <code>{active_proxies_count} / {active_proxies_count} Active</code>
-━━━━━━━━━━━━━━━━━━━━
-<b>符 𝙎𝙚𝙨𝙨𝙞𝙤𝙣</b> -» <code>{session_id}</code>"""
+<b>網 𝙋𝙧𝙤𝙭𝙞𝙚𝙨</b> -» <code>{proxy_status_str}</code>
+━━━━━━━━━━━━━━━━━━━━"""
                 await status_msg.edit(progress_ui, buttons=control_buttons, parse_mode="html")
             except Exception:
                 pass
@@ -3396,8 +3421,7 @@ async def _run_generic_mass_check(event, gateway_name, check_func):
 <b>否 𝘿𝙚𝙘𝙡𝙞𝙣𝙚𝙙</b> -» <code>{declined}</code> ❌
 <b>障 𝙀𝙧𝙧𝙤𝙧𝙨</b> -» <code>{errors}</code> ⚠️
 <b>時 𝙏𝙞𝙢𝙚</b> -» <code>{time_str}</code>
-━━━━━━━━━━━━━━━━━━━━
-<b>符 𝙎𝙚𝙨𝙨𝙞𝙤𝙣</b> -» <code>{session_id}</code>"""
+━━━━━━━━━━━━━━━━━━━━"""
 
     try:
         await status_msg.edit(final_ui, parse_mode="html")

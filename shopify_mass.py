@@ -127,7 +127,7 @@ async def check_card_msh(
         return "charged", f"Charged ({price_display} {currency.upper()})", gateway_str
 
     if "OTP_REQUIRED" in msg_upper or "ACTIONREQUIRED" in msg_upper or "3DS" in msg_upper:
-        return "approved", "3DS Challenge (OTP Required)", gateway_str
+        return "approved", "3DS Challenge Required", gateway_str
 
     if "INSUFFICIENT_FUNDS" in msg_upper or "INSUFFICIENT" in clean_upper:
         return "approved", "Insufficient Funds", gateway_str
