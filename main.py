@@ -3426,7 +3426,7 @@ async def _run_generic_mass_check(event, gateway_name, check_func):
                 pass
 
     ticker_task = asyncio.create_task(ui_ticker())
-    sem = asyncio.Semaphore(25)
+    sem = asyncio.Semaphore(10)
 
     async def worker(card):
         nonlocal checked_count, charged, approved, declined, errors
