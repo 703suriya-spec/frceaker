@@ -3429,11 +3429,13 @@ async def _run_generic_mass_check(event, gateway_name, check_func):
     async def worker(card):
         nonlocal checked_count, charged, approved, declined, errors
         sess_info = MASS_SESSIONS.get(session_id)
-        if not sess_info or sess_info["status"] == "STOPPED":
+        if not sess_info or sess_info.get("status") == "STOPPED":
             return
 
-        await sess_info["paused_event"].wait()
-        if sess_info["status"] == "STOPPED":
+        paused_event = sess_info.get("paused_event")
+        if paused_event:
+            await paused_event.wait()
+        if MASS_SESSIONS.get(session_id, {}).get("status") == "STOPPED":
             return
 
         async with sem:

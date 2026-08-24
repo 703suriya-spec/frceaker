@@ -53,13 +53,16 @@ async def check_card_msh(
     current_proxy = formatted_proxy
     user_supplied_site = bool(custom_site and custom_site.strip())
     if user_supplied_site:
-        site = custom_site.strip()
-        if not site.startswith("http"):
-            site = "https://" + site
+        raw_target = custom_site.strip()
+        site = raw_target if raw_target.startswith("http") else "https://" + raw_target
     else:
-        site = "https://" + random.choice(SHOPIFY_STORE_POOL)
+        site_choice = random.choice(SHOPIFY_STORE_POOL).strip()
+        site = site_choice if site_choice.startswith("http") else "https://" + site_choice
 
-    tried_sites = {site}
+    def _get_clean_domain(u: str) -> str:
+        return u.split("://")[-1].split("/")[0].strip().lower()
+
+    tried_sites = {_get_clean_domain(site)}
     success = False
     message = "ERROR"
     gateway = "Shopify Payments"
@@ -76,20 +79,22 @@ async def check_card_msh(
             message = "TIMEOUT"
             current_proxy = None
             if attempt < max_site_retries - 1 and not user_supplied_site:
-                candidates = [s for s in SHOPIFY_STORE_POOL if "https://" + s not in tried_sites]
+                candidates = [s for s in SHOPIFY_STORE_POOL if _get_clean_domain(s) not in tried_sites]
                 if candidates:
-                    site = "https://" + random.choice(candidates)
-                    tried_sites.add(site)
+                    next_choice = random.choice(candidates).strip()
+                    site = next_choice if next_choice.startswith("http") else "https://" + next_choice
+                    tried_sites.add(_get_clean_domain(site))
                 continue
             break
         except Exception as e:
             message = str(e) or type(e).__name__
             current_proxy = None
             if attempt < max_site_retries - 1 and not user_supplied_site:
-                candidates = [s for s in SHOPIFY_STORE_POOL if "https://" + s not in tried_sites]
+                candidates = [s for s in SHOPIFY_STORE_POOL if _get_clean_domain(s) not in tried_sites]
                 if candidates:
-                    site = "https://" + random.choice(candidates)
-                    tried_sites.add(site)
+                    next_choice = random.choice(candidates).strip()
+                    site = next_choice if next_choice.startswith("http") else "https://" + next_choice
+                    tried_sites.add(_get_clean_domain(site))
                 continue
             break
 
