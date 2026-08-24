@@ -3170,24 +3170,29 @@ async def fake_identity_cmd(event):
     try:
         from generators import generate_fake_identity
         identity = generate_fake_identity(country_q.strip())
-        first_clean = re.sub(r'[^a-zA-Z0-9]', '', identity.get('name', 'user').split()[0]).lower()
-        rand_num = random.randint(10, 99)
-        email = f'{first_clean}{rand_num}@gmail.com'
+        gender_emoji = '👩' if identity.get('gender') == 'Female' else '👱'
+        country_upper = identity.get('country', 'INDIA').upper()
+        flag = identity.get('flag', '🌐')
 
-        id_label = identity.get('id_name', 'ID')
-        id_val = identity.get('id_val', 'N/A')
+        res = f"""🎭 <b>FAKE IDENTITY — {flag} {country_upper}</b>
 
-        res = f'''<b>影 𝙄𝙙𝙚𝙣𝙩𝙞𝙩𝙮 𝘿𝙤𝙨𝙨𝙞𝙚𝙧</b>
-━━━━━━━━━━━━━━━━━━━━
-<b>氏 𝙉𝙖𝙢𝙚</b> -» {identity.get('name', 'N/A')}
-<b>電 𝙀𝙢𝙖𝙞𝙡</b> -» <code>{email}</code>
-<b>話 𝙋𝙝𝙤𝙣𝙚</b> -» <code>{identity.get('phone', 'N/A')}</code>
-<b>所 𝘼𝙙𝙙𝙧𝙚𝙨𝙨</b> -» {identity.get('street', 'N/A')}
-<b>町 𝘾𝙞𝙩𝙮</b> -» {identity.get('city', 'N/A')}, {identity.get('state', 'N/A')}
-<b>〒 𝙕𝙄𝙋</b> -» <code>{identity.get('zip', 'N/A')}</code>
-<b>証 𝙄𝘿 ({id_label})</b> -» <code>{id_val}</code>
-<b>国 𝘾𝙤𝙪𝙣𝙩𝙧𝙮</b> -» {identity.get('country', country_q)} {identity.get('flag', '🌐')}
-━━━━━━━━━━━━━━━━━━━━'''
+────── 💳 <b>PERSONAL INFO</b> ──────
+┣ {gender_emoji} <b>Name</b>  : <code>{identity.get('name', 'N/A')}</code>
+┣ ⚥ <b>Gender</b> : <code>{identity.get('gender', 'N/A')}</code>
+┗ 🎂 <b>Birthday</b>: <code>{identity.get('birthday', 'N/A')}</code>
+
+────── 🏠 <b>ADDRESS</b> ──────
+┣ 🛣 <b>Street</b>  : <code>{identity.get('street', 'N/A')}</code>
+┣ 🏙 <b>City</b>    : <code>{identity.get('city', 'N/A')}</code>
+┣ 🗺 <b>State</b>   : <code>{identity.get('state', 'N/A')}</code>
+┣ 📮 <b>ZIP</b>     : <code>{identity.get('zip', 'N/A')}</code>
+┗ {flag} <b>Country</b>: <code>{identity.get('country', 'N/A')}</code>
+
+────── 📞 <b>CONTACT</b> ──────
+┗ 📱 <b>Phone</b>   : <code>{identity.get('phone', 'N/A')}</code>
+
+────── 🔒 <b>{identity.get('id_name', 'ID')}</b> ──────
+┗ <code>{identity.get('id_val', 'N/A')}</code>"""
 
         await event.reply(res, parse_mode='html')
     except Exception as e:
