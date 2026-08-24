@@ -3144,15 +3144,9 @@ async def bin_generator_cmd(event):
         cards, bin_digits = generate_luhn_cards(bin_pat, amount=amount)
         bin_brand, bin_type, level, bank, country, flag = await get_bin_info(bin_digits[:6])
 
-        if len(cards) <= 15:
+        if len(cards) <= 30:
             cards_block = "\n".join(f"<code>{c}</code>" for c in cards)
-            footer = f"<b>計 𝙏𝙤𝙩𝙖𝙡</b> -» <code>{len(cards)}</code> Cards (Luhn Mod-10 ✅)"
-        else:
-            preview_cards = cards[:10]
-            cards_block = "\n".join(f"<code>{c}</code>" for c in preview_cards) + f"\n<i>...and {len(cards) - 10} more in attached file</i>"
-            footer = f"<b>計 𝙏𝙤𝙩𝙖𝙡</b> -» <code>{len(cards)}</code> Cards · <i>📁 Full list attached below</i>"
-
-        res = f"""<b>陣 𝘽𝙄𝙉 𝘾𝙖𝙧𝙙 𝙂𝙚𝙣𝙚𝙧𝙖𝙩𝙤𝙧</b>
+            res = f"""<b>陣 𝘽𝙄𝙉 𝘾𝙖𝙧𝙙 𝙂𝙚𝙣𝙚𝙧𝙖𝙩𝙤𝙧</b>
 ━━━━━━━━━━━━━━━━━━━━
 <b>番 𝘽𝙄𝙉</b> -» <code>{bin_digits[:6]}</code>
 <b>銘 𝘽𝙧𝙖𝙣𝙙</b> -» {bin_brand} - {bin_type} - {level}
@@ -3161,12 +3155,19 @@ async def bin_generator_cmd(event):
 ━━━━━━━━━━━━━━━━━━━━
 {cards_block}
 ━━━━━━━━━━━━━━━━━━━━
-{footer}"""
+<b>計 𝙏𝙤𝙩𝙖𝙡</b> -» <code>{len(cards)}</code> Cards (Luhn Mod-10 ✅)"""
+            await event.reply(res, parse_mode="html")
+        else:
+            caption = f"""<b>陣 𝘽𝙄𝙉 𝘾𝙖𝙧𝙙 𝙂𝙚𝙣𝙚𝙧𝙖𝙩𝙤𝙧</b>
+━━━━━━━━━━━━━━━━━━━━
+<b>番 𝘽𝙄𝙉</b> -» <code>{bin_digits[:6]}</code>
+<b>銘 𝘽𝙧𝙖𝙣𝙙</b> -» {bin_brand} - {bin_type} - {level}
+<b>行 𝘽𝙖𝙣𝙠</b> -» {bank}
+<b>国 𝘾𝙤𝙪𝙣𝙩𝙧𝙮</b> -» {country} {flag}
+━━━━━━━━━━━━━━━━━━━━
+<b>計 𝙏𝙤𝙩𝙖𝙡</b> -» <code>{len(cards)}</code> Cards (Luhn Mod-10 ✅)
+📁 <i>All {len(cards)} cards included in this .txt file</i>"""
 
-        await event.reply(res, parse_mode="html")
-
-        # If more than 15 cards were requested, generate and send the .txt file directly
-        if len(cards) > 15:
             filename = f"cards_{bin_digits[:6]}_{len(cards)}.txt"
             try:
                 with open(filename, "w", encoding="utf-8") as f:
@@ -3174,7 +3175,7 @@ async def bin_generator_cmd(event):
                 await bot.send_file(
                     event.chat_id,
                     filename,
-                    caption=f"📁 <b>{len(cards)} Generated Cards</b> for BIN <code>{bin_digits[:6]}</code>",
+                    caption=caption,
                     parse_mode="html"
                 )
             finally:
