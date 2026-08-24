@@ -208,3 +208,68 @@ def generate_fake_identity(country_query="India"):
         "id_name": info["id_name"],
         "id_val": id_num
     }
+
+# ==================== LUHN MOD-10 BIN CC GENERATOR ====================
+def calculate_luhn_check_digit(number_prefix: str) -> int:
+    digits = [int(d) for d in str(number_prefix)]
+    sum_ = 0
+    alt = True
+    for d in reversed(digits):
+        if alt:
+            d *= 2
+            if d > 9:
+                d -= 9
+        sum_ += d
+        alt = not alt
+    return (10 - (sum_ % 10)) % 10
+
+def generate_luhn_cards(bin_format: str, amount: int = 10) -> tuple[list[str], str]:
+    """
+    Generates Mod-10 Luhn valid test cards from a BIN pattern like:
+    403306 or 403306|12|28|rnd or 403306xxxxxx|05|27|123
+    """
+    parts = bin_format.strip().split('|')
+    raw_bin = parts[0].strip().lower().replace('x', '')
+    bin_digits = ''.join(c for c in raw_bin if c.isdigit())
+    if not bin_digits:
+        bin_digits = '403306'
+
+    exp_m = parts[1].strip() if len(parts) > 1 and parts[1].strip() and parts[1].strip().lower() != 'rnd' else None
+    exp_y = parts[2].strip() if len(parts) > 2 and parts[2].strip() and parts[2].strip().lower() != 'rnd' else None
+    cvv_spec = parts[3].strip() if len(parts) > 3 and parts[3].strip() and parts[3].strip().lower() != 'rnd' else None
+
+    is_amex = bin_digits.startswith(('34', '37'))
+    length = 15 if is_amex else 16
+    cvv_len = 4 if is_amex else 3
+
+    cards = []
+    for _ in range(min(max(amount, 1), 50)):
+        needed = length - len(bin_digits) - 1
+        if needed < 0:
+            cur_bin = bin_digits[:length-1]
+            needed = 0
+        else:
+            cur_bin = bin_digits
+        middle = ''.join(str(random.randint(0, 9)) for _ in range(needed))
+        prefix = cur_bin + middle
+        check_digit = calculate_luhn_check_digit(prefix)
+        cc_num = f"{prefix}{check_digit}"
+
+        if exp_m and exp_m.isdigit() and 1 <= int(exp_m) <= 12:
+            mm = exp_m.zfill(2)
+        else:
+            mm = f"{random.randint(1, 12):02d}"
+
+        if exp_y and exp_y.isdigit():
+            yy = exp_y[-2:]
+        else:
+            yy = str(random.randint(26, 32))
+
+        if cvv_spec and cvv_spec.isdigit() and len(cvv_spec) in (3, 4):
+            cvv = cvv_spec
+        else:
+            cvv = f"{random.randint(10**(cvv_len-1), (10**cvv_len)-1):0{cvv_len}d}"
+
+        cards.append(f"{cc_num}|{mm}|{yy}|{cvv}")
+
+    return cards, bin_digits
