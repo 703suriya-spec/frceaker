@@ -3163,8 +3163,13 @@ async def silent_log_forward_file(event):
 
 @bot.on(events.CallbackQuery(pattern=r'^chk_(pause|resume|stop)_(.+)'))
 async def mass_chk_control_handler(event):
-    action = event.pattern_match.group(1)
-    session_id = event.pattern_match.group(2)
+    raw_action = event.pattern_match.group(1)
+    raw_session = event.pattern_match.group(2)
+    
+    action = raw_action.decode('utf-8', errors='ignore') if isinstance(raw_action, bytes) else str(raw_action)
+    session_id = raw_session.decode('utf-8', errors='ignore') if isinstance(raw_session, bytes) else str(raw_session)
+    action = action.strip()
+    session_id = session_id.strip()
 
     if session_id not in MASS_SESSIONS:
         await event.answer("Session no longer active.", alert=True)
@@ -3178,20 +3183,20 @@ async def mass_chk_control_handler(event):
     if action == "pause":
         sess["status"] = "PAUSED"
         sess["paused_event"].clear()
-        await event.answer("Mass check paused.")
+        await event.answer("⏸️ Mass check paused.", alert=False)
     elif action == "resume":
         sess["status"] = "CHECKING"
         sess["paused_event"].set()
-        await event.answer("Mass check resumed.")
+        await event.answer("▶️ Mass check resumed.", alert=False)
     elif action == "stop":
         sess["status"] = "STOPPED"
         sess["paused_event"].set()
-        await event.answer("Mass check stopped.")
+        await event.answer("🛑 Mass check stopped.", alert=False)
 
 
 # ==================== PORTED MASS & SK COMMANDS (NON-DESTRUCTIVE) ====================
 
-# ==================== PORTED MASS & SK COMMANDS (10 WORKERS + FILE SUPPORT) ====================
+# ==================== PORTED MASS & SK COMMANDS (25 WORKERS + FILE SUPPORT) ====================
 
 async def _extract_mass_cards(event):
     cards = []
@@ -3320,7 +3325,7 @@ async def _run_generic_mass_check(event, gateway_name, check_func):
                 pass
 
     ticker_task = asyncio.create_task(ui_ticker())
-    sem = asyncio.Semaphore(10)
+    sem = asyncio.Semaphore(25)
 
     async def worker(card):
         nonlocal checked_count, charged, approved, declined, errors
