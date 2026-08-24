@@ -3412,10 +3412,10 @@ async def _run_generic_mass_check(event, gateway_name, check_func):
 <b>進 𝙋𝙧𝙤𝙜𝙧𝙚𝙨𝙨</b>
 {pbar} <b>{pct}%</b>
 <b>総 𝘾𝙝𝙚𝙘𝙠𝙚𝙙</b> -» <code>{checked_count} / {total}</code>
-<b>承 𝘼𝙥𝙥𝙧𝙤𝙫𝙚𝙙</b> -» <code>{approved}</code> ✅
-<b>金 𝘾𝙝𝙖𝙧𝙜𝙚𝙙</b> -» <code>{charged}</code> 🟢
-<b>否 𝘿𝙚𝙘𝙡𝙞𝙣𝙚𝙙</b> -» <code>{declined}</code> ❌
-<b>障 𝙀𝙧𝙧𝙤𝙧𝙨</b> -» <code>{errors}</code> ⚠️
+<b>承 𝘼𝙥𝙥𝙧𝙤𝙫𝙚𝙙</b> -» <code>{approved}</code>
+<b>金 𝘾𝙝𝙖𝙧𝙜𝙚𝙙</b> -» <code>{charged}</code> ✅
+<b>否 𝘿𝙚𝙘𝙡𝙞𝙣𝙚𝙙</b> -» <code>{declined}</code>
+<b>障 𝙀𝙧𝙧𝙤𝙧𝙨</b> -» <code>{errors}</code>
 <b>時 𝙏𝙞𝙢𝙚</b> -» <code>{time_str}</code>
 <b>網 𝙋𝙧𝙤𝙭𝙞𝙚𝙨</b> -» <code>{proxy_status_str}</code>
 ━━━━━━━━━━━━━━━━━━━━"""
@@ -3489,10 +3489,10 @@ async def _run_generic_mass_check(event, gateway_name, check_func):
 <b>式 𝙈𝙤𝙙𝙚</b> -» Approved + Charged
 
 <b>総 𝘾𝙝𝙚𝙘𝙠𝙚𝙙</b> -» <code>{checked_count} / {total}</code>
-<b>承 𝘼𝙥𝙥𝙧𝙤𝙫𝙚𝙙</b> -» <code>{approved}</code> ✅
-<b>金 𝘾𝙝𝙖𝙧𝙜𝙚𝙙</b> -» <code>{charged}</code> 🟢
-<b>否 𝘿𝙚𝙘𝙡𝙞𝙣𝙚𝙙</b> -» <code>{declined}</code> ❌
-<b>障 𝙀𝙧𝙧𝙤𝙧𝙨</b> -» <code>{errors}</code> ⚠️
+<b>承 𝘼𝙥𝙥𝙧𝙤𝙫𝙚𝙙</b> -» <code>{approved}</code>
+<b>金 𝘾𝙝𝙖𝙧𝙜𝙚𝙙</b> -» <code>{charged}</code> ✅
+<b>否 𝘿𝙚𝙘𝙡𝙞𝙣𝙚𝙙</b> -» <code>{declined}</code>
+<b>障 𝙀𝙧𝙧𝙤𝙧𝙨</b> -» <code>{errors}</code>
 <b>時 𝙏𝙞𝙢𝙚</b> -» <code>{time_str}</code>
 ━━━━━━━━━━━━━━━━━━━━"""
 
