@@ -113,7 +113,9 @@ async def check_card_msh(
         is_site_infra_error = any(k in msg_upper for k in [
             "DELIVERY_DELIVERY_LINE_DETAIL_CHANGED", "NO_SESSION_TOKEN", "NO_PAYMENT_METHOD",
             "OUT_OF_STOCK", "CART_EMPTY", "NO_VALID_PRODUCTS", "CHECKOUT_FAILED", "TOKENIZATION_FAILED",
-            "GRAPHQL_ERROR", "INVALID_RESPONSE", "THROTTLED", "CHECKPOINTDENIED", "PRICE_TOO_HIGH"
+            "GRAPHQL_ERROR", "INVALID_RESPONSE", "THROTTLED", "CHECKPOINTDENIED", "PRICE_TOO_HIGH",
+            "NO_PRODUCT", "NO PRODUCTS", "SITE_REQUIRES_LOGIN", "LOGIN REQUIRED", "CART_FAILED",
+            "NO AVAILABLE IN-STOCK PRODUCTS", "CART-JSON", "MAX_RETRIES_EXCEEDED"
         ])
 
         if is_definite_card_verdict and not is_site_infra_error:
@@ -155,7 +157,7 @@ async def check_card_msh(
     if "TIMEOUT" in msg_upper or "GATEWAY TIMEOUT" in msg_upper or "CHANGE PROXY" in msg_upper:
         return "error", "Gateway Timeout", gateway_str
 
-    if any(k in msg_upper for k in ["NO_SESSION_TOKEN", "DELIVERY_DELIVERY_LINE_DETAIL_CHANGED", "NO_PAYMENT_METHOD", "TOKENIZATION_FAILED"]):
+    if any(k in msg_upper for k in ["NO_SESSION_TOKEN", "DELIVERY_DELIVERY_LINE_DETAIL_CHANGED", "NO_PAYMENT_METHOD", "TOKENIZATION_FAILED", "NO_PRODUCT", "NO PRODUCTS", "SITE_REQUIRES_LOGIN", "CART_FAILED"]):
         return "declined", "Store Session Expired (Auto-Rotated)", gateway_str
 
     if "GENERIC_ERROR" in msg_upper or "PAYMENT_FAILED" in msg_upper or "DECLINED" in msg_upper or "FAILED" in msg_upper or "REJECTED" in msg_upper:

@@ -173,54 +173,63 @@ def normalize_response(raw_msg):
     return "CARD_DECLINED"
 
 
-async def fetch_cheapest_product(domain, proxy_str=None, max_price=MAX_PRODUCT_PRICE):
-    """Fetch the cheapest available product under max_price from a Shopify store using Chrome TLS impersonation."""
+async def fetch_cheapest_product(domain, proxy_str=None, max_price=1000.00):
+    """Fetch the cheapest available product from a Shopify store using fast multi-endpoint retrieval."""
     if not domain.startswith("http"):
         domain = "https://" + domain
+    domain = domain.rstrip("/")
 
     proxy = parse_proxy(proxy_str) if proxy_str else None
     proxies = {"http": proxy, "https": proxy} if proxy else None
 
-    try:
-        from curl_cffi.requests import AsyncSession
-        async with AsyncSession(impersonate="chrome120") as session:
-            resp = await session.get(f"{domain}/products.json?limit=10", proxies=proxies, timeout=12)
-            if resp.status_code != 200:
-                return None, f"Site returned status {resp.status_code}"
+    endpoints = [
+        f"{domain}/collections/all/products.json?limit=250&sort_by=price-ascending",
+        f"{domain}/products.json?limit=250",
+        f"{domain}/products.json?limit=50",
+    ]
 
-            data = resp.json()
-            products = data.get("products", [])
-            if not products:
-                return None, "No products found"
-
-        best = None
-        best_price = float("inf")
-
-        for product in products:
-            for variant in product.get("variants", []):
-                if not variant.get("available", True):
+    for ep in endpoints:
+        try:
+            from curl_cffi.requests import AsyncSession
+            async with AsyncSession(impersonate="chrome120") as session:
+                resp = await session.get(ep, proxies=proxies, timeout=10)
+                if resp.status_code != 200:
                     continue
-                try:
-                    price = float(variant.get("price", "0"))
-                except (ValueError, TypeError):
-                    continue
-                if price <= 0 or price > max_price:
-                    continue
-                if price < best_price:
-                    best_price = price
-                    best = {
-                        "site": domain,
-                        "price": f"{price:.2f}",
-                        "variant_id": str(variant["id"]),
-                        "title": product.get("title", "Product"),
-                        "link": f"{domain}/products/{product.get('handle', '')}",
-                    }
 
-        if not best:
-            return None, f"No products under ${max_price:.2f}"
-        return best, None
-    except Exception as e:
-        return None, str(e)
+                data = resp.json()
+                products = data.get("products", [])
+                if not products:
+                    continue
+
+                best = None
+                best_price = float("inf")
+
+                for product in products:
+                    for variant in product.get("variants", []):
+                        if not variant.get("available", True):
+                            continue
+                        try:
+                            price = float(variant.get("price", "0"))
+                        except (ValueError, TypeError):
+                            continue
+                        if price <= 0:
+                            continue
+                        if price < best_price:
+                            best_price = price
+                            best = {
+                                "site": domain,
+                                "price": f"{price:.2f}",
+                                "variant_id": str(variant["id"]),
+                                "title": product.get("title", "Product"),
+                                "link": f"{domain}/products/{product.get('handle', '')}",
+                            }
+
+                if best:
+                    return best, None
+        except Exception:
+            continue
+
+    return None, "No available in-stock products found"
 
 
 async def validate_card(cc, month, year, cvv, site_url, variant_id=None, proxy_str=None, max_retries=3):
