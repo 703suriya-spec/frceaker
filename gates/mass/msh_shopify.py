@@ -73,7 +73,7 @@ async def check_card_msh(
         try:
             success, message, gateway, total_price, currency = await asyncio.wait_for(
                 process_card(cc, mes, ano, cvv, site, proxy_str=current_proxy),
-                timeout=18
+                timeout=12
             )
         except asyncio.TimeoutError:
             message = "TIMEOUT"
@@ -115,7 +115,10 @@ async def check_card_msh(
             "OUT_OF_STOCK", "CART_EMPTY", "NO_VALID_PRODUCTS", "CHECKOUT_FAILED", "TOKENIZATION_FAILED",
             "GRAPHQL_ERROR", "INVALID_RESPONSE", "THROTTLED", "CHECKPOINTDENIED", "PRICE_TOO_HIGH",
             "NO_PRODUCT", "NO PRODUCTS", "SITE_REQUIRES_LOGIN", "LOGIN REQUIRED", "CART_FAILED",
-            "NO AVAILABLE IN-STOCK PRODUCTS", "CART-JSON", "MAX_RETRIES_EXCEEDED"
+            "NO AVAILABLE IN-STOCK PRODUCTS", "CART-JSON", "MAX_RETRIES_EXCEEDED",
+            "MERCHANDISE_EXPECTED_PRICE_MISMATCH", "BUYER_IDENTITY_PRESENTMENT_CURRENCY_DOES_NOT_MATCH",
+            "PAYMENTS_UNACCEPTABLE_PAYMENT_AMOUNT", "SUBMIT_FAILED_NO_DATA", "CAPTCHA_REQUIRED",
+            "DELIVERY_NO_DELIVERY_STRATEGY_AVAILABLE"
         ])
 
         if is_definite_card_verdict and not is_site_infra_error:
@@ -157,10 +160,7 @@ async def check_card_msh(
     if "TIMEOUT" in msg_upper or "GATEWAY TIMEOUT" in msg_upper or "CHANGE PROXY" in msg_upper:
         return "error", "Gateway Timeout", gateway_str
 
-    if any(k in msg_upper for k in ["NO_SESSION_TOKEN", "DELIVERY_DELIVERY_LINE_DETAIL_CHANGED", "NO_PAYMENT_METHOD", "TOKENIZATION_FAILED", "NO_PRODUCT", "NO PRODUCTS", "SITE_REQUIRES_LOGIN", "CART_FAILED"]):
-        return "declined", "Store Session Expired (Auto-Rotated)", gateway_str
-
     if "GENERIC_ERROR" in msg_upper or "PAYMENT_FAILED" in msg_upper or "DECLINED" in msg_upper or "FAILED" in msg_upper or "REJECTED" in msg_upper:
-        return "declined", clean_msg if clean_msg else "Card Declined", gateway_str
+        return "declined", clean_msg if clean_msg and clean_msg not in ("ERROR", "UNKNOWN_ERROR") else "Card Declined", gateway_str
 
-    return "declined", clean_msg if clean_msg else "Card Declined", gateway_str
+    return "declined", clean_msg if clean_msg and clean_msg not in ("ERROR", "UNKNOWN_ERROR") else "Card Declined", gateway_str
