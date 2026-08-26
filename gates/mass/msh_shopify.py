@@ -32,7 +32,7 @@ async def check_card_msh(
     card_str: str,
     proxy_str: str | None = None,
     custom_site: str | None = None,
-    max_site_retries: int = 4
+    max_site_retries: int = 6
 ) -> tuple[str, str, str]:
     """
     Checks a single card against Shopify Storefront GraphQL.

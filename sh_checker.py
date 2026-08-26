@@ -661,7 +661,7 @@ async def validate_card(cc, month, year, cvv, site_url, variant_id=None, proxy_s
                                         }
                                     }
                                 },
-                                "amount": {"value": {"amount": running_total, "currencyCode": currency}},
+                                "amount": {"value": {"amount": f"{float(total_price):.2f}", "currencyCode": currency}},
                                 "dueAt": None,
                             }],
                             "billingAddress": {
