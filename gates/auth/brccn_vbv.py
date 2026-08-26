@@ -9,9 +9,15 @@ import random
 import asyncio
 import time
 
-# Cache the authorization fingerprint to avoid re-scraping the checkout page
-_cached_fingerprint = None
-_cache_expiry = 0
+# Fallback persistent token (auto-refreshed dynamically)
+_FALLBACK_FINGERPRINT = (
+    "eyJraWQiOiIyMDE4MDQyNjE2LXByb2R1Y3Rpb24iLCJpc3MiOiJodHRwczovL2FwaS5icmFpbnRyZWVnYXRld2F5LmNvbSIsImFsZyI6IkVTMjU2In0."
+    "eyJleHAiOjE3ODc4NDA2NjksImp0aSI6Ijc5ZDJlYWY2LTE1Y2QtNGIxNC04NWExLWVkZjQ5OTI3ZDNhOSIsInN1YiI6IjVoZ3pxZ3BjbmRuM2ZzNHkiLCJpc3MiOiJodHRwczovL2FwaS5icmFpbnRyZWVnYXRld2F5LmNvbSIsIm1lcmNoYW50Ijp7InB1YmxpY19pZCI6IjVoZ3pxZ3BjbmRuM2ZzNHkiLCJ2ZXJpZnlfY2FyZF9ieV9kZWZhdWx0Ijp0cnVlLCJ2ZXJpZnlfd2FsbGV0X2J5X2RlZmF1bHQiOmZhbHNlfSwicmlnaHRzIjpbIm1hbmFnZV92YXVsdCJdLCJzY29wZSI6WyJCcmFpbnRyZWU6VmF1bHQiLCJCcmFpbnRyZWU6Q2xpZW50U0RLIl0sIm9wdGlvbnMiOnsibWVyY2hhbnRfYWNjb3VudF9pZCI6ImluZm9tYWtpc3RhbXBzZGUiLCJwYXlwYWxfY2xpZW50X2lkIjoiQWZJM3ZaUTBFZmVVTGZxRElEQlZGNGY4eDh5aUVHV3Z3a0hnYm1CYi1Vclo5Y19sMGhOb2FaNTB4eXpEUDA0ZEdEU0RLYmJUcEc3Q0xwLVoifX0."
+    "nOQOSLk7iVujeq2TDRaFDVKrrzaqZIaD_pG984zT_KsaIkz6C7wZxqbKHwu0DUje6g0_-FU6bq41WYNRVwcl4g"
+)
+
+_cached_fingerprint = _FALLBACK_FINGERPRINT
+_cache_expiry = time.time() + 43200
 
 def _format_proxy(p):
     if not p:
@@ -31,6 +37,24 @@ def _format_proxy(p):
         return f"http://{parts[0]}:{parts[1]}"
     return f"http://{ps}"
 
+def _extract_fp_from_text(text: str) -> str | None:
+    if not text:
+        return None
+    match = re.search(r'var\s+wc_braintree_client_token\s*=\s*\["(.*?)"\]', text)
+    if match:
+        try:
+            decoded = base64.b64decode(match.group(1)).decode()
+            data = json.loads(decoded)
+            fp = data.get("authorizationFingerprint")
+            if fp:
+                return fp
+        except Exception:
+            pass
+    match2 = re.search(r'\"authorizationFingerprint\"\s*:\s*\"([^\"]+)\"', text)
+    if match2:
+        return match2.group(1)
+    return None
+
 async def _get_auth_fingerprint(session, proxy_url=None):
     """Fetch and cache the Braintree authorization fingerprint."""
     global _cached_fingerprint, _cache_expiry
@@ -41,33 +65,40 @@ async def _get_auth_fingerprint(session, proxy_url=None):
     
     headers = {
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-        'User-Agent': 'Mozilla/5.0 (Linux; Android 16; 2409BRN2CA) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.7827.91 Mobile Safari/537.36',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
     }
     
     try:
-        async with session.get('https://www.makistamps.com/checkout/', headers=headers, proxy=proxy_url) as r:
-            resp_text = await r.text()
-    except Exception:
-        try:
-            async with session.get('https://www.makistamps.com/checkout/', headers=headers) as r:
+        async with session.get('https://www.makistamps.com/checkout/', headers=headers, timeout=aiohttp.ClientTimeout(total=8)) as r:
+            if r.status == 200:
                 resp_text = await r.text()
-        except Exception:
-            return None
-    
-    match = re.search(r'var\s+wc_braintree_client_token\s*=\s*\["(.*?)"\]', resp_text)
-    if not match:
-        return None
-    
-    try:
-        decoded = base64.b64decode(match.group(1)).decode()
-        data = json.loads(decoded)
-        fp = data.get("authorizationFingerprint")
-        if fp:
-            _cached_fingerprint = fp
-            _cache_expiry = now + 1500  # Cache for 25 minutes
-        return fp
+                fp = _extract_fp_from_text(resp_text)
+                if fp:
+                    _cached_fingerprint = fp
+                    _cache_expiry = now + 43200
+                    return fp
     except Exception:
-        return None
+        pass
+    
+    if proxy_url:
+        try:
+            async with session.get('https://www.makistamps.com/checkout/', headers=headers, proxy=proxy_url, timeout=aiohttp.ClientTimeout(total=10)) as r:
+                if r.status == 200:
+                    resp_text = await r.text()
+                    fp = _extract_fp_from_text(resp_text)
+                    if fp:
+                        _cached_fingerprint = fp
+                        _cache_expiry = now + 43200
+                        return fp
+        except Exception:
+            pass
+
+    if _FALLBACK_FINGERPRINT:
+        _cached_fingerprint = _FALLBACK_FINGERPRINT
+        _cache_expiry = now + 43200
+        return _FALLBACK_FINGERPRINT
+
+    return None
 
 
 async def check_card_brccn(cc, mm, yy, cvc, proxy_url=None):
