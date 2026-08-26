@@ -32,7 +32,7 @@ async def check_card_msh(
     card_str: str,
     proxy_str: str | None = None,
     custom_site: str | None = None,
-    max_site_retries: int = 2
+    max_site_retries: int = 4
 ) -> tuple[str, str, str]:
     """
     Checks a single card against Shopify Storefront GraphQL.
@@ -105,19 +105,28 @@ async def check_card_msh(
             "ORDER_PLACED", "PROCESSEDRECEIPT", "ACTIONREQUIRED", "OTP_REQUIRED", "3DS",
             "INSUFFICIENT", "CVC", "CVV", "SECURITY_CODE", "DECLINED", "DO_NOT_HONOR",
             "EXPIRED", "FRAUD", "TRANSACTION_REJECTED", "PROCESSING_ERROR", "PAYMENT_FAILED",
-            "CARD_ERROR", "INVALID_CARD", "CALL_ISSUER", "CARD_NOT_SUPPORTED", "LIMIT_EXCEEDED"
+            "CARD_ERROR", "INVALID_CARD", "CALL_ISSUER", "CARD_NOT_SUPPORTED", "LIMIT_EXCEEDED",
+            "CARD_DECLINED", "STOLEN_CARD", "LOST_CARD", "RESTRICTED_CARD", "PICKUP_CARD"
         ])
 
-        if is_definite_card_verdict:
+        # Exclude internal site infrastructure errors from being treated as card verdicts
+        is_site_infra_error = any(k in msg_upper for k in [
+            "DELIVERY_DELIVERY_LINE_DETAIL_CHANGED", "NO_SESSION_TOKEN", "NO_PAYMENT_METHOD",
+            "OUT_OF_STOCK", "CART_EMPTY", "NO_VALID_PRODUCTS", "CHECKOUT_FAILED", "TOKENIZATION_FAILED",
+            "GRAPHQL_ERROR", "INVALID_RESPONSE", "THROTTLED", "CHECKPOINTDENIED", "PRICE_TOO_HIGH"
+        ])
+
+        if is_definite_card_verdict and not is_site_infra_error:
             break
 
         # If it's a site error, proxy error, 404, or cart issue, drop proxy & rotate store
         current_proxy = None
         if attempt < max_site_retries - 1 and not user_supplied_site:
-            candidates = [s for s in SHOPIFY_STORE_POOL if "https://" + s not in tried_sites]
+            candidates = [s for s in SHOPIFY_STORE_POOL if _get_clean_domain(s) not in tried_sites]
             if candidates:
-                site = "https://" + random.choice(candidates)
-                tried_sites.add(site)
+                next_choice = random.choice(candidates).strip()
+                site = next_choice if next_choice.startswith("http") else "https://" + next_choice
+                tried_sites.add(_get_clean_domain(site))
             continue
         break
 
@@ -144,7 +153,10 @@ async def check_card_msh(
         return "approved", "AVS Mismatch (Card Live)", gateway_str
 
     if "TIMEOUT" in msg_upper or "GATEWAY TIMEOUT" in msg_upper or "CHANGE PROXY" in msg_upper:
-        return "error", clean_msg if clean_msg else "Gateway Timeout", gateway_str
+        return "error", "Gateway Timeout", gateway_str
+
+    if any(k in msg_upper for k in ["NO_SESSION_TOKEN", "DELIVERY_DELIVERY_LINE_DETAIL_CHANGED", "NO_PAYMENT_METHOD", "TOKENIZATION_FAILED"]):
+        return "declined", "Store Session Expired (Auto-Rotated)", gateway_str
 
     if "GENERIC_ERROR" in msg_upper or "PAYMENT_FAILED" in msg_upper or "DECLINED" in msg_upper or "FAILED" in msg_upper or "REJECTED" in msg_upper:
         return "declined", clean_msg if clean_msg else "Card Declined", gateway_str
