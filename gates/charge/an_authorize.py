@@ -196,14 +196,14 @@ async def check_card_authorize(
                     elif any(k in resp_upper for k in ["EXPIRATION", "EXPIRED"]):
                         return "declined", "Expired Card", "Authorize.Net"
                     elif any(k in resp_upper for k in ["TRANSACTION HAS BEEN DECLINED", "CARD DECLINED", "DO NOT HONOR", "DECLINED"]):
-                        return "declined", "Card Declined", "Authorize.Net"
+                        return "declined", "Generic Decline", "Authorize.Net"
                     else:
-                        return "declined", response_text or "Card Declined", "Authorize.Net"
+                        return "declined", response_text or "Generic Decline", "Authorize.Net"
 
                 if result and result != "failure":
                     return "charged", "Charged! ✅ -» $5.00", "Authorize.Net"
 
-                return "declined", "Card Declined", "Authorize.Net"
+                return "declined", "Generic Decline", "Authorize.Net"
 
         except Exception as e:
             if current_proxies is not None:
