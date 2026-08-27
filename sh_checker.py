@@ -605,7 +605,23 @@ async def validate_card(cc, month, year, cvv, site_url, variant_id=None, proxy_s
                 }
                 json_data["variables"]["taxes"]["proposedTotalAmount"]["value"]["amount"] = str(tax_amount)
 
-                await session.post(graphql_url, json=json_data, headers=gql_headers, proxies=curl_proxies)
+                resp_step5 = await session.post(graphql_url, json=json_data, headers=gql_headers, proxies=curl_proxies)
+                try:
+                    step5_json = json.loads(resp_step5.text)
+                    step5_res = step5_json.get("data", {}).get("session", {}).get("negotiate", {}).get("result", {})
+                    if step5_res:
+                        if step5_res.get("checkpointData"):
+                            checkpoint_data = step5_res.get("checkpointData")
+                        step5_sp = step5_res.get("sellerProposal", {})
+                        if step5_sp:
+                            seller_proposal = step5_sp
+                            sp_t = seller_proposal.get("total", {}).get("value", {}) or seller_proposal.get("checkoutTotal", {}).get("value", {}) or seller_proposal.get("runningTotal", {}).get("value", {})
+                            if sp_t and sp_t.get("amount") and float(sp_t.get("amount", 0)) > 0:
+                                total_price = f"{float(sp_t['amount']):.2f}"
+                            if sp_t and sp_t.get("currencyCode"):
+                                currency = sp_t.get("currencyCode")
+                except Exception:
+                    pass
 
                 # Step 5: Tokenize card via PCI vault (aiohttp is fine here - no bot detection)
                 print(f"[{attempt}] [STEP 6] Vaulting Card...")
