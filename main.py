@@ -2480,8 +2480,12 @@ async def process_ba_cmd(event):
         await event.reply("Access denied.")
         return
 
-    raw_text = event.raw_text or ""
-    cards = extract_cards(raw_text)
+    card_input = event.pattern_match.group(1)
+    if not card_input:
+        await event.reply("⚠️ Format: `/ba cc|mm|yy|cvv`")
+        return
+
+    cards = extract_cc(card_input)
     if not cards:
         await event.reply("⚠️ Format: `/ba cc|mm|yy|cvv`")
         return
