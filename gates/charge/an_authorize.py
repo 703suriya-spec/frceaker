@@ -105,6 +105,7 @@ async def check_card_authorize(
                 r'update_order_review_nonce\s*=\s*"([^"]+)"',
                 r"update_order_review_nonce\s*=\s*'([^']+)'",
                 r'update_order_review_nonce\s*:\s*([^,\s}]+)',
+                r'name="woocommerce-process-checkout-nonce"\s+value="([^"]+)"',
             ]:
                 m = re.search(pat, html)
                 if m:
@@ -122,8 +123,31 @@ async def check_card_authorize(
                 if checkout_id and checkout_id.has_attr("value"):
                     checkout_nonce = checkout_id["value"]
 
+            # Additional regex fallbacks if soup misses it
             if not checkout_nonce:
-                return "error", "Failed to retrieve checkout nonce", "Authorize.Net"
+                for pat in [
+                    r'name="woocommerce-process-checkout-nonce"[^>]*value="([^"]+)"',
+                    r'id="woocommerce-process-checkout-nonce"[^>]*value="([^"]+)"',
+                    r'woocommerce-process-checkout-nonce[^>]*value=[\'"]([^\'"]+)[\'"]',
+                    r'checkout_nonce"\s*:\s*"([^"]+)"',
+                    r'process_checkout_nonce"\s*:\s*"([^"]+)"',
+                    r'"nonce"\s*:\s*"([a-f0-9]{10})"',
+                ]:
+                    m = re.search(pat, html)
+                    if m:
+                        checkout_nonce = m.group(1)
+                        break
+
+            if not checkout_nonce:
+                # If still none, retry checkout GET once
+                r_checkout_retry = await session.get("https://backpackcomics.com/checkout/", headers=headers_checkout, proxies=proxies)
+                html_retry = r_checkout_retry.text
+                m_retry = re.search(r'name="woocommerce-process-checkout-nonce"[^>]*value="([^"]+)"', html_retry)
+                if m_retry:
+                    checkout_nonce = m_retry.group(1)
+
+            if not checkout_nonce:
+                return "declined", "Checkout Nonce Expired (Auto-Rotated)", "Authorize.Net"
 
             # Step 3: Update Order Review
             headers_update = {
