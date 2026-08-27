@@ -189,17 +189,21 @@ async def check_card_authorize(
                         return "approved", "Incorrect CVV (Live CCN)", "Authorize.Net"
                     elif any(k in resp_upper for k in ["AVS", "ADDRESS", "ZIP"]):
                         return "approved", "AVS Mismatch (Card Live)", "Authorize.Net"
-                    elif any(k in resp_upper for k in ["3D", "VERIFICATION", "AUTHENTICATION"]):
+                    elif any(k in resp_upper for k in ["3D", "VERIFICATION", "AUTHENTICATION", "OTP"]):
                         return "approved", "3DS Challenge Required", "Authorize.Net"
-                    elif any(k in resp_upper for k in ["DECLINED", "DO NOT HONOR", "TRANSACTION"]):
-                        return "declined", response_text, "Authorize.Net"
+                    elif any(k in resp_upper for k in ["INVALID CARD", "NUMBER IS INVALID", "INVALID NUMBER"]):
+                        return "declined", "Invalid Card Number", "Authorize.Net"
+                    elif any(k in resp_upper for k in ["EXPIRATION", "EXPIRED"]):
+                        return "declined", "Expired Card", "Authorize.Net"
+                    elif any(k in resp_upper for k in ["TRANSACTION HAS BEEN DECLINED", "CARD DECLINED", "DO NOT HONOR", "DECLINED"]):
+                        return "declined", "Card Declined", "Authorize.Net"
                     else:
-                        return "declined", response_text or "Payment Failed", "Authorize.Net"
+                        return "declined", response_text or "Card Declined", "Authorize.Net"
 
                 if result and result != "failure":
                     return "charged", "Charged! ✅ -» $5.00", "Authorize.Net"
 
-                return "declined", "Payment Failed", "Authorize.Net"
+                return "declined", "Card Declined", "Authorize.Net"
 
         except Exception as e:
             if current_proxies is not None:
