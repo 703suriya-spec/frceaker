@@ -32,7 +32,7 @@ async def check_card_msh(
     card_str: str,
     proxy_str: str | None = None,
     custom_site: str | None = None,
-    max_site_retries: int = 6
+    max_site_retries: int = 3
 ) -> tuple[str, str, str]:
     """
     Checks a single card against Shopify Storefront GraphQL.
@@ -73,7 +73,7 @@ async def check_card_msh(
         try:
             success, message, gateway, total_price, currency = await asyncio.wait_for(
                 process_card(cc, mes, ano, cvv, site, proxy_str=current_proxy),
-                timeout=12
+                timeout=5
             )
         except asyncio.TimeoutError:
             message = "TIMEOUT"
