@@ -51,7 +51,8 @@ from gates.auth import (
     check_card_dila,
     check_card_nemaneide,
     check_card_inu,
-    check_card_brccn
+    check_card_brccn,
+    check_card_ba
 )
 from gates.charge import (
     check_card_shp10,
@@ -2471,6 +2472,45 @@ async def process_inu_cmd(event):
     await status_msg.edit(res, parse_mode="html")
 
 
+# ==================== BA (BRAINTREE DIRECT AUTH $0.00) ENGINE ====================
+@bot.on(events.NewMessage(pattern=r'^/ba(?:\s+(.+))?$'))
+async def process_ba_cmd(event):
+    user_id = event.sender_id
+    if not is_admin(event.sender_id):
+        await event.reply("Access denied.")
+        return
+
+    raw_text = event.raw_text or ""
+    cards = extract_cards(raw_text)
+    if not cards:
+        await event.reply("⚠️ Format: `/ba cc|mm|yy|cvv`")
+        return
+
+    card = cards[0]
+    parts = card.split('|')
+    try:
+        cc = parts[0].strip()
+        mm = parts[1].strip()
+        yy = parts[2].strip()
+        cvc = parts[3].strip()
+    except IndexError:
+        await event.reply("⚠️ Format: `/ba cc|mm|yy|cvv`")
+        return
+
+    status_msg = await event.reply("🔄 <b>Checking (Braintree Auth $0.00)...</b>", parse_mode="html")
+    proxies = load_proxies(user_id)
+    proxy = random.choice(proxies) if proxies else None
+    start_time = time.time()
+
+    is_live, status_str, response_str, raw = await check_card_ba(cc, mm, yy, cvc, proxy_url=proxy)
+    time_taken = round(time.time() - start_time, 2)
+    brand, bin_type, level, bank, country, flag = await get_bin_info(cc[:6])
+
+    status_emoji = "Approved! ✅ -» Auth" if is_live else ("Live! 🟡" if "3DS Challenge" in response_str else "Declined! ❌")
+    res = format_anime_result(f"{cc}|{mm}|{yy}|{cvc}", status_emoji, response_str, "Braintree Auth -» $0.00", brand, bin_type, level, bank, country, flag, time_taken, event.sender)
+    await status_msg.edit(res, parse_mode="html")
+
+
 # ==================== AU (NOVA STRIPE SETUPINTENT) ENGINE ====================
 @bot.on(events.NewMessage(pattern=r'^/au(?:\s+(.+))?$'))
 async def process_au_cmd(event):
@@ -2861,7 +2901,7 @@ async def checker_menu_handler(event):
     gates_msg = """<b>Gates Menu</b>
 
 Browse the available categories:
-• <b>Auth Gates:</b> 6
+• <b>Auth Gates:</b> 7
 • <b>Charge Gates:</b> 17
 • <b>Mass Checker:</b> 6"""
 
@@ -2899,7 +2939,10 @@ async def auth_info_handler(event):
 <b><i>Braintree Auth 1</i></b>
 <code>/inu cc|mm|yy|cvv</code>
 
-<b><i>Braintree Auth 2 (3DS)</i></b>
+<b><i>Braintree Auth 2</i></b>
+<code>/ba cc|mm|yy|cvv</code>
+
+<b><i>Braintree Auth 3 (3DS)</i></b>
 <code>/brccn cc|mm|yy|cvv</code> (or <code>/vbv</code>)"""
 
     buttons = [
@@ -3837,9 +3880,10 @@ async def setup_bot_commands():
         commands = [
             BotCommand(command="start", description="Start bot & dashboard"),
             BotCommand(command="gates", description="View all gates categories"),
-            BotCommand(command="auth", description="View 6 Auth Gates"),
+            BotCommand(command="auth", description="View 7 Auth Gates"),
             BotCommand(command="charge", description="View 17 Charge Gates"),
             BotCommand(command="mass", description="View 6 Mass Checkers"),
+            BotCommand(command="ba", description="Braintree Auth ($0.00)"),
             BotCommand(command="an", description="Authorize.Net Charge ($5.00)"),
             BotCommand(command="sh", description="Auto shopify(0.10$ - 5.00$)"),
             BotCommand(command="msh", description="Auto shopify(0.10$ - 5.00$) Mass"),
