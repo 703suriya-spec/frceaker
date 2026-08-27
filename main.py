@@ -2236,7 +2236,7 @@ async def process_an_cmd(event):
         await event.reply("Format: `/an cc|mm|yy|cvv`")
         return
 
-    status_msg = await event.reply("<b>Processing Authorize.Net ($0.10)...</b>", parse_mode="html")
+    status_msg = await event.reply("<b>Processing Authorize.Net ($5.00)...</b>", parse_mode="html")
     proxies = load_proxies(user_id)
     proxy = random.choice(proxies) if proxies else None
     start_time = time.time()
@@ -2252,7 +2252,7 @@ async def process_an_cmd(event):
     else:
         status_emoji = "Declined! ❌"
 
-    res = format_anime_result(f"{cc}|{mm}|{yy}|{cvc}", status_emoji, msg, "Authorize.Net Charge -» $0.10", brand, bin_type, level, bank, country, flag, time_taken, event.sender)
+    res = format_anime_result(f"{cc}|{mm}|{yy}|{cvc}", status_emoji, msg, "Authorize.Net Charge -» $5.00", brand, bin_type, level, bank, country, flag, time_taken, event.sender)
     await status_msg.edit(res, parse_mode="html")
 
 
@@ -2966,7 +2966,7 @@ async def charge_info_handler(event):
 <b><i>Razorpay Charge ($1.00)</i></b>
 <code>/rz1 cc|mm|yy|cvv</code> (or <code>/rz</code>)
 
-<b><i>Authorize.Net Charge ($0.10)</i></b>
+<b><i>Authorize.Net Charge ($5.00)</i></b>
 <code>/an cc|mm|yy|cvv</code>"""
 
     buttons = [
@@ -3840,6 +3840,7 @@ async def setup_bot_commands():
             BotCommand(command="auth", description="View 6 Auth Gates"),
             BotCommand(command="charge", description="View 17 Charge Gates"),
             BotCommand(command="mass", description="View 6 Mass Checkers"),
+            BotCommand(command="an", description="Authorize.Net Charge ($5.00)"),
             BotCommand(command="sh", description="Auto shopify(0.10$ - 5.00$)"),
             BotCommand(command="msh", description="Auto shopify(0.10$ - 5.00$) Mass"),
             BotCommand(command="tools", description="Tools & utilities menu"),
