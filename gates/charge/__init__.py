@@ -15,7 +15,6 @@ from .pp_paypal import check_card_paypal_aww
 from .fz_fatzebra import check_card_fz
 from .sq_square import process_square, _parse_square_url, _extract_square_result
 from .cl_clover import check_card_clover
-from .rz_razorpay import charge_payment_page_card_async as check_card_rz
 from .an_authorize import check_card_authorize
 from .sh_autoshopify import check_card_autoshopify
 
@@ -36,7 +35,7 @@ __all__ = [
     "_parse_square_url",
     "_extract_square_result",
     "check_card_clover",
-    "check_card_rz",
     "check_card_authorize",
     "check_card_autoshopify"
 ]
+

@@ -1,0 +1,240 @@
+<!DOCTYPE html><html lang="en-US" dir="ltr"><head><title>Checkout - Magnolia Soap and Bath Company </title><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0, height=device-height"/><script async src="https://cdn.shopify.com/cdn/shopifycloud/checkout-web/assets/c1/origin-trials.BzLLnmi_.js" type="module" crossorigin integrity="sha384-fFg2RXsijDKZnymP1K+ruxnFfzTI+GCDi5dj+1AE/jj+vuF1BEDHyl5AJlDnUUoJ"></script><link rel="icon" href="https://cdn.shopify.com/s/files/1/0418/3887/0696/files/Untitled_design_4.png?v=1787204493&amp;crop=center&amp;width=32&amp;height=32" type="image/png"/><link rel="preconnect" href="https://cdn.shopify.com" crossorigin/><link rel="dns-prefetch" href="https://cdn.shopify.com" crossorigin/><link rel="preconnect" href="https://extensions.shopifycdn.com" crossorigin/><link rel="dns-prefetch" href="https://extensions.shopifycdn.com" crossorigin/><link rel="preconnect" href="https://checkout.pci.shopifyinc.com" crossorigin/><link rel="dns-prefetch" href="https://checkout.pci.shopifyinc.com" crossorigin/><link rel="preconnect" href="https://checkout.shopify.com" crossorigin/><link rel="dns-prefetch" href="https://checkout.shopify.com" crossorigin/><link rel="preconnect" href="https://shop.app" crossorigin/><link rel="dns-prefetch" href="https://shop.app" crossorigin/><link rel="preconnect" href="https://server.shop.app" crossorigin/><link rel="dns-prefetch" href="https://server.shop.app" crossorigin/></head><body class="Loading">
+<script>
+(function() {
+  try {
+    // No need to use the value of syntaxCheck, as we only care if it is valid syntax
+    const [syntaxCheck] = ((abc = 1) => [Promise.resolve(abc)])();
+    window.checkoutMinimalBrowserSupport = typeof window.fetch === 'function';
+  } catch (err) {}
+})();
+</script>
+<script>
+if (window.checkoutMinimalBrowserSupport !== true) {
+  document.documentElement.innerHTML = "<div class=\"error-container\"><style>* {\n  box-sizing: border-box;\n  margin: 0;\n  padding: 0;\n}\n\nhtml {\n  font-family: \"Helvetica Neue\", Helvetica, Arial, sans-serif;\n  background: #F1F1F1;\n  font-size: 62.5%;\n  color: #303030;\n  min-height: 100%;\n}\n\nbody {\n  padding: 0;\n  margin: 0;\n  line-height: 2.7rem;\n}\n\nh1 {\n  font-size: 1.8rem;\n  font-weight: 400;\n  margin: 0 0 1.4rem 0;\n}\n\np {\n  font-size: 1.5rem;\n  margin: 0;\n}\n\n.error-container {\n  padding: 4rem 3.5rem;\n}\n\n@media all and (min-width:500px) {\n  .error-container {\n    padding: 7.5rem 10.5rem;\n    align-items: center;\n  }\n}</style><div><h1>It looks like your browser version isn't supported.</h1><p>Please update your browser to access the checkout and complete your purchase.</p></div></div>";
+}
+</script><style>
+    
+    :root {
+      
+      
+    
+    --x-skeleton-color-global-accent: #005BD1;
+    --x-skeleton-color-global-background: #FFFFFF;
+    --x-skeleton-color-global-backgroundSubdued: #F5F5F5;
+    --x-skeleton-color-global-border: #DEDEDE;
+    --x-skeleton-color-global-text: #000000;
+    --x-skeleton-color-global-textContrast: #FFFFFF;
+    --x-skeleton-color-global-textSubdued: #707070;
+    --x-skeleton-color-global-textSubdued200: #E6E6E6;
+
+    --x-skeleton-color-schemes-scheme2-base-background: #F5F5F5;
+    --x-skeleton-color-schemes-scheme2-base-backgroundSubdued: #EDEDED;
+    --x-skeleton-color-schemes-scheme2-base-border: #D6D6D6;
+    --x-skeleton-color-schemes-scheme2-base-text: #000000;
+    --x-skeleton-color-schemes-scheme2-base-textContrast: #F5F5F5;
+    --x-skeleton-color-schemes-scheme2-base-textSubdued: #666666;
+    --x-skeleton-color-schemes-scheme2-base-textSubdued200: #CCCCCC;
+
+    --x-skeleton-color-schemes-scheme6-base-background: #005BD1;
+    --x-skeleton-color-schemes-scheme6-base-backgroundSubdued: #0061E0;
+    --x-skeleton-color-schemes-scheme6-base-border: #8C97C5;
+    --x-skeleton-color-schemes-scheme6-base-text: #FFFFFF;
+    --x-skeleton-color-schemes-scheme6-base-textContrast: #000000;
+    --x-skeleton-color-schemes-scheme6-base-textSubdued: #FFFFFFA8;
+    --x-skeleton-color-schemes-scheme6-base-textSubdued200: #FFFFFF33;
+  
+    
+    --x-skeleton-color-schemes-scheme1-base-background: #01426A;
+--x-skeleton-color-schemes-scheme1-base-backgroundSubdued: #014975;
+--x-skeleton-color-schemes-scheme1-base-border: #567496;
+--x-skeleton-color-schemes-scheme1-base-text: #ffffff;
+--x-skeleton-color-schemes-scheme1-base-textContrast: #000000;
+--x-skeleton-color-schemes-scheme1-base-textSubdued: #ffffffa8;
+--x-skeleton-color-schemes-scheme1-base-textSubdued200: #ffffff33;
+--x-skeleton-color-schemes-scheme2-base-background: #01426A;
+--x-skeleton-color-schemes-scheme2-base-backgroundSubdued: #014975;
+--x-skeleton-color-schemes-scheme2-base-border: #567496;
+--x-skeleton-color-schemes-scheme2-base-text: #ffffff;
+--x-skeleton-color-schemes-scheme2-base-textContrast: #000000;
+--x-skeleton-color-schemes-scheme2-base-textSubdued: #ffffffa8;
+--x-skeleton-color-schemes-scheme2-base-textSubdued200: #ffffff33;
+--x-skeleton-color-schemes-scheme3-base-background: #01426A;
+--x-skeleton-color-schemes-scheme3-base-backgroundSubdued: #014975;
+--x-skeleton-color-schemes-scheme3-base-border: #567496;
+--x-skeleton-color-schemes-scheme3-base-text: #ffffff;
+--x-skeleton-color-schemes-scheme3-base-textContrast: #000000;
+--x-skeleton-color-schemes-scheme3-base-textSubdued: #ffffffa8;
+--x-skeleton-color-schemes-scheme3-base-textSubdued200: #ffffff33;
+  
+
+      --x-skeleton-typography-line-small: 1.2;
+      --x-skeleton-typography-line-base: 1.35;
+      --x-skeleton-line-quantity-size: 2.1rem;
+
+      --x-skeleton-typography-size-small: 1.2rem;
+      --x-skeleton-typography-size-default: 1.4rem;
+      --x-skeleton-typography-size-medium: 1.6rem;
+      --x-skeleton-typography-size-large: 1.8rem;
+      --x-skeleton-typography-size-extra-large: 2rem;
+      --x-skeleton-typography-size-extra-extra-large: 2.2rem;
+
+      --x-skeleton-typography-primary-weight-bold: 400;
+
+      --x-skeleton-typography-primary-fonts: New York;
+
+      --x-skeleton-typography-secondary-weight-bold: 400;
+      --x-skeleton-typography-secondary-fonts: New York;
+
+      --x-skeleton-spacing-none: 0;
+      --x-skeleton-spacing-small-100: 1rem;
+      --x-skeleton-spacing-small-200: 0.8rem;
+      --x-skeleton-spacing-small-300: 0.6rem;
+      --x-skeleton-spacing-small-400: 0.4rem;
+      --x-skeleton-spacing-small-500: 0.2rem;
+      --x-skeleton-spacing-base: 1.4rem;
+      --x-skeleton-spacing-large-100: 1.6rem;
+      --x-skeleton-spacing-large-200: 2rem;
+      --x-skeleton-spacing-large-300: 2.4rem;
+      --x-skeleton-spacing-large-400: 3.2rem;
+      --x-skeleton-spacing-large-500: 4rem;
+      --x-skeleton-spacing-large-600: 4.8rem;
+
+      --x-skeleton-border-radius-none: 0;
+      --x-skeleton-border-radius-small: 8px;
+      --x-skeleton-border-radius-base: 12px;
+      --x-skeleton-border-radius-large: 16px;
+    }
+
+    
+
+    @keyframes SkeletonPulse {
+      50% {
+        opacity: 1;
+      }
+      75% {
+        opacity: 0.5;
+      }
+      100% {
+        opacity: 1;
+      }
+    }
+
+    *,
+    :after,
+    :before {
+      box-sizing: border-box;
+    }
+
+    body,
+    html {
+      height: 100%;
+      margin: 0;
+      width: 100%;
+    }
+
+    html {
+      -webkit-text-size-adjust: 100%;
+      text-size-adjust: 100%;
+      font-size: 62.5%;
+      font-family: var(--x-skeleton-typography-primary-fonts);
+      line-height: var(--x-skeleton-typography-line-base);
+    }
+
+    body {
+      -webkit-font-smoothing: subpixel-antialiased;
+      overflow-wrap: break-word;
+      overflow-x: hidden;
+      overflow-y: auto;
+      scrollbar-gutter: stable;
+    }
+
+    body.Loading {
+      position: fixed;
+    }
+
+    /* TODO: need to take it out of the accessibility tree, too? */
+    body.Loading > .LoadingShell {
+      opacity: 1;
+    }
+  
+    
+    .BlockStack {
+      display: grid;
+    }
+
+    .BlockStack--spacing-small500 {
+      gap: var(--x-skeleton-spacing-small-500);
+    }
+    .BlockStack--spacing-small300 {
+      gap: var(--x-skeleton-spacing-small-300);
+    }
+    .BlockStack--spacing-small100 {
+      gap: var(--x-skeleton-spacing-small-100);
+    }
+    .BlockStack--spacing-base {
+      gap: var(--x-skeleton-spacing-base);
+    }
+    .BlockStack--spacing-large100 {
+      gap: var(--x-skeleton-spacing-large-100);
+    }
+    .BlockStack--spacing-large200 {
+      gap: var(--x-skeleton-spacing-large-200);
+    }
+    .BlockStack--min-inline-size-full {
+      flex: 1;
+    }
+    .BlockStack--inline-alignment-center {
+      justify-items: center;
+    }
+    .BlockStack--inline-alignment-end {
+      justify-items: end;
+    }
+
+    /*
+     * Rollup loading row: label column (see SKELETON_ROLLUP_LABEL_COLUMN)
+     * inline-start, value filling the rest. See
+     * shop/issues-checkout-experience#5583.
+     */
+    .SkeletonRollupRow {
+      display: grid;
+      grid-template-columns: min(22cqi, 10.5rem) minmax(0, 1fr);
+      column-gap: var(--x-skeleton-spacing-small-200);
+      align-items: start;
+    }
+
+    .LoadingHeaderHeading {
+      margin: 0;
+      font-size: var(--x-skeleton-typography-size-extra-large);
+      font-weight: var(--x-skeleton-typography-secondary-weight-bold);
+      font-family: var(--x-skeleton-typography-secondary-fonts);
+      line-height: var(--x-skeleton-typography-line-small);
+    }
+
+    .LoadingHeaderHeading > svg {
+      display: block;
+    }
+
+    .LoadingHeaderImage {
+      display: block;
+      max-width: 100%;
+      height: auto;
+    }
+
+    .LoadingReferralTitle {
+      font-size: var(--x-skeleton-typography-size-default);
+      font-weight: var(--x-skeleton-typography-secondary-weight-bold);
+      font-family: var(--x-skeleton-typography-secondary-fonts);
+      line-height: var(--x-skeleton-typography-line-small);
+    }
+
+    .LoadingReferralTitleContainer {
+      display: flex;
+      flex-direction: column;
+      gap: var(--x-skeleton-spacing-small-300);
+      justify-content: space-between;
+      padding-block-start: 2px;
+    }
+
+    .InlineStack {
+      display: flex;
+      min-hei
