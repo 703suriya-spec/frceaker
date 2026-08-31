@@ -1,4 +1,4 @@
-# SK-Based Gate Engine
+# SK-Based Gate Engine - Stripe Direct PaymentIntents ($1.00)
 import aiohttp
 import asyncio
 import re
@@ -71,8 +71,8 @@ async def validate_stripe_sk(sk_key, pk_key=None):
                         'account_id': acc_id,
                         'country': country,
                         'currency': currency,
-                        'available': f"{avail_amt:.2f} {currency}",
-                        'pending': f"{pend_amt:.2f} {currency}"
+                        'available': f'{avail_amt:.2f} {currency}',
+                        'pending': f'{pend_amt:.2f} {currency}'
                     }
                     return True, 'LIVE & ACTIVE 🟢', info
                 else:
@@ -80,6 +80,150 @@ async def validate_stripe_sk(sk_key, pk_key=None):
                     return False, 'DEAD 🔴 (' + err_msg + ')', None
     except Exception as e:
         return False, 'Error checking key: ' + str(e), None
+
+async def skintoff_engine(session, cc, mm, yy, cvv, sk_key, pk_key):
+    max_amt = 0
+    max_retry = 3
+    derived_pk, acct_id = derive_pk_or_acct(sk_key, pk_key)
+
+    url = 'https://api.stripe.com/v1/payment_methods'
+    headers = {
+        'authority': 'api.stripe.com',
+        'accept': 'application/json',
+        'accept-language': 'en-US',
+        'content-type': 'application/x-www-form-urlencoded',
+        'origin': 'https://js.stripe.com',
+        'referer': 'https://js.stripe.com/',
+        'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+    }
+
+    if acct_id:
+        headers['Stripe-Account'] = acct_id
+
+    data = {
+        'type': 'card',
+        'key': derived_pk,
+        'card[number]': cc,
+        'card[cvc]': cvv,
+        'card[exp_month]': mm,
+        'card[exp_year]': yy,
+        'billing_details[name]': 'Ayan XD',
+        'billing_details[address][city]': 'Los Angeles',
+        'billing_details[address][country]': 'US',
+        'billing_details[address][line1]': '1234 Street',
+        'billing_details[address][postal_code]': '90001',
+        'billing_details[address][state]': 'CA',
+        'guid': str(uuid.uuid4()),
+        'muid': str(uuid.uuid4()),
+        'sid': str(uuid.uuid4()),
+        'payment_user_agent': 'stripe.js/split-card-element',
+        'time_on_page': random.randint(10021, 10090),
+    }
+
+    if acct_id:
+        data['_stripe_account'] = acct_id
+
+    attempts = 0
+    while True:
+        if attempts >= max_retry:
+            return 'Max retry reached due to connection issues (payment_methods)'
+
+        try:
+            result = await session.post(url=url, headers=headers, data=data)
+        except Exception:
+            attempts += 1
+            continue
+
+        text = result.text
+        if 'Invalid API Key provided' in text:
+            return 'Invalid API Key'
+        if 'api_key_expired' in text:
+            return 'API Key Expired'
+        if 'Your account cannot currently make live charges.' in text:
+            return 'Account Cannot Make Live Charges'
+
+        if 'Request rate limit exceeded.' in text:
+            max_amt += 1
+            if max_amt == max_retry:
+                return '429 Too Many Requests'
+            continue
+        else:
+            break
+
+    try:
+        response_json = result.json()
+        payment_method_id = response_json.get('id')
+        if not payment_method_id:
+            err_msg = response_json.get('error', {}).get('message', 'Unexpected response')
+            return f'[Step 1 Error] {err_msg}'
+    except Exception:
+        return 'Unexpected response (no ID)'
+
+    url = 'https://api.stripe.com/v1/payment_intents'
+    headers = {
+        'authority': 'api.stripe.com',
+        'accept': 'application/json',
+        'accept-language': 'en-US',
+        'content-type': 'application/x-www-form-urlencoded',
+        'Authorization': f'Bearer {sk_key}',
+        'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+    }
+
+    data = {
+        'amount': 100,
+        'currency': 'usd',
+        'payment_method_types[]': 'card',
+        'payment_method': payment_method_id,
+        'confirm': 'true',
+        'off_session': 'true',
+        'use_stripe_sdk': 'true',
+        'description': 'None',
+        'receipt_email': 'xhfuhuduburyg@gmail.com',
+        'metadata[order_id]': str(random.randint(100000000000000000, 999999999999999999)),
+    }
+
+    attempts = 0
+    while True:
+        if attempts >= max_retry:
+            return 'Max retry reached due to connection issues (payment_intents)'
+
+        try:
+            response = await session.post(url=url, headers=headers, data=data)
+        except Exception:
+            attempts += 1
+            continue
+
+        text = response.text
+        if 'Invalid API Key provided' in text:
+            return 'Invalid API Key'
+        if 'api_key_expired' in text:
+            return 'API Key Expired'
+
+        if 'Request rate limit exceeded.' in text:
+            max_amt += 1
+            if max_amt == max_retry:
+                return '429 Too Many Requests'
+            continue
+        else:
+            break
+
+    try:
+        json_res = response.json()
+        if 'requires_action' in text or 'requires_source_action' in text:
+            return '3D Secure Required'
+        if '"cvc_check": "pass"' in text or '"cvc_check":"pass"' in text:
+            return 'CVV Live'
+        if 'error' in text:
+            if 'decline_code' in json_res['error']:
+                return json_res['error']['decline_code'].replace('_', ' ').title()
+            else:
+                return json_res['error']['message']
+        elif 'succeeded' in text or (json_res.get('status') == 'succeeded') or 'success:true' in text:
+            return 'Charged $1'
+        else:
+            return 'Unexpected response'
+    except Exception:
+        return 'Unexpected response'
 
 async def check_card_sk(cc, mm, yy, cvc, sk_key=None, pk_key=None, proxy_url=None, user_id=None):
     if not sk_key or not pk_key:
@@ -94,16 +238,13 @@ async def check_card_sk(cc, mm, yy, cvc, sk_key=None, pk_key=None, proxy_url=Non
                 pass
 
     if not sk_key:
-        return False, 'NO KEYS', 'Please add an active SK key using /sk command', ''
+        return False, 'NO KEYS ⚠️', 'Please add an active SK key using /sk command', ''
 
     derived_pk, acct_id = derive_pk_or_acct(sk_key, pk_key)
 
     try:
-        sys.path.insert(0, r'C:\Users\acer\Downloads\Ch-main\Ch-main')
-        from Gates.skbasedoff import skintoff
-        
         async with httpx.AsyncClient(proxy=proxy_url if proxy_url else None, timeout=20.0) as session:
-            res_str = await skintoff(session, cc, mm, yy, cvc, sk_key=sk_key, pk_key=derived_pk)
+            res_str = await skintoff_engine(session, cc, mm, yy, cvc, sk_key=sk_key, pk_key=derived_pk)
             
             res_lower = str(res_str).lower()
             if 'charged' in res_lower or 'succeeded' in res_lower:
@@ -115,4 +256,4 @@ async def check_card_sk(cc, mm, yy, cvc, sk_key=None, pk_key=None, proxy_url=Non
             else:
                 return False, 'Declined! ❌', res_str, res_str
     except Exception as e:
-        return False, 'ERROR', str(e), ''
+        return False, 'ERROR ⚠️', str(e), ''
