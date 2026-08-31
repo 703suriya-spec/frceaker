@@ -51,7 +51,9 @@ from gates.auth import (
     check_card_dila,
     check_card_nemaneide,
     check_card_inu,
-    check_card_brccn
+    check_card_brccn,
+    check_card_sk,
+    validate_stripe_sk
 )
 from gates.charge import (
     check_card_shp10,
@@ -2440,6 +2442,187 @@ async def process_mass3_cmd(event):
         return "declined", "Invalid Card Format", "Unknown"
 
     await _run_generic_mass_check(event, "Braintree Mass Auth ($0.00)", run_mass3_worker)
+
+
+# ==================== SK KEY MANAGEMENT & SK-BASED GATEWAY ====================
+@bot.on(events.NewMessage(pattern=r'(?i)^[./]sk(?:\s+([\s\S]+))?$'))
+async def process_sk_cmd(event):
+    user_id = event.sender_id
+    raw_args = event.pattern_match.group(1) or ""
+    
+    if not raw_args.strip() and event.is_reply:
+        reply_msg = await event.get_reply_message()
+        if reply_msg and reply_msg.text:
+            raw_args = reply_msg.text
+
+    sks = re.findall(r'sk_live_[a-zA-Z0-9]+', raw_args)
+    pks = re.findall(r'pk_live_[a-zA-Z0-9]+', raw_args)
+
+    if not sks:
+        saved_sk = get_user_sk(user_id)
+        if saved_sk and isinstance(saved_sk, dict):
+            sk_val = saved_sk.get('sk', 'N/A')
+            pk_val = saved_sk.get('pk', 'N/A')
+            await event.reply(f"""<b>🔑 YOUR ACTIVE STRIPE SK KEY</b>
+━━━━━━━━━━━━━━━━━━━━
+🔑 <b>SK:</b> <code>{sk_val}</code>
+🔑 <b>PK:</b> <code>{pk_val}</code>
+
+💡 <b>To add or update SK key:</b>
+<code>/sk sk_live_...</code> or paste keys in chat.""", parse_mode="html")
+        else:
+            await event.reply("""<b>🔑 STRIPE SK KEY MANAGER</b>
+━━━━━━━━━━━━━━━━━━━━
+💡 <b>Usage:</b>
+<code>/sk sk_live_...</code>
+<code>/sk sk_live_... pk_live_...</code>
+
+Or reply to a message containing secret keys.""", parse_mode="html")
+        return
+
+    sk_key = sks[0]
+    pk_key = pks[0] if pks else None
+
+    status_msg = await event.reply("🔎 <b>Auditing Stripe SK Key...</b>", parse_mode="html")
+    is_live, msg, info = await validate_stripe_sk(sk_key, pk_key)
+
+    if is_live and info:
+        save_user_sk(user_id, info['sk'], info['pk'])
+        buttons = [
+            [Button.inline("➕ Add This SK Key", f"add_sk_{user_id}".encode())]
+        ]
+        text = f"""<b>🔑 STRIPE SK KEY VERIFIED & AUDITED</b>
+━━━━━━━━━━━━━━━━━━━━
+<b>Status:</b> {msg}
+<b>Business:</b> <code>{info['business_name']}</code>
+<b>Account ID:</b> <code>{info['account_id']}</code>
+<b>Charges Enabled:</b> <code>{info['charges_enabled']}</code>
+<b>Currency:</b> <code>{info['currency']}</code> ({info['country']})
+
+<b>Secret Key:</b> <code>{info['sk']}</code>
+<b>Publishable Key:</b> <code>{info['pk']}</code>
+
+✅ <b>Option:</b> Click below to save as your default SK gate key!"""
+        await status_msg.edit(text, buttons=buttons, parse_mode="html")
+    else:
+        await status_msg.edit(f"""❌ <b>STRIPE SK KEY AUDIT FAILED</b>
+━━━━━━━━━━━━━━━━━━━━
+<b>Status:</b> {msg}
+<b>Provided SK:</b> <code>{sk_key}</code>
+
+<i>Dead or invalid secret keys are not saved to your account pool.</i>""", parse_mode="html")
+
+
+@bot.on(events.CallbackQuery(pattern=r'^add_sk_(\d+)$'))
+async def callback_add_sk(event):
+    target_user_id = int(event.pattern_match.group(1))
+    if event.sender_id != target_user_id:
+        await event.answer("⚠️ You cannot claim another user's SK key audit!", alert=True)
+        return
+
+    msg_text = event.message.text or ""
+    sks = re.findall(r'sk_live_[a-zA-Z0-9]+', msg_text)
+    pks = re.findall(r'pk_live_[a-zA-Z0-9]+', msg_text)
+    
+    if not sks:
+        await event.answer("⚠️ No valid SK key found in audit message!", alert=True)
+        return
+
+    sk_key = sks[0]
+    pk_key = pks[0] if pks else None
+    is_live, msg, info = await validate_stripe_sk(sk_key, pk_key)
+
+    if is_live and info:
+        save_user_sk(target_user_id, info['sk'], info['pk'])
+        await event.answer("✅ SK Key Saved as Active Gate!", alert=True)
+        await event.edit(f"""<b>🔑 STRIPE SK KEY ACTIVE & SAVED</b>
+━━━━━━━━━━━━━━━━━━━━
+<b>Status:</b> {msg}
+<b>Business:</b> <code>{info['business_name']}</code>
+<b>Account ID:</b> <code>{info['account_id']}</code>
+
+<b>Saved SK:</b> <code>{info['sk']}</code>
+<b>Saved PK:</b> <code>{info['pk']}</code>
+
+🚀 <b>Gate Ready:</b> Use <code>/skchk cc|mm|yy|cvv</code> or <code>/msk</code> for mass checking!""", parse_mode="html")
+    else:
+        await event.answer("❌ SK Key expired or invalid!", alert=True)
+
+
+# Single Card SK-Based Gate (/skchk)
+@bot.on(events.NewMessage(pattern=r'(?i)^[./]skchk(?:\s+(.+))?$'))
+async def process_skchk_cmd(event):
+    user_id = event.sender_id
+    if not await is_joined_channel(user_id):
+        await event.reply("Join channel and /verify first!")
+        return
+
+    allowed, remaining = check_limits(user_id, False)
+    if not allowed:
+        await event.reply("Daily limit reached. Get premium.")
+        return
+
+    card_input = event.pattern_match.group(1)
+    if not card_input and event.is_reply:
+        reply_msg = await event.get_reply_message()
+        if reply_msg:
+            card_input = reply_msg.text
+
+    if not card_input:
+        await event.reply("⚠️ Format: `/skchk cc|mm|yy|cvv`")
+        return
+
+    cards = extract_cc(card_input)
+    if not cards:
+        await event.reply("⚠️ Format: `/skchk cc|mm|yy|cvv`")
+        return
+
+    card = cards[0]
+    parts = card.split('|')
+    try:
+        cc = parts[0].strip()
+        mm = parts[1].strip()
+        yy = parts[2].strip()
+        cvc = parts[3].strip()
+    except IndexError:
+        await event.reply("⚠️ Format: `/skchk cc|mm|yy|cvv`")
+        return
+
+    status_msg = await event.reply("⚡ <b>Checking via Stripe SK Direct API...</b>", parse_mode="html")
+    proxies = load_proxies(user_id)
+    proxy = random.choice(proxies) if proxies else None
+    start_time = time.time()
+
+    is_live, status_str, response_str, raw = await check_card_sk(cc, mm, yy, cvc, proxy_url=proxy, user_id=user_id)
+    time_taken = round(time.time() - start_time, 2)
+    update_daily_usage(user_id, 1)
+
+    brand, bin_type, level, bank, country, flag = await get_bin_info(cc[:6])
+    res = format_anime_result(f"{cc}|{mm}|{yy}|{cvc}", status_str, response_str, "Stripe SK Direct ($1.00)", brand, bin_type, level, bank, country, flag, time_taken, event.sender)
+    await status_msg.edit(res, parse_mode="html")
+
+
+# Mass SK-Based Gate (/msk)
+@bot.on(events.NewMessage(pattern=r'(?i)^[./]msk(?:\s+([\s\S]+))?$'))
+async def process_msk_cmd(event):
+    user_id = event.sender_id
+    saved_sk = get_user_sk(user_id)
+    if not saved_sk or not isinstance(saved_sk, dict) or not saved_sk.get('sk'):
+        await event.reply("⚠️ <b>No Active SK Key Found!</b>\nPlease add your active SK key using <code>/sk sk_live_...</code> first.", parse_mode="html")
+        return
+
+    sk_key = saved_sk.get('sk')
+    pk_key = saved_sk.get('pk')
+
+    async def run_msk_worker(card_item, proxy_item):
+        parts = card_item.split("|")
+        if len(parts) >= 4:
+            is_live, st, msg, _ = await check_card_sk(parts[0], parts[1], parts[2], parts[3], sk_key=sk_key, pk_key=pk_key, proxy_url=proxy_item)
+            status_verdict = "charged" if "Charged" in st else ("approved" if is_live else "declined")
+            return status_verdict, msg, "Stripe SK Direct"
+        return "declined", "Invalid Card Format", "Unknown"
+
+    await _run_generic_mass_check(event, "Stripe SK Direct Mass ($1.00)", run_msk_worker)
 
 
 @bot.on(events.NewMessage(pattern=r'^/sq(?:\s+(.+))?$'))
