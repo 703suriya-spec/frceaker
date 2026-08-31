@@ -14,6 +14,14 @@ SKKEYS_FILE = os.path.join(os.path.dirname(__file__), "skkeys.json")
 STSITE_FILE = os.path.join(os.path.dirname(__file__), "stsite.json")
 
 def get_user_sk(user_id: int):
+    try:
+        from db import get_db_user_sk
+        res = get_db_user_sk(user_id)
+        if res:
+            return res
+    except Exception:
+        pass
+
     if os.path.exists(SKKEYS_FILE):
         try:
             with open(SKKEYS_FILE, "r", encoding="utf-8") as f:
@@ -24,6 +32,12 @@ def get_user_sk(user_id: int):
     return None
 
 def save_user_sk(user_id: int, sk: str, pk: str):
+    try:
+        from db import save_db_user_sk
+        save_db_user_sk(user_id, sk, pk)
+    except Exception as e:
+        print(f"save_db_user_sk error: {e}")
+
     data = {}
     if os.path.exists(SKKEYS_FILE):
         try:

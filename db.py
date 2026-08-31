@@ -491,6 +491,61 @@ def clear_db_user_sites(user_id: int):
     save_db_user_sites(user_id, [])
 
 
+# ==================== STRIPE SK KEYS (SUPABASE PERSISTENCE) ====================
+def save_db_user_sk(user_id: int, sk: str, pk: str):
+    uid = str(user_id)
+    conn = get_db_connection()
+    if conn:
+        try:
+            now = int(time.time())
+            with conn.cursor() as cur:
+                cur.execute("""
+                    CREATE TABLE IF NOT EXISTS user_sk_keys (
+                        user_id TEXT PRIMARY KEY,
+                        sk TEXT NOT NULL,
+                        pk TEXT NOT NULL,
+                        updated_at BIGINT
+                    );
+                """)
+                cur.execute("""
+                    INSERT INTO user_sk_keys (user_id, sk, pk, updated_at)
+                    VALUES (%s, %s, %s, %s)
+                    ON CONFLICT (user_id) DO UPDATE SET sk = EXCLUDED.sk, pk = EXCLUDED.pk, updated_at = EXCLUDED.updated_at;
+                """, (uid, sk, pk, now))
+                conn.commit()
+        except Exception as e:
+            print(f"[Supabase DB Error] save_db_user_sk: {e}")
+        finally:
+            conn.close()
+
+
+def get_db_user_sk(user_id: int) -> dict | None:
+    uid = str(user_id)
+    conn = get_db_connection()
+    if conn:
+        try:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    CREATE TABLE IF NOT EXISTS user_sk_keys (
+                        user_id TEXT PRIMARY KEY,
+                        sk TEXT NOT NULL,
+                        pk TEXT NOT NULL,
+                        updated_at BIGINT
+                    );
+                """)
+                conn.commit()
+                cur.execute("SELECT sk, pk FROM user_sk_keys WHERE user_id = %s;", (uid,))
+                row = cur.fetchone()
+                if row and row[0] and row[1]:
+                    return {"sk": row[0], "pk": row[1]}
+        except Exception as e:
+            print(f"[Supabase DB Error] get_db_user_sk: {e}")
+        finally:
+            conn.close()
+
+    return None
+
+
 
 
 
