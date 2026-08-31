@@ -51,9 +51,7 @@ from gates.auth import (
     check_card_dila,
     check_card_nemaneide,
     check_card_inu,
-    check_card_brccn,
-    check_card_sk,
-    validate_stripe_sk
+    check_card_brccn
 )
 from gates.charge import (
     check_card_shp10,
@@ -73,7 +71,9 @@ from gates.charge import (
     _extract_square_result,
     check_card_clover,
     check_card_authorize,
-    check_card_autoshopify
+    check_card_autoshopify,
+    check_card_sk,
+    validate_stripe_sk
 )
 from gates.mass import (
     check_card_msh,
@@ -2729,8 +2729,8 @@ async def checker_menu_handler(event):
 
 Browse the available categories:
 • <b>Auth Gates:</b> 6
-• <b>Charge Gates:</b> 16
-• <b>Mass Checker:</b> 6"""
+• <b>Charge Gates:</b> 17
+• <b>Mass Checker:</b> 7"""
 
     buttons = [
         [Button.inline("Auth Gates", b"auth_info"),
@@ -2831,7 +2831,10 @@ async def charge_info_handler(event):
 <code>/cl site_url|cc|mm|yy|cvv</code>
 
 <b><i>Authorize.Net Charge ($5.00)</i></b>
-<code>/an cc|mm|yy|cvv</code>"""
+<code>/an cc|mm|yy|cvv</code>
+
+<b><i>Stripe SK Direct ($1.00)</i></b>
+<code>/skchk cc|mm|yy|cvv</code>"""
 
     buttons = [
         [Button.inline("Back", b"checker")]
@@ -2849,6 +2852,9 @@ async def charge_info_handler(event):
 async def mass_info_handler(event):
     mass_msg = """<b>MASS CHECKER GATES</b>
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+<b><i>Stripe SK Direct Mass ($1.00)</i></b>
+Reply to .txt or inline: <code>/msk cc|mm|yy|cvv cc...</code>
+
 <b><i>Auto shopify(0.10$ - 5.00$)</i></b>
 Reply to .txt or inline: <code>/msh cc|mm|yy|cvv cc...</code>
 

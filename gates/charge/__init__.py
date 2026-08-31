@@ -17,6 +17,7 @@ from .sq_square import process_square, _parse_square_url, _extract_square_result
 from .cl_clover import check_card_clover
 from .an_authorize import check_card_authorize
 from .sh_autoshopify import check_card_autoshopify
+from .sk_stripe import check_card_sk, validate_stripe_sk
 
 __all__ = [
     "check_card_shp10",
@@ -36,6 +37,8 @@ __all__ = [
     "_extract_square_result",
     "check_card_clover",
     "check_card_authorize",
-    "check_card_autoshopify"
+    "check_card_autoshopify",
+    "check_card_sk",
+    "validate_stripe_sk"
 ]
 
