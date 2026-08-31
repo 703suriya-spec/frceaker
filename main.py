@@ -2494,10 +2494,9 @@ Or reply to a message containing secret keys.""", parse_mode="html")
         text = f"""<b>🔑 STRIPE SK KEY VERIFIED & AUDITED</b>
 ━━━━━━━━━━━━━━━━━━━━
 <b>Status:</b> {msg}
-<b>Business:</b> <code>{info['business_name']}</code>
-<b>Account ID:</b> <code>{info['account_id']}</code>
-<b>Charges Enabled:</b> <code>{info['charges_enabled']}</code>
-<b>Currency:</b> <code>{info['currency']}</code> ({info['country']})
+<b>Available Balance:</b> <code>{info['available']}</code>
+<b>Pending Balance:</b> <code>{info['pending']}</code>
+<b>Account ID:</b> <code>{info['account_id']}</code> ({info['country']})
 
 <b>Secret Key:</b> <code>{info['sk']}</code>
 <b>Publishable Key:</b> <code>{info['pk']}</code>
@@ -2538,8 +2537,9 @@ async def callback_add_sk(event):
         await event.edit(f"""<b>🔑 STRIPE SK KEY ACTIVE & SAVED</b>
 ━━━━━━━━━━━━━━━━━━━━
 <b>Status:</b> {msg}
-<b>Business:</b> <code>{info['business_name']}</code>
-<b>Account ID:</b> <code>{info['account_id']}</code>
+<b>Available Balance:</b> <code>{info['available']}</code>
+<b>Pending Balance:</b> <code>{info['pending']}</code>
+<b>Account ID:</b> <code>{info['account_id']}</code> ({info['country']})
 
 <b>Saved SK:</b> <code>{info['sk']}</code>
 <b>Saved PK:</b> <code>{info['pk']}</code>
@@ -3581,69 +3581,7 @@ async def user_profile_cmd(event):
     await event.reply(res, parse_mode="html")
 
 
-# ==================== STRIPE SK AUDITOR (/sk) ====================
-@bot.on(events.NewMessage(pattern=r'(?i)^[./]sk(?:\s+(.+))?$'))
-async def stripe_sk_audit_cmd(event):
-    raw_args = event.pattern_match.group(1) or ""
-    sk = ""
-    
-    if raw_args.strip():
-        extracted = re.findall(r'sk_(?:live|test)_[a-zA-Z0-9]+', raw_args)
-        if extracted:
-            sk = extracted[0]
-    elif event.is_reply:
-        reply_msg = await event.get_reply_message()
-        if reply_msg and reply_msg.text:
-            extracted = re.findall(r'sk_(?:live|test)_[a-zA-Z0-9]+', reply_msg.text)
-            if extracted:
-                sk = extracted[0]
-                
-    if not sk:
-        await event.reply("⚠️ <b>Format:</b> <code>/sk sk_live_...</code>", parse_mode="html")
-        return
 
-    status_msg = await event.reply("🔍 <b>Auditing Stripe Secret Key...</b>", parse_mode="html")
-    
-    try:
-        headers = {"Authorization": f"Bearer {sk}"}
-        async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=10)) as session:
-            # 1. Check Balance
-            async with session.get("https://api.stripe.com/v1/balance", headers=headers) as resp:
-                bal_json = await resp.json()
-                
-            if resp.status == 200:
-                # 2. Check Account info
-                async with session.get("https://api.stripe.com/v1/account", headers=headers) as acc_resp:
-                    acc_json = await acc_resp.json() if acc_resp.status == 200 else {}
-
-                avail = bal_json.get("available", [{}])[0]
-                pending = bal_json.get("pending", [{}])[0]
-                currency = str(avail.get("currency", "usd")).upper()
-                avail_amt = float(avail.get("amount", 0)) / 100.0
-                pend_amt = float(pending.get("amount", 0)) / 100.0
-                acct_id = acc_json.get("id", "N/A")
-                country = acc_json.get("country", "US")
-                
-                res = f"""<b>鍵 𝙎𝙩𝙧𝙞𝙥𝙚 𝙎𝙆 𝘼𝙪𝙙𝙞𝙩</b>
-━━━━━━━━━━━━━━━━━━━━
-<b>式 𝙆𝙚𝙮</b> -» <code>{sk[:14]}...{sk[-4:]}</code>
-<b>態 𝙎𝙩𝙖𝙩𝙪𝙨</b> -» LIVE & ACTIVE 🟢
-<b>金 𝘼𝙫𝙖𝙞𝙡𝙖𝙗𝙡𝙚</b> -» <code>{avail_amt:.2f} {currency}</code>
-<b>保 𝙋𝙚𝙣𝙙𝙞𝙣𝙜</b> -» <code>{pend_amt:.2f} {currency}</code>
-<b>貨 𝘾𝙪𝙧𝙧𝙚𝙣𝙘𝙮</b> -» {currency}
-<b>連 𝘼𝙘𝙘𝙤𝙪𝙣𝙩</b> -» <code>{acct_id}</code> ({country})
-━━━━━━━━━━━━━━━━━━━━"""
-            else:
-                err_msg = bal_json.get("error", {}).get("message", "Invalid Stripe API Key")
-                res = f"""<b>鍵 𝙎𝙩𝙧𝙞𝙥𝙚 𝙎𝙆 𝘼𝙪𝙙𝙞𝙩</b>
-━━━━━━━━━━━━━━━━━━━━
-<b>式 𝙆𝙚𝙮</b> -» <code>{sk[:14]}...{sk[-4:]}</code>
-<b>態 𝙎𝙩𝙖𝙩𝙪𝙨</b> -» DEAD / REVOKED 🔴
-<b>答 𝙍𝙚𝙨𝙥𝙤𝙣𝙨𝙚</b> -» {err_msg}
-━━━━━━━━━━━━━━━━━━━━"""
-        await status_msg.edit(res, parse_mode="html")
-    except Exception as e:
-        await status_msg.edit(f"⚠️ Error auditing SK: {e}")
 
 
 # ==================== LICENSE KEY GENERATOR & REDEMPTION ====================

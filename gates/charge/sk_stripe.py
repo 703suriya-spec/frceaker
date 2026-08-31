@@ -41,28 +41,43 @@ async def validate_stripe_sk(sk_key, pk_key=None):
 
     try:
         async with aiohttp.ClientSession() as session:
-            async with session.get('https://api.stripe.com/v1/account', headers=headers, timeout=10) as resp:
-                res_json = await resp.json()
+            async with session.get('https://api.stripe.com/v1/balance', headers=headers, timeout=10) as resp:
+                bal_json = await resp.json()
                 if resp.status == 200:
-                    acc_id = res_json.get('id') or acct_id
-                    charges_enabled = res_json.get('charges_enabled', False)
-                    country = res_json.get('country', 'US')
-                    currency = res_json.get('default_currency', 'usd').upper()
-                    biz_name = (res_json.get('business_profile') or {}).get('name') or (res_json.get('settings') or {}).get('dashboard', {}).get('display_name') or 'Stripe Account'
+                    acc_json = {}
+                    try:
+                        async with session.get('https://api.stripe.com/v1/account', headers=headers, timeout=10) as acc_resp:
+                            if acc_resp.status == 200:
+                                acc_json = await acc_resp.json()
+                    except Exception:
+                        pass
+
+                    avail_list = bal_json.get('available', [{}])
+                    pend_list = bal_json.get('pending', [{}])
+                    
+                    avail_item = avail_list[0] if avail_list else {}
+                    pend_item = pend_list[0] if pend_list else {}
+
+                    currency = str(avail_item.get('currency', 'usd')).upper()
+                    avail_amt = float(avail_item.get('amount', 0)) / 100.0
+                    pend_amt = float(pend_item.get('amount', 0)) / 100.0
+
+                    acc_id = acc_json.get('id') or acct_id
+                    country = acc_json.get('country', 'US')
                     
                     info = {
                         'sk': sk_key,
                         'pk': derived_pk,
                         'account_id': acc_id,
-                        'charges_enabled': charges_enabled,
                         'country': country,
                         'currency': currency,
-                        'business_name': biz_name
+                        'available': f"{avail_amt:.2f} {currency}",
+                        'pending': f"{pend_amt:.2f} {currency}"
                     }
-                    return True, 'LIVE', info
+                    return True, 'LIVE & ACTIVE 🟢', info
                 else:
-                    err_msg = (res_json.get('error') or {}).get('message', 'Expired or Invalid SK Key')
-                    return False, 'DEAD (' + err_msg + ')', None
+                    err_msg = (bal_json.get('error') or {}).get('message', 'Expired or Invalid SK Key')
+                    return False, 'DEAD 🔴 (' + err_msg + ')', None
     except Exception as e:
         return False, 'Error checking key: ' + str(e), None
 
