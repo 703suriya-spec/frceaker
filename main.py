@@ -2482,6 +2482,7 @@ Or reply to a message containing secret keys.""", parse_mode="html")
 
     sk_key = sks[0]
     pk_key = pks[0] if pks else None
+    pk_provided = bool(pks)
 
     status_msg = await event.reply("🔎 <b>Auditing Stripe SK Key...</b>", parse_mode="html")
     is_live, msg, info = await validate_stripe_sk(sk_key, pk_key)
@@ -2491,6 +2492,7 @@ Or reply to a message containing secret keys.""", parse_mode="html")
         buttons = [
             [Button.inline("➕ Add This SK Key", f"add_sk_{user_id}".encode())]
         ]
+        pk_warning = "" if pk_provided else "\n⚠️ <b>Tip:</b> If card checking returns <i>Invalid API Key</i>, provide your matching PK key:\n<code>/sk sk_live_... pk_live_...</code>\n"
         text = f"""<b>🔑 STRIPE SK KEY VERIFIED & AUDITED</b>
 ━━━━━━━━━━━━━━━━━━━━
 <b>Status:</b> {msg}
@@ -2499,8 +2501,7 @@ Or reply to a message containing secret keys.""", parse_mode="html")
 <b>Account ID:</b> <code>{info['account_id']}</code> ({info['country']})
 
 <b>Secret Key:</b> <code>{info['sk']}</code>
-<b>Publishable Key:</b> <code>{info['pk']}</code>
-
+<b>Publishable Key:</b> <code>{info['pk']}</code>{pk_warning}
 ✅ <b>Option:</b> Click below to save as your default SK gate key!"""
         await status_msg.edit(text, buttons=buttons, parse_mode="html")
     else:
