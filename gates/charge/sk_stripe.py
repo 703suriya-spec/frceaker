@@ -243,17 +243,24 @@ async def check_card_sk(cc, mm, yy, cvc, sk_key=None, pk_key=None, proxy_url=Non
     derived_pk, acct_id = derive_pk_or_acct(sk_key, pk_key)
 
     try:
-        async with httpx.AsyncClient(proxy=proxy_url if proxy_url else None, timeout=20.0) as session:
-            res_str = await skintoff_engine(session, cc, mm, yy, cvc, sk_key=sk_key, pk_key=derived_pk)
-            
-            res_lower = str(res_str).lower()
-            if 'charged' in res_lower or 'succeeded' in res_lower:
-                return True, 'Charged! 🟢', res_str, res_str
-            elif 'cvv live' in res_lower or 'insufficient' in res_lower or 'approved' in res_lower:
-                return True, 'Approved! ✅', res_str, res_str
-            elif '3d secure' in res_lower:
-                return False, 'Live! 🟡 (3DS)', res_str, res_str
+        try:
+            async with httpx.AsyncClient(proxy=proxy_url if proxy_url else None, timeout=20.0) as session:
+                res_str = await skintoff_engine(session, cc, mm, yy, cvc, sk_key=sk_key, pk_key=derived_pk)
+        except Exception as pe:
+            if 'socks' in str(pe).lower() or 'proxy' in str(pe).lower():
+                async with httpx.AsyncClient(timeout=20.0) as session:
+                    res_str = await skintoff_engine(session, cc, mm, yy, cvc, sk_key=sk_key, pk_key=derived_pk)
             else:
-                return False, 'Declined! ❌', res_str, res_str
+                raise pe
+            
+        res_lower = str(res_str).lower()
+        if 'charged' in res_lower or 'succeeded' in res_lower:
+            return True, 'Charged! 🟢', res_str, res_str
+        elif 'cvv live' in res_lower or 'insufficient' in res_lower or 'approved' in res_lower:
+            return True, 'Approved! ✅', res_str, res_str
+        elif '3d secure' in res_lower:
+            return False, 'Live! 🟡 (3DS)', res_str, res_str
+        else:
+            return False, 'Declined! ❌', res_str, res_str
     except Exception as e:
         return False, 'ERROR ⚠️', str(e), ''
