@@ -2567,54 +2567,61 @@ async def callback_add_sk(event):
 # Single Card SK-Based Gate (/skchk)
 @bot.on(events.NewMessage(pattern=r'(?i)^[./]skchk(?:\s+(.+))?$'))
 async def process_skchk_cmd(event):
-    user_id = event.sender_id
-    if not await is_joined_channel(user_id):
-        await event.reply("Join channel and /verify first!")
-        return
-
-    allowed, remaining = check_limits(user_id, False)
-    if not allowed:
-        await event.reply("Daily limit reached. Get premium.")
-        return
-
-    card_input = event.pattern_match.group(1)
-    if not card_input and event.is_reply:
-        reply_msg = await event.get_reply_message()
-        if reply_msg:
-            card_input = reply_msg.text
-
-    if not card_input:
-        await event.reply("⚠️ Format: `/skchk cc|mm|yy|cvv`")
-        return
-
-    cards = extract_cc(card_input)
-    if not cards:
-        await event.reply("⚠️ Format: `/skchk cc|mm|yy|cvv`")
-        return
-
-    card = cards[0]
-    parts = card.split('|')
     try:
-        cc = parts[0].strip()
-        mm = parts[1].strip()
-        yy = parts[2].strip()
-        cvc = parts[3].strip()
-    except IndexError:
-        await event.reply("⚠️ Format: `/skchk cc|mm|yy|cvv`")
-        return
+        user_id = event.sender_id
+        if not await is_joined_channel(user_id):
+            await event.reply("⚠️ Join channel and /verify first!")
+            return
 
-    status_msg = await event.reply("⚡ <b>Checking via Stripe SK Direct API...</b>", parse_mode="html")
-    proxies = load_proxies(user_id)
-    proxy = random.choice(proxies) if proxies else None
-    start_time = time.time()
+        allowed, remaining = check_limits(user_id, False)
+        if not allowed:
+            await event.reply("⚠️ Daily limit reached. Get premium.")
+            return
 
-    is_live, status_str, response_str, raw = await check_card_sk(cc, mm, yy, cvc, proxy_url=proxy, user_id=user_id)
-    time_taken = round(time.time() - start_time, 2)
-    update_daily_usage(user_id, 1)
+        card_input = event.pattern_match.group(1)
+        if not card_input and event.is_reply:
+            reply_msg = await event.get_reply_message()
+            if reply_msg and reply_msg.text:
+                card_input = reply_msg.text
 
-    brand, bin_type, level, bank, country, flag = await get_bin_info(cc[:6])
-    res = format_anime_result(f"{cc}|{mm}|{yy}|{cvc}", status_str, response_str, "Stripe SK Direct ($1.00)", brand, bin_type, level, bank, country, flag, time_taken, event.sender)
-    await status_msg.edit(res, parse_mode="html")
+        if not card_input:
+            await event.reply("⚠️ Format: `/skchk cc|mm|yy|cvv`")
+            return
+
+        cards = extract_cc(card_input)
+        if not cards:
+            await event.reply("⚠️ Format: `/skchk cc|mm|yy|cvv`")
+            return
+
+        card = cards[0]
+        parts = card.split('|')
+        try:
+            cc = parts[0].strip()
+            mm = parts[1].strip()
+            yy = parts[2].strip()
+            cvc = parts[3].strip()
+        except IndexError:
+            await event.reply("⚠️ Format: `/skchk cc|mm|yy|cvv`")
+            return
+
+        status_msg = await event.reply("⚡ <b>Checking via Stripe SK Direct API...</b>", parse_mode="html")
+        proxies = load_proxies(user_id)
+        proxy = random.choice(proxies) if proxies else None
+        start_time = time.time()
+
+        is_live, status_str, response_str, raw = await check_card_sk(cc, mm, yy, cvc, proxy_url=proxy, user_id=user_id)
+        time_taken = round(time.time() - start_time, 2)
+        update_daily_usage(user_id, 1)
+
+        brand, bin_type, level, bank, country, flag = await get_bin_info(cc[:6])
+        res = format_anime_result(f"{cc}|{mm}|{yy}|{cvc}", status_str, response_str, "Stripe SK Direct ($1.00)", brand, bin_type, level, bank, country, flag, time_taken, event.sender)
+        await status_msg.edit(res, parse_mode="html")
+    except Exception as e:
+        print(f"[SKCHK Error]: {e}")
+        try:
+            await event.reply(f"❌ <b>Error processing check:</b> <code>{e}</code>", parse_mode="html")
+        except Exception:
+            pass
 
 
 # Mass SK-Based Gate (/msk)

