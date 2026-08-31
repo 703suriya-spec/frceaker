@@ -2514,29 +2514,38 @@ Or reply to a message containing secret keys.""", parse_mode="html")
 
 @bot.on(events.CallbackQuery(pattern=r'^add_sk_(\d+)$'))
 async def callback_add_sk(event):
-    target_user_id = int(event.pattern_match.group(1))
-    if event.sender_id != target_user_id:
-        await event.answer("⚠️ You cannot claim another user's SK key audit!", alert=True)
-        return
+    try:
+        target_user_id = int(event.pattern_match.group(1))
+        if event.sender_id != target_user_id:
+            await event.answer("⚠️ You cannot claim another user's SK key audit!", alert=True)
+            return
 
-    msg_text = event.message.text or ""
-    sks = re.findall(r'sk_live_[a-zA-Z0-9]+', msg_text)
-    pks = re.findall(r'pk_live_[a-zA-Z0-9]+', msg_text)
-    
-    if not sks:
-        await event.answer("⚠️ No valid SK key found in audit message!", alert=True)
-        return
+        msg = await event.get_message()
+        msg_text = msg.text if (msg and hasattr(msg, 'text')) else ""
 
-    sk_key = sks[0]
-    pk_key = pks[0] if pks else None
-    is_live, msg, info = await validate_stripe_sk(sk_key, pk_key)
+        sks = re.findall(r'sk_live_[a-zA-Z0-9]+', msg_text)
+        pks = re.findall(r'pk_live_[a-zA-Z0-9]+', msg_text)
+        
+        if not sks:
+            saved = get_user_sk(target_user_id)
+            if saved and isinstance(saved, dict) and saved.get('sk'):
+                sk_key = saved.get('sk')
+                pk_key = saved.get('pk')
+            else:
+                await event.answer("⚠️ No valid SK key found in audit message!", alert=True)
+                return
+        else:
+            sk_key = sks[0]
+            pk_key = pks[0] if pks else None
 
-    if is_live and info:
-        save_user_sk(target_user_id, info['sk'], info['pk'])
-        await event.answer("✅ SK Key Saved as Active Gate!", alert=True)
-        await event.edit(f"""<b>🔑 STRIPE SK KEY ACTIVE & SAVED</b>
+        is_live, msg_status, info = await validate_stripe_sk(sk_key, pk_key)
+
+        if is_live and info:
+            save_user_sk(target_user_id, info['sk'], info['pk'])
+            await event.answer("✅ SK Key Saved as Active Gate!", alert=True)
+            await event.edit(f"""<b>🔑 STRIPE SK KEY ACTIVE & SAVED</b>
 ━━━━━━━━━━━━━━━━━━━━
-<b>Status:</b> {msg}
+<b>Status:</b> {msg_status}
 <b>Available Balance:</b> <code>{info['available']}</code>
 <b>Pending Balance:</b> <code>{info['pending']}</code>
 <b>Account ID:</b> <code>{info['account_id']}</code> ({info['country']})
@@ -2545,8 +2554,13 @@ async def callback_add_sk(event):
 <b>Saved PK:</b> <code>{info['pk']}</code>
 
 🚀 <b>Gate Ready:</b> Use <code>/skchk cc|mm|yy|cvv</code> or <code>/msk</code> for mass checking!""", parse_mode="html")
-    else:
-        await event.answer("❌ SK Key expired or invalid!", alert=True)
+        else:
+            await event.answer("❌ SK Key expired or invalid!", alert=True)
+    except Exception as e:
+        try:
+            await event.answer(f"⚠️ Error saving SK key: {e}", alert=True)
+        except Exception:
+            pass
 
 
 # Single Card SK-Based Gate (/skchk)
