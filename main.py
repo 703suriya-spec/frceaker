@@ -3695,33 +3695,41 @@ async def setup_bot_commands():
 
 if __name__ == "__main__":
     register_hoshigaki_gate(bot, is_admin, load_proxies, extract_cc, get_bin_info)
-    print("FREAKY CHECKER BOT ACTIVE")
+    print("FREAKY CHECKER BOT ACTIVE", flush=True)
+    
+    if not BOT_TOKEN:
+        print("❌ CRITICAL ERROR: BOT_TOKEN environment variable is EMPTY or NOT SET on Render!", flush=True)
+        print(" Please add BOT_TOKEN in Render Dashboard -> Environment Variables and deploy again.", flush=True)
+    else:
+        bot_id_part = BOT_TOKEN.split(':')[0] if ':' in BOT_TOKEN else 'INVALID'
+        print(f"🔑 Loaded BOT_TOKEN for Bot ID: {bot_id_part}", flush=True)
+
     retry_count = 0
     max_retries = 9999
 
     while retry_count < max_retries:
         try:
-            print(f"Bot running... (attempt {retry_count + 1})")
+            print(f"Bot running... (attempt {retry_count + 1})", flush=True)
             bot.start(bot_token=BOT_TOKEN)
             try:
                 bot.loop.create_task(setup_bot_commands())
             except Exception as e:
-                print(f"Error launching setup_bot_commands: {e}")
+                print(f"Error launching setup_bot_commands: {e}", flush=True)
             if globals().get("FAKE_HITS_ENABLED", False):
                 try:
                     bot.loop.create_task(start_fake_hits())
                 except:
                     pass
-            print("Bot is online and listening!")
+            print("🚀 Bot is ONLINE and listening to Telegram commands!", flush=True)
             bot.run_until_disconnected()
             break
         except KeyboardInterrupt:
-            print("User stopped the bot manually.")
+            print("User stopped the bot manually.", flush=True)
             break
         except Exception as e:
             retry_count += 1
             error_str = str(e)
-            print(f"Bot crashed: {error_str}")
+            print(f"❌ Bot crashed on start: {error_str}", flush=True)
             time.sleep(5)
 
 
