@@ -2653,15 +2653,6 @@ DEFAULT_SQUARE_SITE = "https://checkout.square.site/merchant/MLR1YP75V68E5/check
 async def sq_check_cmd(event):
     try:
         user_id = event.sender_id
-        if not await is_joined_channel(user_id):
-            await event.reply("⚠️ Join channel and /verify first!")
-            return
-
-        allowed, remaining = check_limits(user_id, False)
-        if not allowed:
-            await event.reply("⚠️ Daily limit reached. Get premium.")
-            return
-
         raw_text = event.pattern_match.group(1) or ""
         if not raw_text and event.is_reply:
             reply_msg = await event.get_reply_message()
@@ -2702,7 +2693,6 @@ async def sq_check_cmd(event):
 
         result = await process_square(merchant_id, checkout_id, cc, mes, ano, cvv, proxy=proxy)
         time_taken = round(time.time() - start_time, 2)
-        update_daily_usage(user_id, 1)
 
         is_charged, resp_text = _extract_square_result(result)
         brand, bin_type, level, bank, country, flag = await get_bin_info(cc[:6])
