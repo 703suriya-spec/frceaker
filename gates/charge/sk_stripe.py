@@ -14,9 +14,9 @@ def derive_pk_or_acct(sk_key, pk_key=None):
     if pk_key and pk_key.startswith('pk_live_'):
         if '_' in pk_key:
             raw = pk_key.split('_')[-1]
-            if raw.startswith('51'):
+            if len(raw) >= 17 and raw.startswith('51'):
                 acct_id = 'acct_1' + raw[2:17]
-            else:
+            elif len(raw) >= 16:
                 acct_id = 'acct_' + raw[:16]
         return pk_key, acct_id
 
@@ -24,9 +24,9 @@ def derive_pk_or_acct(sk_key, pk_key=None):
         return pk_key, None
 
     raw_sk = sk_key.split('_')[-1]
-    if raw_sk.startswith('51'):
+    if len(raw_sk) >= 17 and raw_sk.startswith('51'):
         acct_id = 'acct_1' + raw_sk[2:17]
-    else:
+    elif len(raw_sk) >= 16:
         acct_id = 'acct_' + raw_sk[:16]
     
     derived_pk = pk_key or ('pk_live_' + raw_sk)
@@ -141,14 +141,17 @@ async def skintoff_engine(session, cc, mm, yy, cvv, sk_key, pk_key):
     
     try:
         r1 = await session.post('https://api.stripe.com/v1/payment_intents', headers=headers_pi, data=data_pi)
-        pi_json = r1.json()
+        try:
+            pi_json = r1.json()
+        except Exception:
+            pi_json = {}
         client_secret = pi_json.get('client_secret')
         pi_id = pi_json.get('id')
     except Exception as e:
         return f'[Step 1 Error] {str(e)}'
 
     if not client_secret or not pi_id:
-        err_msg = pi_json.get('error', {}).get('message', 'Failed to create PaymentIntent')
+        err_msg = pi_json.get('error', {}).get('message', f'Failed to create PaymentIntent ({getattr(r1, "status_code", 400)})')
         return f'[Step 1 Error] {err_msg}'
 
     # Step 2: Confirm PaymentIntent via real PK + payment_user_agent
@@ -179,18 +182,24 @@ async def skintoff_engine(session, cc, mm, yy, cvv, sk_key, pk_key):
     try:
         r2 = await session.post(f'https://api.stripe.com/v1/payment_intents/{pi_id}/confirm', headers=headers_confirm, data=data_confirm)
         text = r2.text
-        json_res = r2.json()
+        try:
+            json_res = r2.json()
+        except Exception:
+            json_res = {}
 
         if 'requires_action' in text or 'requires_source_action' in text:
             return '3D Secure Required'
         if '"cvc_check": "pass"' in text or '"cvc_check":"pass"' in text:
             return 'CVV Live'
         if 'error' in text:
-            if 'decline_code' in json_res['error']:
-                return json_res['error']['decline_code'].replace('_', ' ').title()
+            err_obj = json_res.get('error', {}) if isinstance(json_res, dict) else {}
+            if isinstance(err_obj, dict) and 'decline_code' in err_obj:
+                return err_obj['decline_code'].replace('_', ' ').title()
+            elif isinstance(err_obj, dict) and 'message' in err_obj:
+                return err_obj['message']
             else:
-                return json_res['error']['message']
-        elif 'succeeded' in text or (json_res.get('status') == 'succeeded') or 'success:true' in text:
+                return 'Payment Declined'
+        elif 'succeeded' in text or (isinstance(json_res, dict) and json_res.get('status') == 'succeeded') or 'success:true' in text:
             return 'Charged $1'
         else:
             return 'Unexpected response'
@@ -231,7 +240,7 @@ async def check_card_sk(cc, mm, yy, cvc, sk_key=None, pk_key=None, proxy_url=Non
         elif 'cvv live' in res_lower or 'insufficient' in res_lower or 'approved' in res_lower:
             return True, 'Approved! ✅', res_str, res_str
         elif '3d secure' in res_lower:
-            return False, 'Live! 🟡 (3DS)', res_str, res_str
+            return True, 'Live! 🟡 (3DS)', res_str, res_str
         else:
             return False, 'Declined! ❌', res_str, res_str
     except Exception as e:
