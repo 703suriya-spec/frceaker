@@ -2647,51 +2647,76 @@ async def process_msk_cmd(event):
     await _run_generic_mass_check(event, "Stripe SK Direct Mass ($1.00)", run_msk_worker)
 
 
-@bot.on(events.NewMessage(pattern=r'^/sq(?:\s+(.+))?$'))
+DEFAULT_SQUARE_SITE = "https://checkout.square.site/merchant/MLR1YP75V68E5/checkout/K2D6LMLJIZFOQULVTVCNGIMV"
+
+@bot.on(events.NewMessage(pattern=r'(?i)^[./]sq(?:\s+(.+))?$'))
 async def sq_check_cmd(event):
-    user_id = event.sender_id
-    raw_text = event.pattern_match.group(1) if event.pattern_match.group(1) else ""
-    if not raw_text:
-        await event.reply("Format: `/sq cc|mm|yy|cvv`")
-        return
-
-    cards = extract_cc(raw_text)
-    if not cards:
-        await event.reply("Invalid format! Send: <code>/sq card|mm|yy|cvv</code>", parse_mode="html")
-        return
-
-    card = cards[0]
-    parts = card.split("|")
-    if len(parts) < 4:
-        await event.reply("Invalid format! Send: <code>/sq card|mm|yy|cvv</code>", parse_mode="html")
-        return
-
-    cc, mes, ano, cvv = [p.strip() for p in parts[:4]]
-    if len(ano) == 2:
-        ano = f"20{ano}"
-
-    target_site = DEFAULT_SQUARE_SITE
     try:
-        merchant_id, checkout_id = _parse_square_url(target_site)
+        user_id = event.sender_id
+        if not await is_joined_channel(user_id):
+            await event.reply("⚠️ Join channel and /verify first!")
+            return
+
+        allowed, remaining = check_limits(user_id, False)
+        if not allowed:
+            await event.reply("⚠️ Daily limit reached. Get premium.")
+            return
+
+        raw_text = event.pattern_match.group(1) or ""
+        if not raw_text and event.is_reply:
+            reply_msg = await event.get_reply_message()
+            if reply_msg and reply_msg.text:
+                raw_text = reply_msg.text
+
+        if not raw_text:
+            await event.reply("⚠️ Format: `/sq cc|mm|yy|cvv`")
+            return
+
+        cards = extract_cc(raw_text)
+        if not cards:
+            await event.reply("Invalid format! Send: <code>/sq card|mm|yy|cvv</code>", parse_mode="html")
+            return
+
+        card = cards[0]
+        parts = card.split("|")
+        if len(parts) < 4:
+            await event.reply("Invalid format! Send: <code>/sq card|mm|yy|cvv</code>", parse_mode="html")
+            return
+
+        cc, mes, ano, cvv = [p.strip() for p in parts[:4]]
+        if len(ano) == 2:
+            ano = f"20{ano}"
+
+        target_site = DEFAULT_SQUARE_SITE
+        try:
+            merchant_id, checkout_id = _parse_square_url(target_site)
+        except Exception as e:
+            await event.reply(f"❌ Site config error: {e}")
+            return
+
+        status_msg = await event.reply(f"⚡ <b>Checking via Square $1.00 Gateway...</b>\nCard: <code>{cc}|{mes}|{ano}|{cvv}</code>", parse_mode="html")
+
+        proxies = load_proxies(user_id)
+        proxy = random.choice(proxies) if proxies else None
+        start_time = time.time()
+
+        result = await process_square(merchant_id, checkout_id, cc, mes, ano, cvv, proxy=proxy)
+        time_taken = round(time.time() - start_time, 2)
+        update_daily_usage(user_id, 1)
+
+        is_charged, resp_text = _extract_square_result(result)
+        brand, bin_type, level, bank, country, flag = await get_bin_info(cc[:6])
+
+        status_emoji = "Approved! ✅ -» charged!" if "CHARGED" in str(resp_text).upper() else ("Approved! ✅" if is_charged else "Declined! ❌")
+        res_msg = format_anime_result(f"{cc}|{mes}|{ano}|{cvv}", status_emoji, resp_text, "Square Charge -» $1.00", brand, bin_type, level, bank, country, flag, time_taken, event.sender)
+
+        await status_msg.edit(res_msg, parse_mode="html")
     except Exception as e:
-        await event.reply(f"Site config error: {e}")
-        return
-
-    status_msg = await event.reply(f"<b>SQUARE $1 GATEWAY</b>\n━━━━━━━━━━━━━━━━━━━━\nCard: <code>{cc}|{mes}|{ano}|{cvv}</code>\n<i>Processing payment...</i>", parse_mode="html")
-
-
-    proxies = load_proxies(user_id)
-    proxy = random.choice(proxies) if proxies else None
-
-    result = await process_square(merchant_id, checkout_id, cc, mes, ano, cvv, proxy=proxy)
-    is_charged, resp_text = _extract_square_result(result)
-
-    brand, bin_type, level, bank, country, flag = await get_bin_info(cc[:6])
-
-    status_emoji = "Approved! ✅ -» charged!" if "CHARGED" in str(resp_text).upper() else ("Approved! ✅" if is_charged else "Declined! ❌")
-    res_msg = format_anime_result(f"{cc}|{mes}|{ano}|{cvv}", status_emoji, resp_text, "Square Charge -» $1.00", brand, bin_type, level, bank, country, flag, "2.1", event.sender)
-
-    await status_msg.edit(res_msg, parse_mode="html")
+        print(f"[SQ Error]: {e}", flush=True)
+        try:
+            await event.reply(f"❌ <b>Error processing check:</b> <code>{e}</code>", parse_mode="html")
+        except Exception:
+            pass
 
 
 
