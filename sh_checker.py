@@ -190,9 +190,13 @@ async def fetch_cheapest_product(domain, proxy_str=None, max_price=1000.00):
 
     for ep in endpoints:
         try:
-            from curl_cffi.requests import AsyncSession
-            async with AsyncSession(impersonate="chrome120") as session:
-                resp = await session.get(ep, proxies=proxies, timeout=10)
+            try:
+                from anti_detect import create_anti_detect_session
+            except ImportError:
+                from curl_cffi.requests import AsyncSession as create_anti_detect_session
+            proxy_url = proxies.get("http") if proxies else None
+            async with create_anti_detect_session("chrome124", proxy=proxy_url, timeout=10) as session:
+                resp = await session.get(ep, timeout=10)
                 if resp.status_code != 200:
                     continue
 
@@ -286,7 +290,14 @@ async def validate_card(cc, month, year, cvv, site_url, variant_id=None, proxy_s
                 variant_id = product["variant_id"]
                 total_price = product["price"]
 
-            async with CurlSession(impersonate="chrome120", timeout=12) as session:
+            try:
+                from anti_detect import create_anti_detect_session, get_browser_headers
+            except ImportError:
+                from curl_cffi.requests import AsyncSession as create_anti_detect_session
+                def get_browser_headers(p, extra=None): return {}
+
+            profile_name = "chrome124"
+            async with create_anti_detect_session(profile_name=profile_name, proxy=proxy, timeout=12) as session:
                 # Step 1: Add to cart
                 print(f"[{attempt}] [STEP 2] Adding to cart...")
                 cart_resp = await session.post(
@@ -633,9 +644,10 @@ async def validate_card(cc, month, year, cvv, site_url, variant_id=None, proxy_s
                     "payment_session_scope": domain,
                 }
                 vault_headers = {
-                    "Content-Type": "application/json", "Accept": "application/json",
+                    **get_browser_headers(profile_name),
+                    "Content-Type": "application/json",
+                    "Accept": "application/json",
                     "Origin": "https://checkout.pci.shopifyinc.com",
-                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.7103.93 Safari/537.36",
                 }
                 if ident_sig: vault_headers["shopify-identification-signature"] = ident_sig
 
