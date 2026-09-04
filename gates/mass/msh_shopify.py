@@ -73,7 +73,7 @@ async def check_card_msh(
         try:
             success, message, gateway, total_price, currency = await asyncio.wait_for(
                 process_card(cc, mes, ano, cvv, site, proxy_str=current_proxy),
-                timeout=5
+                timeout=20
             )
         except asyncio.TimeoutError:
             message = "TIMEOUT"

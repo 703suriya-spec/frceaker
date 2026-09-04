@@ -47,9 +47,6 @@ def get_browser_headers(profile_name: str = DEFAULT_PROFILE, additional_headers:
         "sec-ch-ua-mobile": prof["sec_ch_ua_mobile"],
         "sec-ch-ua-platform": prof["sec_ch_ua_platform"],
         "Accept-Language": "en-US,en;q=0.9",
-        "Sec-Fetch-Site": "same-origin",
-        "Sec-Fetch-Mode": "cors",
-        "Sec-Fetch-Dest": "empty",
     }
     if additional_headers:
         headers.update(additional_headers)
