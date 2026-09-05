@@ -149,8 +149,10 @@ async def check_card_hoshigaki(cc: str, mm: str, yy: str, cvc: str, proxy_url: s
                 data6 = {}
 
             error_msg = data6.get("error", "")
-            if not error_msg and (data6.get("success") or "requires_action" in res_text or "status" in data6):
+            if not error_msg and (data6.get("success") or data6.get("status") == "succeeded"):
                 return True, "CHARGED ✅", "Thank You For Your Donation ($1.00)", res_text
+            elif "requires_action" in res_text or data6.get("requires_action"):
+                return True, "3DS 🟡", "3D Secure / Verification Required", res_text
             elif "incorrect_cvc" in error_msg or "security code is incorrect" in error_msg:
                 return True, "APPROVED 🟩", "Your card's security code is incorrect (CCN Live)", res_text
             elif "insufficient_funds" in error_msg:
@@ -204,7 +206,7 @@ def register_hoshigaki_gate(bot, is_admin_fn, load_proxies_fn, extract_cc_fn, ge
         time_taken = round(time.time() - start_time, 2)
         brand, bin_type, level, bank, country, flag = await get_bin_info_fn(cc[:6])
 
-        status_emoji = "Approved! ✅ -» charged!" if "CHARGED" in status_str else ("Approved! ✅" if is_live else "Dead! ❌")
+        status_emoji = "Approved! ✅ -» charged!" if "CHARGED" in status_str else ("Declined! ❌ -» 3DS Required" if "3DS" in status_str else ("Approved! ✅" if is_live else "Declined! ❌"))
 
         user_tag = ""
         if event.sender:
