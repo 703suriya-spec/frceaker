@@ -51,7 +51,7 @@ async def extract_real_pk_from_sk(session, sk_key):
         if '#' in checkout_url:
             url_part = checkout_url.split('#')[1]
             encoded_url = url_part.replace('%2B', '+').replace('%2F', '/')
-            encoded_url += '=' * (len(encoded_url) % 4)
+            encoded_url += '=' * (-len(encoded_url) % 4)
             decoded_bytes = base64.urlsafe_b64decode(encoded_url)
             decoded_url = decoded_bytes.decode('utf-8')
             key = 5
@@ -240,8 +240,8 @@ async def check_card_sk(cc, mm, yy, cvc, sk_key=None, pk_key=None, proxy_url=Non
         elif 'cvv live' in res_lower or 'insufficient' in res_lower or 'approved' in res_lower:
             return True, 'Approved! ✅', res_str, res_str
         elif '3d secure' in res_lower:
-            return True, 'Live! 🟡 (3DS)', res_str, res_str
+            return False, 'Live! 🟡 (3DS)', res_str, res_str
         else:
             return False, 'Declined! ❌', res_str, res_str
     except Exception as e:
-        return False, 'ERROR ⚠️', str(e), ''
+        return False, 'ERROR ⚠️', f'Execution error: {str(e)}', ''
