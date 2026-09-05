@@ -13,15 +13,15 @@ import random
 import uuid
 import re
 
-# Fallback persistent token (auto-refreshed dynamically)
+# Persistent fallback refreshed dynamically from checkout
 _FALLBACK_FINGERPRINT = (
     "eyJraWQiOiIyMDE4MDQyNjE2LXByb2R1Y3Rpb24iLCJpc3MiOiJodHRwczovL2FwaS5icmFpbnRyZWVnYXRld2F5LmNvbSIsImFsZyI6IkVTMjU2In0."
-    "eyJleHAiOjE3ODc4NDA2NjksImp0aSI6Ijc5ZDJlYWY2LTE1Y2QtNGIxNC04NWExLWVkZjQ5OTI3ZDNhOSIsInN1YiI6IjVoZ3pxZ3BjbmRuM2ZzNHkiLCJpc3MiOiJodHRwczovL2FwaS5icmFpbnRyZWVnYXRld2F5LmNvbSIsIm1lcmNoYW50Ijp7InB1YmxpY19pZCI6IjVoZ3pxZ3BjbmRuM2ZzNHkiLCJ2ZXJpZnlfY2FyZF9ieV9kZWZhdWx0Ijp0cnVlLCJ2ZXJpZnlfd2FsbGV0X2J5X2RlZmF1bHQiOmZhbHNlfSwicmlnaHRzIjpbIm1hbmFnZV92YXVsdCJdLCJzY29wZSI6WyJCcmFpbnRyZWU6VmF1bHQiLCJCcmFpbnRyZWU6Q2xpZW50U0RLIl0sIm9wdGlvbnMiOnsibWVyY2hhbnRfYWNjb3VudF9pZCI6ImluZm9tYWtpc3RhbXBzZGUiLCJwYXlwYWxfY2xpZW50X2lkIjoiQWZJM3ZaUTBFZmVVTGZxRElEQlZGNGY4eDh5aUVHV3Z3a0hnYm1CYi1Vclo5Y19sMGhOb2FaNTB4eXpEUDA0ZEdEU0RLYmJUcEc3Q0xwLVoifX0."
-    "nOQOSLk7iVujeq2TDRaFDVKrrzaqZIaD_pG984zT_KsaIkz6C7wZxqbKHwu0DUje6g0_-FU6bq41WYNRVwcl4g"
+    "eyJleHAiOjE3ODg2NzIxNjIsImp0aSI6IjU5YmE2ZGIxLWQ0MGUtNGI2Yy05YTEwLWQ1ZjIxNjg1ZTUyMSIsInN1YiI6IjVoZ3pxZ3BjbmRuM2ZzNHkiLCJpc3MiOiJodHRwczovL2FwaS5icmFpbnRyZWVnYXRld2F5LmNvbSIsIm1lcmNoYW50Ijp7InB1YmxpY19pZCI6IjVoZ3pxZ3BjbmRuM2ZzNHkiLCJ2ZXJpZnlfY2FyZF9ieV9kZWZhdWx0Ijp0cnVlLCJ2ZXJpZnlfd2FsbGV0X2J5X2RlZmF1bHQiOmZhbHNlfSwicmlnaHRzIjpbIm1hbmFnZV92YXVsdCJdLCJzY29wZSI6WyJCcmFpbnRyZWU6VmF1bHQiLCJCcmFpbnRyZWU6Q2xpZW50U0RLIl0sIm9wdGlvbnMiOnsibWVyY2hhbnRfYWNjb3VudF9pZCI6ImluZm9tYWtpc3RhbXBzZGUiLCJwYXlwYWxfY2xpZW50X2lkIjoiQWZJM3ZaUTBFZmVVTGZxRElEQlZGNGY4eDh5aUVHV3Z3a0hnYm1CYi1Vclo5Y19sMGhOb2FaNTB4eXpEUDA0ZEdEU0RLYmJUcEc3Q0xwLVoifX0."
+    "zZ62y0oMrg4AtXMtxmqvRM_KOAfbdGIBjBWND9m8AeHYp0uhW6mnxzJUlPotYBL4ujo4NTrr9OPpasb6n_TJZQ"
 )
 
-_cached_fingerprint = _FALLBACK_FINGERPRINT
-_cache_expiry = time.time() + 43200
+_cached_fingerprint = None
+_cache_expiry = 0
 
 def _format_proxy(p):
     if not p:
@@ -47,7 +47,9 @@ def _extract_fp_from_text(text: str) -> str | None:
     match = re.search(r'var\s+wc_braintree_client_token\s*=\s*\["(.*?)"\]', text)
     if match:
         try:
-            decoded = base64.b64decode(match.group(1)).decode()
+            raw_b64 = match.group(1)
+            padded = raw_b64 + '=' * (4 - len(raw_b64) % 4)
+            decoded = base64.b64decode(padded).decode('utf-8', errors='ignore')
             data = json.loads(decoded)
             fp = data.get("authorizationFingerprint")
             if fp:
@@ -79,7 +81,7 @@ async def _get_auth_fingerprint(session, proxy_url=None):
                 fp = _extract_fp_from_text(resp_text)
                 if fp:
                     _cached_fingerprint = fp
-                    _cache_expiry = now + 43200
+                    _cache_expiry = now + 1800
                     return fp
     except Exception:
         pass
@@ -93,7 +95,7 @@ async def _get_auth_fingerprint(session, proxy_url=None):
                     fp = _extract_fp_from_text(resp_text)
                     if fp:
                         _cached_fingerprint = fp
-                        _cache_expiry = now + 43200
+                        _cache_expiry = now + 1800
                         return fp
         except Exception:
             pass
@@ -101,7 +103,7 @@ async def _get_auth_fingerprint(session, proxy_url=None):
     # Safe persistent fallback
     if _FALLBACK_FINGERPRINT:
         _cached_fingerprint = _FALLBACK_FINGERPRINT
-        _cache_expiry = now + 43200
+        _cache_expiry = now + 1800
         return _FALLBACK_FINGERPRINT
 
     return None
