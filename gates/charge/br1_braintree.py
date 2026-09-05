@@ -16,9 +16,9 @@ from helpers import classify_gate_response
 HTTP_TIMEOUT = aiohttp.ClientTimeout(total=25, connect=10)
 
 USER_AGENTS = [
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
 ]
 
 PRODUCT_ID = 3298960
@@ -216,9 +216,25 @@ async def check_card(
                 },
                 **proxy_args
             ) as add_resp:
-                if add_resp.status not in (200, 201):
+                if add_resp.status == 403 and proxy_args:
+                    async with session.post(
+                        "https://vitabase.com/headless-api/cart/add",
+                        headers=api_headers,
+                        json={
+                            "cart_token": cart_token,
+                            "product_id": PRODUCT_ID,
+                            "quantity": 1,
+                            "user_id": "guest",
+                            "autoship_flag": False,
+                        },
+                    ) as direct_add:
+                        if direct_add.status not in (200, 201):
+                            return "error", f"cart_add_{direct_add.status}", "cart_fail"
+                        await direct_add.read()
+                elif add_resp.status not in (200, 201):
                     return "error", f"cart_add_{add_resp.status}", "cart_fail"
-                await add_resp.read()
+                else:
+                    await add_resp.read()
 
             client_token = None
             bt_data = {}
@@ -337,6 +353,20 @@ async def check_card(
                 except:
                     co_text = await co_resp.text()
                     co_json = {"message": co_text[:200]}
+
+            # If proxy triggered bot-protection (Imunify360 or 403), fallback immediately to clean direct checkout
+            if proxy_args and (co_resp.status in (403, 406, 429) or "imunify" in str(co_json).lower() or "bot-protection" in str(co_json).lower()):
+                async with session.post(
+                    "https://vitabase.com/headless-api/checkout",
+                    headers=checkout_headers,
+                    json=checkout_payload,
+                ) as dir_co:
+                    try:
+                        co_json = await dir_co.json()
+                    except:
+                        co_text = await dir_co.text()
+                        co_json = {"message": co_text[:200]}
+                    co_resp = dir_co
 
             status, msg, code = _classify_checkout(co_json, co_resp.status)
             elapsed = f"{time.perf_counter() - started:.2f}s"

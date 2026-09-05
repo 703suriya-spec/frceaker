@@ -6,7 +6,8 @@ Pillow
 pytz
 psycopg2-binary
 httpx
-requests
+requests[socks]
+PySocks>=1.7.1
 cachetools
 beautifulsoup4
 cloudscraper
