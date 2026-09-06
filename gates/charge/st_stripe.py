@@ -72,14 +72,19 @@ async def process_stripe(cc, mm, yy, cvc, proxy_url=None):
     proxy_url = _format_proxy(proxy_url)
 
     try:
-        first_name = random.choice(first_names)
-        last_name = random.choice(last_names)
-        email = random_email()
-        street_num = random.randint(100, 9999)
-        street = random.choice(streets)
-        city = random.choice(cities)
-        state = random.choice(states)
-        zip_code = random.choice(zip_codes)
+        try:
+            from faker_gen import generate_fake_identity
+        except ImportError:
+            from alone_checker_bot.faker_gen import generate_fake_identity
+
+        ident = generate_fake_identity("US")
+        first_name = ident["firstName"]
+        last_name = ident["lastName"]
+        email = ident["email"]
+        street = ident["address1"]
+        city = ident["city"]
+        state = ident["zoneCode"]
+        zip_code = ident["postalCode"]
         fingerprint = random_fingerprint()
 
         connector = aiohttp.TCPConnector(ssl=False)

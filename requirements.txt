@@ -13,5 +13,6 @@ beautifulsoup4
 cloudscraper
 curl_cffi>=0.7.0
 flask>=2.0.0
+Faker>=20.0.0
 
 

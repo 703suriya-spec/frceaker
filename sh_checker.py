@@ -93,21 +93,25 @@ def get_random_card(cards=None):
 
 
 def pick_address(url, currency=None):
+    try:
+        from faker_gen import generate_fake_identity
+    except ImportError:
+        from alone_checker_bot.faker_gen import generate_fake_identity
+
     dom = urlparse(url).netloc
     tld = dom.split(".")[-1].upper()
-    if tld in ADDRESS_BOOK:
-        return ADDRESS_BOOK[tld]
-    cc = C2C.get((currency or "").upper())
-    if cc and cc in ADDRESS_BOOK:
-        return ADDRESS_BOOK[cc]
-    return ADDRESS_BOOK["DEFAULT"]
+    cc = tld if len(tld) == 2 else (C2C.get((currency or "").upper()) or "US")
+    return generate_fake_identity(cc)
 
 
-def random_identity():
-    first = random.choice(FIRST_NAMES)
-    last = random.choice(LAST_NAMES)
-    email = f"{first.lower()}.{last.lower()}{random.randint(1, 999)}@{random.choice(EMAIL_DOMAINS)}"
-    return first, last, email
+def random_identity(country="US"):
+    try:
+        from faker_gen import generate_fake_identity
+    except ImportError:
+        from alone_checker_bot.faker_gen import generate_fake_identity
+
+    ident = generate_fake_identity(country)
+    return ident["firstName"], ident["lastName"], ident["email"]
 
 
 def extract_between(text, start, end):
