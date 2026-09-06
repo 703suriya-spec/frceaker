@@ -46,8 +46,14 @@ def save_user_sk(user_id: int, sk: str, pk: str):
         except Exception:
             data = {}
     data[str(user_id)] = {"sk": sk, "pk": pk}
-    with open(SKKEYS_FILE, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=2)
+    
+    tmp_file = f"{SKKEYS_FILE}.tmp"
+    try:
+        with open(tmp_file, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2)
+        os.replace(tmp_file, SKKEYS_FILE)
+    except Exception as e:
+        print(f"SK file write error: {e}")
 
 def get_user_stsites(user_id: int):
     try:
@@ -106,11 +112,12 @@ async def test_merchant_site(url: str) -> tuple[bool, str]:
                     return True, f"HTTP {resp.status} - Active"
                 return False, f"HTTP {resp.status} - Inactive"
     except Exception as e:
-        return False, str(e)[:60]
+        err_msg = str(e) or type(e).__name__
+        return False, f"Connection Failed ({err_msg[:120]})"
 
 # ==================== CC CLEANER & FILTER UTILITY ====================
 def extract_and_clean_ccs(text: str) -> list[str]:
-    pattern = r'\b(\d{15,16})[|/:,\s]+(\d{1,2})[|/:,\s]+(\d{2,4})[|/:,\s]+(\d{3,4})\b'
+    pattern = r'(\d{13,19})[|/:,\s]+(\d{1,2})[|/:,\s]+(\d{2,4})[|/:,\s]+(\d{3,4})'
     matches = re.findall(pattern, text)
     cleaned = []
     seen = set()
@@ -118,6 +125,15 @@ def extract_and_clean_ccs(text: str) -> list[str]:
         mm = mm.zfill(2)
         if len(yy) == 2:
             yy = f"20{yy}"
+        elif len(yy) != 4:
+            continue
+        try:
+            m_int = int(mm)
+            if m_int < 1 or m_int > 12:
+                continue
+        except ValueError:
+            continue
+
         card_str = f"{cc}|{mm}|{yy}|{cvc}"
         if card_str not in seen:
             seen.add(card_str)
@@ -130,13 +146,17 @@ def filter_ccs_by_brand(ccs: list[str], brand_filter: str) -> list[str]:
     for card in ccs:
         bin_num = card.split("|")[0]
         first_digit = bin_num[0]
+        prefix_2 = bin_num[:2]
+        prefix_4 = bin_num[:4]
+        prefix_6 = int(bin_num[:6]) if len(bin_num) >= 6 and bin_num[:6].isdigit() else 0
+
         if brand_filter in ("visa", "v") and first_digit == "4":
             filtered.append(card)
-        elif brand_filter in ("mastercard", "mc", "m") and first_digit in ("5", "2"):
+        elif brand_filter in ("mastercard", "mc", "m") and (first_digit == "5" or (222100 <= prefix_6 <= 272099) or first_digit == "2"):
             filtered.append(card)
-        elif brand_filter in ("amex", "american express", "a") and bin_num[:2] in ("34", "37"):
+        elif brand_filter in ("amex", "american express", "a") and prefix_2 in ("34", "37"):
             filtered.append(card)
-        elif brand_filter in ("discover", "d") and bin_num[:2] in ("60", "65"):
+        elif brand_filter in ("discover", "d") and (prefix_4 == "6011" or prefix_2 in ("64", "65") or (622126 <= prefix_6 <= 622925)):
             filtered.append(card)
     return filtered
 
