@@ -46,8 +46,6 @@ import asyncio
 # ==================== MODULAR GATES PACKAGE IMPORTS ====================
 from gates.auth import (
     check_card_au,
-    check_card_st2,
-    check_card_st,
     check_card_dila,
     check_card_nemaneide,
     check_card_inu,
@@ -1913,28 +1911,7 @@ async def process_an_cmd(event):
 
 
 
-# ==================== STRIPE NEW (st2) ENGINE ====================
-@bot.on(events.NewMessage(pattern=r'^/st2(?:\s+(.+))?$'))
-async def process_st2_cmd(event):
-    user_id = event.sender_id
-    if not is_admin(event.sender_id):
-        await event.reply("Access denied.")
-        return
-    card_input = event.pattern_match.group(1)
-    if not card_input:
-        await event.reply("Format: `/st2 cc|mm|yy|cvv`")
-        return
-    status_msg = await event.reply("<b>Processing Stripe WCPay...</b>", parse_mode="html")
-    proxies = load_proxies(user_id)
-    proxy = random.choice(proxies) if proxies else None
-    start_time = time.time()
-    msg = await check_card_st(card_input, proxy_url=proxy)
-    time_taken = round(time.time() - start_time, 2)
-    cc_first = card_input.split('|')[0][:6] if '|' in card_input else card_input[:6]
-    brand, bin_type, level, bank, country, flag = await get_bin_info(cc_first)
-    status_emoji = "Approved! ✅" if msg == "Card Added" else ("Live! 🟡" if ("3DS" in msg or "Challenge" in msg) else "Declined! ❌")
-    res = format_anime_result(card_input, status_emoji, msg, "Stripe Auth 2", brand, bin_type, level, bank, country, flag, time_taken, event.sender)
-    await status_msg.edit(res, parse_mode="html")
+
 
 
 @bot.on(events.NewMessage(pattern=r'^/pp(?:\s+(.+))?$'))

