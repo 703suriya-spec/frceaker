@@ -797,18 +797,31 @@ def format_proxy_url(proxy: str | None) -> str:
 
 
 async def test_proxy(proxy: str):
-    """Robust fast proxy health check with multi-endpoint fallback"""
+    """Robust fast proxy health check with socks5h upgrade and target-level fallback"""
     proxy_url = format_proxy_url(proxy)
+    if not proxy_url:
+        return {"proxy": proxy, "status": "dead"}
+
+    if proxy_url.startswith("socks5://"):
+        proxy_url = proxy_url.replace("socks5://", "socks5h://")
+    elif proxy_url.startswith("socks4://"):
+        proxy_url = proxy_url.replace("socks4://", "socks4a://")
+
     try:
         from aiohttp_socks import ProxyConnector
         connector = ProxyConnector.from_url(proxy_url, verify_ssl=False)
-        timeout = aiohttp.ClientTimeout(total=5.0, connect=3.5)
+        timeout = aiohttp.ClientTimeout(total=8.0, connect=5.0)
         
         async with aiohttp.ClientSession(connector=connector, timeout=timeout) as session:
-            for check_url in ["http://api.ipify.org?format=json", "http://ip-api.com/json", "http://httpbin.org/ip"]:
+            for check_url in [
+                "https://api.stripe.com/v1/healthcheck",
+                "https://api.ipify.org?format=json",
+                "https://ip-api.com/json",
+                "http://httpbin.org/ip"
+            ]:
                 try:
                     async with session.get(check_url) as resp:
-                        if resp.status == 200:
+                        if resp.status in (200, 401, 404):
                             return {"proxy": proxy, "status": "alive"}
                 except Exception:
                     continue
@@ -1791,7 +1804,7 @@ async def process_st5_cmd(event):
     time_taken = round(time.time() - start_time, 2)
     brand, bin_type, level, bank, country, flag = await get_bin_info(cc[:6])
 
-    status_emoji = "Approved! ✅" if st in ("approved", "live") else ("Live! 🟡" if ("3DS" in msg or "Challenge" in msg) else "Declined! ❌")
+    status_emoji = "Approved! ✅" if st == "approved" else ("Live! 🟡" if st == "live" or "3DS" in msg or "Challenge" in msg else ("Error! ⚠️" if st == "error" else "Declined! ❌"))
     res = format_anime_result(f"{cc}|{mm}|{yy}|{cvc}", status_emoji, msg, "Stripe Auth 4", brand, bin_type, level, bank, country, flag, time_taken, event.sender)
     await status_msg.edit(res, parse_mode="html")
 

@@ -15,21 +15,28 @@ def _format_proxy(proxy: str | None) -> dict | None:
     if not proxy:
         return None
     p = str(proxy).strip()
+    formatted = None
     if p.startswith(("http://", "https://", "socks5://", "socks4://")):
-        return {"http": p, "https": p}
-    parts = p.split(":")
-    if len(parts) == 4:
-        if parts[1].isdigit():
-            formatted = f"http://{parts[2]}:{parts[3]}@{parts[0]}:{parts[1]}"
-        elif parts[3].isdigit():
-            formatted = f"http://{parts[0]}:{parts[1]}@{parts[2]}:{parts[3]}"
+        formatted = p
+    else:
+        parts = p.split(":")
+        if len(parts) == 4:
+            if parts[1].isdigit():
+                formatted = f"http://{parts[2]}:{parts[3]}@{parts[0]}:{parts[1]}"
+            elif parts[3].isdigit():
+                formatted = f"http://{parts[0]}:{parts[1]}@{parts[2]}:{parts[3]}"
+            else:
+                formatted = f"http://{parts[2]}:{parts[3]}@{parts[0]}:{parts[1]}"
+        elif len(parts) == 2:
+            formatted = f"http://{parts[0]}:{parts[1]}"
         else:
-            formatted = f"http://{parts[2]}:{parts[3]}@{parts[0]}:{parts[1]}"
-        return {"http": formatted, "https": formatted}
-    elif len(parts) == 2:
-        formatted = f"http://{parts[0]}:{parts[1]}"
-        return {"http": formatted, "https": formatted}
-    formatted = f"http://{p}"
+            formatted = f"http://{p}"
+
+    if formatted.startswith("socks5://"):
+        formatted = formatted.replace("socks5://", "socks5h://")
+    elif formatted.startswith("socks4://"):
+        formatted = formatted.replace("socks4://", "socks4a://")
+
     return {"http": formatted, "https": formatted}
 
 def check_card_nemaneide_sync(cc: str, mm: str, yy: str, cvv: str, proxy_url: str | None = None) -> tuple[str, str, str]:
@@ -156,8 +163,13 @@ def check_card_nemaneide_sync(cc: str, mm: str, yy: str, cvv: str, proxy_url: st
 
         return "declined", "Card Was Declined", brand
 
+    except requests.exceptions.RequestException as e:
+        err_str = str(e)
+        if "timeout" in err_str.lower() or "connection" in err_str.lower():
+            return "error", "Connection timed out (proxy / target error)", "UNKNOWN"
+        return "error", err_str[:80], "UNKNOWN"
     except Exception as e:
-        return "error", str(e), "UNKNOWN"
+        return "error", str(e)[:80], "UNKNOWN"
 
 async def check_card_nemaneide(cc: str, mm: str, yy: str, cvv: str, proxy_url: str | None = None) -> tuple[str, str, str]:
     return await asyncio.to_thread(check_card_nemaneide_sync, cc, mm, yy, cvv, proxy_url)

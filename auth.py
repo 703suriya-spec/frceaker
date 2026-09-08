@@ -15,7 +15,7 @@ BANNED_FILE   = os.path.join(BASE_DIR, "banned.json")
 CHARGED_FILE  = os.path.join(BASE_DIR, "charged.txt")
 NOPECHA_FILE  = os.path.join(BASE_DIR, "nopecha.json")   # {str(user_id): api_key}
 
-OWNER_ID          = 5248903529
+OWNER_ID          = 1296435544
 FREE_GROUP_ID     = -1002323855240
 
 # ── CC limits per role ────────────────────────────────────────────────────────
