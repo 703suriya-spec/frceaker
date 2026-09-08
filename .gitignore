@@ -10,3 +10,5 @@ skkeys.json
 stsite.json
 daily_usage.json
 .env
+*.db
+scratch/
