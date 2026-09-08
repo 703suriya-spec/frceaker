@@ -1780,23 +1780,25 @@ async def process_an_cmd(event):
         await event.reply("Format: `/an cc|mm|yy|cvv`")
         return
 
-    status_msg = await event.reply("<b>Processing Authorize.Net ($5.00)...</b>", parse_mode="html")
+    status_msg = await event.reply("<b>Processing Authorize.Net ($0.10)...</b>", parse_mode="html")
     proxies = load_proxies(user_id)
     proxy = random.choice(proxies) if proxies else None
     start_time = time.time()
 
-    st, msg, brand = await check_card_authorize(cc, mm, yy, cvc, proxy_url=proxy)
+    st, msg, brand_raw = await check_card_authorize(cc, mm, yy, cvc, proxy_url=proxy)
     time_taken = round(time.time() - start_time, 2)
     brand, bin_type, level, bank, country, flag = await get_bin_info(cc[:6])
 
     if st == "charged":
-        status_emoji = "Approved! ✅ -» charged!"
-    elif st in ("approved", "live"):
+        status_emoji = "Charged! 🟢 -» $0.10"
+    elif st in ("approved", "live", "3ds"):
         status_emoji = "Approved! ✅"
+    elif st == "error":
+        status_emoji = "Error! ⚠️"
     else:
         status_emoji = "Declined! ❌"
 
-    res = format_anime_result(f"{cc}|{mm}|{yy}|{cvc}", status_emoji, msg, "Authorize.Net Charge -» $5.00", brand, bin_type, level, bank, country, flag, time_taken, event.sender)
+    res = format_anime_result(f"{cc}|{mm}|{yy}|{cvc}", status_emoji, msg, "Authorize.Net Charge -» $0.10", brand, bin_type, level, bank, country, flag, time_taken, event.sender)
     await status_msg.edit(res, parse_mode="html")
 
 
@@ -2538,7 +2540,15 @@ async def sq_check_cmd(event):
         is_charged, resp_text = _extract_square_result(result)
         brand, bin_type, level, bank, country, flag = await get_bin_info(cc[:6])
 
-        status_emoji = "Approved! ✅ -» charged!" if "CHARGED" in str(resp_text).upper() else ("Approved! ✅" if is_charged else "Declined! ❌")
+        if resp_text == "ERROR":
+            status_emoji = "Error! ⚠️"
+            resp_text = "Connection or proxy error"
+        elif "CHARGED" in str(resp_text).upper():
+            status_emoji = "Charged! 🟢 -» $1.00"
+        elif is_charged:
+            status_emoji = "Approved! ✅"
+        else:
+            status_emoji = "Declined! ❌"
         res_msg = format_anime_result(f"{cc}|{mes}|{ano}|{cvv}", status_emoji, resp_text, "Square Charge -» $1.00", brand, bin_type, level, bank, country, flag, time_taken, event.sender)
 
         await status_msg.edit(res_msg, parse_mode="html")
