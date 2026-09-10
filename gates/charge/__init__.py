@@ -4,9 +4,7 @@ Charge Gates Package (13 Gates)
 from .shp10_shopify import check_card_shp10
 from .hg_hoshigaki import register_hoshigaki_gate
 from .st6_bloomerang import check_card_bloomerang
-from .br2_mixtape import check_card_mixtape
 from .br1_braintree import check_card as check_card_braintree_1
-from .pp2_lounsbury import check_card_paypal_lounsbury
 from .pp_paypal import check_card_paypal_aww
 from .fz_fatzebra import check_card_fz
 from .sq_square import process_square, _parse_square_url, _extract_square_result
@@ -21,9 +19,7 @@ __all__ = [
     "check_card_shp10",
     "register_hoshigaki_gate",
     "check_card_bloomerang",
-    "check_card_mixtape",
     "check_card_braintree_1",
-    "check_card_paypal_lounsbury",
     "check_card_paypal_aww",
     "check_card_fz",
     "process_square",
