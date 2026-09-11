@@ -153,7 +153,7 @@ async def check_card_payment_intent(
                 amount = pi_resp.get("amount", 0)
                 amount_str = f"${amount / 100:.2f}" if amount else "$1.00"
                 if st == "succeeded":
-                    return "charged", f"Charged! 🟢 -» {amount_str} (PI Confirmed)", brand
+                    return "charged", f"Charged! ✅ -» {amount_str} (PI Confirmed)", brand
                 if st in ("requires_action", "requires_source_action"):
                     return "live", "3D Secure Challenge Required (Card Live)", brand
                 if st == "requires_capture":

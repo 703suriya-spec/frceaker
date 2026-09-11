@@ -274,7 +274,7 @@ async def _check_single_target(gate: dict, cc: str, mm: str, yy: str, cvv: str, 
         p_status = payment_result.get("status") or payment_result.get("payment_status") or ""
 
         if p_status == "success" or co_resp.get("status") == "success" or "order_id" in co_resp:
-            return "charged", f"Charged! 🟢 -» {price_display} ({currency})", brand
+            return "charged", f"Charged! ✅ -» {price_display} ({currency})", brand
 
         msg = str(co_resp.get("message") or "")
         details_txt = json.dumps(payment_result.get("payment_details", []), ensure_ascii=False)

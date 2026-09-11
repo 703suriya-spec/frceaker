@@ -1582,7 +1582,7 @@ async def process_st6_cmd(event):
     time_taken = round(time.time() - start_time, 2)
     brand, bin_type, level, bank, country, flag = await get_bin_info(cc[:6])
     
-    status_emoji = "Charged! 🟢 -» $1.00" if st == "charged" else ("Approved! ✅" if st in ("approved", "live", "3ds") else "Declined! ❌")
+    status_emoji = "Charged! ✅ -» $1.00" if st == "charged" else ("Approved! ✅" if st in ("approved", "live", "3ds") else "Declined! ❌")
     res = format_anime_result(f"{cc}|{mm}|{yy}|{cvc}", status_emoji, msg, "Stripe Charge 4 -» $1.00", brand, bin_type, level, bank, country, flag, time_taken, event.sender)
     await status_msg.edit(res, parse_mode="html")
 
@@ -1618,7 +1618,7 @@ async def process_br1_cmd(event):
 
     time_taken = round(time.time() - start_time, 2)
     brand, bin_type, level, bank, country, flag = await get_bin_info(cc[:6])
-    status_emoji = "Charged! 🟢 -» $1.00" if st == "charged" else ("Approved! ✅" if st in ("approved", "live") else "Declined! ❌")
+    status_emoji = "Charged! ✅ -» $1.00" if st == "charged" else ("Approved! ✅" if st in ("approved", "live") else "Declined! ❌")
     res = format_anime_result(f"{cc}|{mm}|{yy}|{cvc}", status_emoji, msg, "Braintree Charge 2 -» $1.00", brand, bin_type, level, bank, country, flag, time_taken, event.sender)
     await status_msg.edit(res, parse_mode="html")
 
@@ -1681,17 +1681,18 @@ async def process_cl_cmd(event):
         return
     card_input = event.pattern_match.group(1)
     if not card_input:
-        await event.reply("Format: `/cl site_url|cc|mm|yy|cvv` or `/cl cc|mm|yy|cvv`")
-        return
-
-    parts = [p.strip() for p in card_input.split('|')]
-    if len(parts) >= 5:
-        site_url = parts[0]
-        cc, mm, yy, cvc = parts[1:5]
-    else:
         await event.reply("Format: `/cl site_url|cc|mm|yy|cvv`")
         return
-
+    try:
+        parts = card_input.split('|')
+        site_url = parts[0].strip()
+        cc = parts[1].strip()
+        mm = parts[2].strip()
+        yy = parts[3].strip()
+        cvc = parts[4].strip()
+    except IndexError:
+        await event.reply("Format: `/cl site_url|cc|mm|yy|cvv`")
+        return
 
     status_msg = await event.reply("<b>Processing Clover Gate...</b>", parse_mode="html")
     proxies = load_proxies(user_id)
@@ -1702,7 +1703,7 @@ async def process_cl_cmd(event):
     time_taken = round(time.time() - start_time, 2)
     brand, bin_type, level, bank, country, flag = await get_bin_info(cc[:6])
 
-    status_emoji = "Approved! ✅ -» charged!" if st == "charged" else ("Approved! ✅" if st in ("approved", "live") else "Declined! ❌")
+    status_emoji = "Charged! ✅ -» $1.00" if st == "charged" else ("Approved! ✅" if st in ("approved", "live") else "Declined! ❌")
     res = format_anime_result(f"{cc}|{mm}|{yy}|{cvc}", status_emoji, msg, "Clover Charge -» $1.00", brand, bin_type, level, bank, country, flag, time_taken, event.sender)
     await status_msg.edit(res, parse_mode="html")
 
@@ -1726,7 +1727,7 @@ async def process_an_cmd(event):
         await event.reply("Format: `/an cc|mm|yy|cvv`")
         return
 
-    status_msg = await event.reply("<b>Processing Authorize.Net ($0.10)...</b>", parse_mode="html")
+    status_msg = await event.reply("<b>Processing Authorize.Net Gate...</b>", parse_mode="html")
     proxies = load_proxies(user_id)
     proxy = random.choice(proxies) if proxies else None
     start_time = time.time()
@@ -1736,7 +1737,7 @@ async def process_an_cmd(event):
     brand, bin_type, level, bank, country, flag = await get_bin_info(cc[:6])
 
     if st == "charged":
-        status_emoji = "Charged! 🟢 -» $0.10"
+        status_emoji = "Charged! ✅ -» $0.10"
     elif st in ("approved", "live", "3ds"):
         status_emoji = "Approved! ✅"
     elif st == "error":
@@ -1792,7 +1793,7 @@ async def process_paypal_cmd(event):
     brand, bin_type, level, bank, country, flag = await get_bin_info(cc[:6])
 
     if st == "charged":
-        status_emoji = "Charged! 🟢 -» $1.00"
+        status_emoji = "Charged! ✅ -» $1.00"
     elif st in ("approved", "live", "3ds"):
         status_emoji = "Approved! ✅"
     elif st == "error":
@@ -2023,7 +2024,7 @@ async def process_shp10_cmd(event):
     is_live, status_str, response_str, raw = await check_card_shp10(cc, mm, yy, cvc, proxy_url=proxy)
     time_taken = round(time.time() - start_time, 2)
     brand, bin_type, level, bank, country, flag = await get_bin_info(cc[:6])
-    status_emoji = "Charged! 🟢 -» $10.00" if "CHARGED" in status_str else ("Approved! ✅" if is_live else "Declined! ❌")
+    status_emoji = "Charged! ✅ -» $10.00" if "CHARGED" in status_str else ("Approved! ✅" if is_live else "Declined! ❌")
     res = format_anime_result(f"{cc}|{mm}|{yy}|{cvc}", status_emoji, response_str, "Shopify Charge -» $10.00", brand, bin_type, level, bank, country, flag, time_taken, event.sender)
     await status_msg.edit(res, parse_mode="html")
 
@@ -2092,7 +2093,7 @@ async def process_autoshopify_cmd(event):
 
         st_lower = str(st).lower()
         if st_lower == 'charged' or "charged" in response_msg.lower():
-            status_emoji = "Charged! 🟢"
+            status_emoji = "Charged! ✅"
         elif st_lower == 'approved':
             if "3DS" in response_msg or "OTP" in response_msg:
                 status_emoji = "Live! 🟡"
@@ -2244,7 +2245,7 @@ async def process_ws_cmd(event):
 
         st_lower = str(st).lower()
         if st_lower == 'charged' or "charged" in response_msg.lower():
-            status_emoji = "Charged! 🟢"
+            status_emoji = "Charged! ✅"
         elif st_lower == 'approved':
             status_emoji = "Approved! ✅"
         elif st_lower == 'live' or "3ds" in response_msg.lower() or "challenge" in response_msg.lower():
@@ -2303,7 +2304,7 @@ async def process_fz_cmd(event):
     time_taken = round(time.time() - start_time, 2)
     brand, bin_type, level, bank, country, flag = await get_bin_info(cc[:6])
 
-    status_emoji = "Charged! 🟢 -» £4.00" if "CHARGED" in status_str else ("Approved! ✅" if is_live else "Declined! ❌")
+    status_emoji = "Charged! ✅ -» £4.00" if "CHARGED" in status_str else ("Approved! ✅" if is_live else "Declined! ❌")
     res = format_anime_result(f"{cc}|{mm}|{yy}|{cvc}", status_emoji, response_str, "FatZebra Charge -» £4.00", brand, bin_type, level, bank, country, flag, time_taken, event.sender)
     await status_msg.edit(res, parse_mode="html")
 
@@ -2607,7 +2608,7 @@ async def sq_check_cmd(event):
             status_emoji = "Error! ⚠️"
             resp_text = "Connection or proxy error"
         elif "CHARGED" in str(resp_text).upper():
-            status_emoji = "Charged! 🟢 -» $1.00"
+            status_emoji = "Charged! ✅ -» $1.00"
         elif is_charged:
             status_emoji = "Approved! ✅"
         else:
@@ -2679,9 +2680,9 @@ async def checker_menu_handler(event):
     gates_msg = """<b>Gates Menu</b>
 
 Browse the available categories:
-• <b>Auth Gates:</b> 7
-• <b>Charge Gates:</b> 18
-• <b>Mass Checker:</b> 7"""
+• <b>Auth Gates:</b> 5
+• <b>Charge Gates:</b> 12
+• <b>Mass Checker:</b> 5"""
 
     buttons = [
         [Button.inline("Auth Gates", b"auth_info"),
@@ -2734,18 +2735,18 @@ async def charge_info_handler(event):
     charge_msg = """<b>CHARGE GATES</b>
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 <b><i>Shopify Checkout (0.10$ - 20.00$)</i></b>
-<code>/sh cc|mm|yy|cvv</code> (or <code>/sho</code>)
+<code>/sh cc|mm|yy|cvv</code>
 
 <b><i>Woo Store API Direct (< $20.00)</i></b>
-<code>/ws cc|mm|yy|cvv</code> (or <code>/storeapi</code>)
+<code>/ws cc|mm|yy|cvv</code>
 
 <b><i>Shopify Charge ($10.00)</i></b>
 <code>/shp10 cc|mm|yy|cvv</code>
 
-<b><i>Stripe Charge 3 ($1.00)</i></b>
+<b><i>Stripe Charge 1 ($1.00)</i></b>
 <code>/hg cc|mm|yy|cvv</code>
 
-<b><i>Stripe Charge 4 ($1.00)</i></b>
+<b><i>Stripe Charge 2 ($1.00)</i></b>
 <code>/st6 cc|mm|yy|cvv</code>
 
 <b><i>Braintree Charge ($1.00)</i></b>
@@ -3139,12 +3140,13 @@ async def _run_generic_mass_check(event, gateway_name, check_func):
     charged = 0
     approved = 0
     declined = 0
+    captchas = 0
     errors = 0
     checked_count = 0
 
     session_id = ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
     start_time_ts = time.time()
-    proxy_status_str = "Live 🟢" if proxies else "Direct ⚪"
+    proxy_status_str = "Live" if proxies else "Direct"
 
     paused_evt = asyncio.Event()
     paused_evt.set()
@@ -3154,7 +3156,7 @@ async def _run_generic_mass_check(event, gateway_name, check_func):
         "user_id": user_id
     }
 
-    def make_progress_bar(pct, length=20):
+    def make_progress_bar(pct, length=15):
         filled = int(length * pct / 100)
         return "[" + "=" * filled + " " * (length - filled) + "]"
 
@@ -3167,22 +3169,20 @@ async def _run_generic_mass_check(event, gateway_name, check_func):
     ]
 
     initial_pbar = make_progress_bar(0)
-    status_msg = await event.reply(f"""<b>陣 𝙈𝙖𝙨𝙨 𝘾𝙝𝙚𝙘𝙠𝙚𝙧 𝙃𝙐𝘿</b>
-━━━━━━━━━━━━━━━━━━━━
-<b>門 𝙂𝙖𝙩𝙚𝙬𝙖𝙮</b> -» {gateway_name}
-<b>態 𝙎𝙩𝙖𝙩𝙪𝙨</b> -» <code>CHECKING</code> ⚡
-<b>式 𝙈𝙤𝙙𝙚</b> -» Approved + Charged
-
-<b>進 𝙋𝙧𝙤𝙜𝙧𝙚𝙨s</b>
+    status_msg = await event.reply(f"""<b>門 𝙂𝙖𝙩𝙚𝙬𝙖𝙮</b> -» {gateway_name}
+<b>態 𝙎𝙩𝙖𝙩𝙪𝙨</b> -» <code>CHECKING</code>
+━━━━━━━━━━━━━━━━
+<b>進 𝙋𝙧𝙤𝙜𝙧𝙚𝙨𝙨</b>
 {initial_pbar} <b>0%</b>
 <b>総 𝘾𝙝𝙚𝙘𝙠𝙚𝙙</b> -» <code>0 / {total}</code>
-<b>承 𝘼𝙥𝙥𝙧𝙤𝙫𝙚𝙙</b> -» <code>0</code> ✅
-<b>金 𝘾𝙝𝙖𝙧𝙜𝙚𝙙</b> -» <code>0</code> 🟢
-<b>否 𝘿𝙚𝙘𝙡𝙞𝙣𝙚𝙙</b> -» <code>0</code> ❌
-<b>障 𝙀𝙧𝙧𝙤𝙧𝙨</b> -» <code>0</code> ⚠️
+<b>承 𝘼𝙥𝙥𝙧𝙤𝙫𝙚𝙙</b> -» <code>0</code>
+<b>金 𝘾𝙝𝙖𝙧𝙜𝙚𝙙</b> -» <code>0</code> ✅
+<b>否 𝘿𝙚𝙘𝙡𝙞𝙣𝙚𝙙</b> -» <code>0</code>
+<b>防 𝘾𝙖𝙥𝙩𝙘𝙝𝙖</b> -» <code>0</code>
+<b>障 𝙀𝙧𝙧𝙤𝙧𝙨</b> -» <code>0</code>
 <b>時 𝙏𝙞𝙢𝙚</b> -» <code>0s</code>
 <b>網 𝙋𝙧𝙤𝙭𝙞𝙚𝙨</b> -» <code>{proxy_status_str}</code>
-━━━━━━━━━━━━━━━━━━━━""", buttons=control_buttons, parse_mode="html")
+━━━━━━━━━━━━━━━━""", buttons=control_buttons, parse_mode="html")
 
     is_running = True
 
@@ -3203,19 +3203,19 @@ async def _run_generic_mass_check(event, gateway_name, check_func):
                 current_st = sess_info.get("status", "CHECKING")
 
                 progress_ui = f"""<b>門 𝙂𝙖𝙩𝙚𝙬𝙖𝙮</b> -» {gateway_name}
-<b>態 𝙎𝙩𝙖𝙩𝙪𝙨</b> -» <code>{current_st}</code> ⚡
-<b>式 𝙈𝙤𝙙𝙚</b> -» Approved + Charged
-
+<b>態 𝙎𝙩𝙖𝙩𝙪𝙨</b> -» <code>{current_st}</code>
+━━━━━━━━━━━━━━━━
 <b>進 𝙋𝙧𝙤𝙜𝙧𝙚𝙨𝙨</b>
 {pbar} <b>{pct}%</b>
 <b>総 𝘾𝙝𝙚𝙘𝙠𝙚𝙙</b> -» <code>{checked_count} / {total}</code>
 <b>承 𝘼𝙥𝙥𝙧𝙤𝙫𝙚𝙙</b> -» <code>{approved}</code>
 <b>金 𝘾𝙝𝙖𝙧𝙜𝙚𝙙</b> -» <code>{charged}</code> ✅
 <b>否 𝘿𝙚𝙘𝙡𝙞𝙣𝙚𝙙</b> -» <code>{declined}</code>
+<b>防 𝘾𝙖𝙥𝙩𝙘𝙝𝙖</b> -» <code>{captchas}</code>
 <b>障 𝙀𝙧𝙧𝙤𝙧𝙨</b> -» <code>{errors}</code>
 <b>時 𝙏𝙞𝙢𝙚</b> -» <code>{time_str}</code>
 <b>網 𝙋𝙧𝙤𝙭𝙞𝙚𝙨</b> -» <code>{proxy_status_str}</code>
-━━━━━━━━━━━━━━━━━━━━"""
+━━━━━━━━━━━━━━━━"""
                 await status_msg.edit(progress_ui, buttons=control_buttons, parse_mode="html")
             except Exception:
                 pass
@@ -3224,7 +3224,7 @@ async def _run_generic_mass_check(event, gateway_name, check_func):
     sem = asyncio.Semaphore(10)
 
     async def worker(card):
-        nonlocal checked_count, charged, approved, declined, errors
+        nonlocal checked_count, charged, approved, declined, captchas, errors
         sess_info = MASS_SESSIONS.get(session_id)
         if not sess_info or sess_info.get("status") == "STOPPED":
             return
@@ -3242,16 +3242,26 @@ async def _run_generic_mass_check(event, gateway_name, check_func):
                 proxy = random.choice(proxies) if proxies else None
                 st, msg, brand = await check_func(card, proxy)
                 st_lower = str(st).lower()
+                msg_lower = str(msg).lower()
+
+                is_captcha = any(k in msg_lower or k in st_lower for k in (
+                    "captcha", "recaptcha", "hcaptcha", "turnstile",
+                    "cloudflare", "cf_challenge", "cf_blocked", "datadome",
+                    "perimeterx", "bot challenge", "bot protection",
+                    "bot detected", "security check", "checkpoint",
+                    "human verification", "solve_puzzle"
+                ))
 
                 if st_lower in ('charged', 'approved', 'live'):
                     if st_lower == 'charged':
                         charged += 1
+                        status_emoji = "Charged! ✅"
                     else:
                         approved += 1
+                        status_emoji = "Approved! ✅"
 
                     cc_num = card.split('|')[0]
                     bin_brand, bin_type, level, bank, country, flag = await get_bin_info(cc_num[:6])
-                    status_emoji = "Approved! ✅ -» charged!" if st_lower == 'charged' else "Approved! ✅"
                     hit_msg = format_anime_result(card, status_emoji, msg, gateway_name, bin_brand or brand, bin_type, level, bank, country, flag, "Live", event.sender)
                     await event.reply(hit_msg, parse_mode="html")
 
@@ -3259,6 +3269,8 @@ async def _run_generic_mass_check(event, gateway_name, check_func):
                         await bot.send_message("Fchker", hit_msg, parse_mode="html")
                     except Exception:
                         pass
+                elif is_captcha:
+                    captchas += 1
                 elif st_lower in ('error', 'timeout'):
                     errors += 1
                 else:
@@ -3282,16 +3294,16 @@ async def _run_generic_mass_check(event, gateway_name, check_func):
         final_st = "COMPLETE"
 
     final_ui = f"""<b>門 𝙂𝙖𝙩𝙚𝙬𝙖𝙮</b> -» {gateway_name}
-<b>態 𝙎𝙩𝙖𝙩𝙪𝙨</b> -» <code>{final_st}</code> 💠
-<b>式 𝙈𝙤𝙙𝙚</b> -» Approved + Charged
-
+<b>態 𝙎𝙩𝙖𝙩𝙪𝙨</b> -» <code>{final_st}</code>
+━━━━━━━━━━━━━━━━
 <b>総 𝘾𝙝𝙚𝙘𝙠𝙚𝙙</b> -» <code>{checked_count} / {total}</code>
 <b>承 𝘼𝙥𝙥𝙧𝙤𝙫𝙚𝙙</b> -» <code>{approved}</code>
 <b>金 𝘾𝙝𝙖𝙧𝙜𝙚𝙙</b> -» <code>{charged}</code> ✅
 <b>否 𝘿𝙚𝙘𝙡𝙞𝙣𝙚𝙙</b> -» <code>{declined}</code>
+<b>防 𝘾𝙖𝙥𝙩𝙘𝙝𝙖</b> -» <code>{captchas}</code>
 <b>障 𝙀𝙧𝙧𝙤𝙧𝙨</b> -» <code>{errors}</code>
 <b>時 𝙏𝙞𝙢𝙚</b> -» <code>{time_str}</code>
-━━━━━━━━━━━━━━━━━━━━"""
+━━━━━━━━━━━━━━━━"""
 
     try:
         await status_msg.edit(final_ui, buttons=[], parse_mode="html")

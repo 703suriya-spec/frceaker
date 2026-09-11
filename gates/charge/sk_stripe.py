@@ -236,7 +236,7 @@ async def check_card_sk(cc, mm, yy, cvc, sk_key=None, pk_key=None, proxy_url=Non
 
         res_lower = str(res_str).lower()
         if 'charged' in res_lower or 'succeeded' in res_lower:
-            return True, 'Charged! 🟢', res_str, res_str
+            return True, 'Charged! ✅', res_str, res_str
         elif 'cvv live' in res_lower or 'insufficient' in res_lower or 'approved' in res_lower:
             return True, 'Approved! ✅', res_str, res_str
         elif '3d secure' in res_lower:

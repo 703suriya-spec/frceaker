@@ -206,7 +206,7 @@ def register_hoshigaki_gate(bot, is_admin_fn, load_proxies_fn, extract_cc_fn, ge
         time_taken = round(time.time() - start_time, 2)
         brand, bin_type, level, bank, country, flag = await get_bin_info_fn(cc[:6])
 
-        status_emoji = "Approved! ✅ -» charged!" if "CHARGED" in status_str else ("Declined! ❌ -» 3DS Required" if "3DS" in status_str else ("Approved! ✅" if is_live else "Declined! ❌"))
+        status_emoji = "Charged! ✅ -» $1.00" if "CHARGED" in status_str else ("Declined! ❌ -» 3DS Required" if "3DS" in status_str else ("Approved! ✅" if is_live else "Declined! ❌"))
 
         user_tag = ""
         if event.sender:
