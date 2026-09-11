@@ -19,7 +19,7 @@ from urllib.parse import urlparse, parse_qs
 
 
 
-MAX_PRODUCT_PRICE = 60.00
+MAX_PRODUCT_PRICE = 5.00
 CARDS_FILE = "cards.txt"
 
 
@@ -181,7 +181,7 @@ def normalize_response(raw_msg):
 _PRODUCT_CACHE = {}
 
 
-async def fetch_cheapest_product(domain, proxy_str=None, max_price=1000.00):
+async def fetch_cheapest_product(domain, proxy_str=None, max_price=MAX_PRODUCT_PRICE):
     """Fetch the cheapest available product from a Shopify store using fast multi-endpoint retrieval."""
     if not domain.startswith("http"):
         domain = "https://" + domain
@@ -230,7 +230,7 @@ async def fetch_cheapest_product(domain, proxy_str=None, max_price=1000.00):
                             price = float(variant.get("price", "0"))
                         except (ValueError, TypeError):
                             continue
-                        if price <= 0:
+                        if price <= 0 or price > max_price:
                             continue
                         if price < best_price:
                             best_price = price
