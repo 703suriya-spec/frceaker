@@ -15,7 +15,7 @@ from aiohttp_socks import ProxyConnector
 
 from helpers import classify_gate_response
 
-HTTP_TIMEOUT = aiohttp.ClientTimeout(total=25, connect=10)
+HTTP_TIMEOUT = aiohttp.ClientTimeout(total=15, connect=8)
 
 USER_AGENTS = [
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
@@ -225,22 +225,19 @@ async def check_card(
                 "x-api-key": API_KEY,
             }
             cart_token = None
-            for attempt in range(2):
-                try:
-                    async with session.post(
-                        "https://vitabase.com/headless-api/cart/create",
-                        headers=api_headers,
-                        json={"user_id": "guest"},
-                    ) as create_resp:
-                        try:
-                            create_data = await create_resp.json()
-                        except:
-                            create_data = {}
-                        cart_token = create_data.get("cart_token") or (create_data.get("data") or {}).get("cart_token")
-                        if cart_token:
-                            break
-                except Exception:
-                    pass
+            try:
+                async with session.post(
+                    "https://vitabase.com/headless-api/cart/create",
+                    headers=api_headers,
+                    json={"user_id": "guest"},
+                ) as create_resp:
+                    try:
+                        create_data = await create_resp.json()
+                    except:
+                        create_data = {}
+                    cart_token = create_data.get("cart_token") or (create_data.get("data") or {}).get("cart_token")
+            except Exception:
+                pass
 
             if not cart_token:
                 return "error", "Merchant Cart API Unavailable", "cart_fail"
@@ -262,22 +259,19 @@ async def check_card(
 
             client_token = None
             bt_data = {}
-            for attempt in range(2):
-                try:
-                    async with session.get(
-                        "https://vitabase.com/headless-api/braintree/client-token",
-                        headers=api_headers,
-                    ) as bt_resp:
-                        if bt_resp.status == 200:
-                            try:
-                                bt_data = await bt_resp.json()
-                            except:
-                                bt_data = {}
-                            client_token = bt_data.get("client_token")
-                            if client_token:
-                                break
-                except Exception:
-                    pass
+            try:
+                async with session.get(
+                    "https://vitabase.com/headless-api/braintree/client-token",
+                    headers=api_headers,
+                ) as bt_resp:
+                    if bt_resp.status == 200:
+                        try:
+                            bt_data = await bt_resp.json()
+                        except:
+                            bt_data = {}
+                        client_token = bt_data.get("client_token")
+            except Exception:
+                pass
 
             if not client_token:
                 return "error", "Merchant Tokenization Unavailable", "bt_token_fail"

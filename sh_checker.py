@@ -178,11 +178,20 @@ def normalize_response(raw_msg):
     return "CARD_DECLINED"
 
 
+_PRODUCT_CACHE = {}
+
+
 async def fetch_cheapest_product(domain, proxy_str=None, max_price=1000.00):
     """Fetch the cheapest available product from a Shopify store using fast multi-endpoint retrieval."""
     if not domain.startswith("http"):
         domain = "https://" + domain
     domain = domain.rstrip("/")
+
+    cached = _PRODUCT_CACHE.get(domain)
+    if cached:
+        c_prod, c_time = cached
+        if time.time() - c_time < 900:
+            return c_prod, None
 
     proxy = parse_proxy(proxy_str) if proxy_str else None
     proxies = {"http": proxy, "https": proxy} if proxy else None
@@ -234,6 +243,7 @@ async def fetch_cheapest_product(domain, proxy_str=None, max_price=1000.00):
                             }
 
                 if best:
+                    _PRODUCT_CACHE[domain] = (best, time.time())
                     return best, None
         except Exception:
             continue
@@ -241,7 +251,7 @@ async def fetch_cheapest_product(domain, proxy_str=None, max_price=1000.00):
     return None, "No available in-stock products found"
 
 
-async def validate_card(cc, month, year, cvv, site_url, variant_id=None, proxy_str=None, max_retries=3):
+async def validate_card(cc, month, year, cvv, site_url, variant_id=None, proxy_str=None, max_retries=1):
     """
     Validate a card against a Shopify store with retries.
     Uses curl_cffi with Chrome impersonation to bypass Shopify bot detection.
@@ -979,7 +989,7 @@ def extract_clean_response(message):
     msg = str(message).strip()
     return msg
 
-async def process_card(cc, mes, ano, cvv, site_url, variant_id=None, proxy_str=None, max_retries=2):
+async def process_card(cc, mes, ano, cvv, site_url, variant_id=None, proxy_str=None, max_retries=1):
     res = await validate_card(cc, mes, ano, cvv, site_url, variant_id=variant_id, proxy_str=proxy_str, max_retries=max_retries)
     status_str = res.get('Response', 'ERROR')
     is_charged = res.get('Charged') == 'True'

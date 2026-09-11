@@ -73,7 +73,8 @@ from gates.mass import (
     check_card_msh,
     run_mst6,
     check_card_mass3,
-    run_mbt1
+    run_mbt1,
+    run_mpp2
 )
 
 

